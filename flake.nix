@@ -82,6 +82,7 @@
                 name = "x";
                 home = "/Users/x";
               };
+              nixpkgs.hostPlatform = "x86_64-darwin";
             })
             ./nix-darwin/configuration.nix
             ./nix-darwin/linuxBuilder.nix
@@ -108,6 +109,7 @@
                 name = "cody";
                 home = "/Users/cody";
               };
+              nixpkgs.hostPlatform = "x86_64-darwin";
             })
             ./nix-darwin/configuration.nix
             ./nix-darwin/linuxBuilder.nix

@@ -37,6 +37,7 @@
     system = "x86_64-linux";
     maxJobs = 4;
     supportedFeatures = [ "nixos-test" "benchmark" "big-parallel" "kvm" ];
+    protocol = "ssh-ng";
   }];
 
   environment.etc."nix/ssh_config.d/linux-builder".text = ''

@@ -89,7 +89,7 @@ in
     #   org.gradle.console=verbose
     #   org.gradle.daemon.idletimeout=3600000
     # '';
-    "${cache-home}/nix/current-home-flake".source = ./.;
+    "${cache-home}/nix/current-home-flake".source = ../.;
   };
 
 

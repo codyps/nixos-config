@@ -124,6 +124,49 @@
             }
           ];
         };
-      }
+      } // (
+        let
+          system = "x86_64-linux";
+          pkgs = (import nixpkgs {
+            inherit system;
+            overlays = [
+              (final: prev: {
+                targo = targo.packages.${system}.default;
+                nvim-send = (import ../nixpkgs/pkgs/nvim-send.nix {
+                  inherit (prev) rustPlatform fetchFromGitHub lib;
+                });
+              })
+            ];
+          });
+        in
+        {
+
+          # chromeos
+          homeConfigurations."cody@penguin" = home-manager.lib.homeManagerConfiguration {
+            inherit pkgs;
+
+            modules = [
+              ({ ... }: {
+                home.username = "cody";
+                home.homeDirectory = "/home/cody";
+              })
+              ./home-manager/home.nix
+            ];
+          };
+
+          # vm on x-mbp
+          homeConfigurations."x@adams" = home-manager.lib.homeManagerConfiguration {
+            inherit pkgs;
+
+            modules = [
+              ({ ... }: {
+                home.username = "x";
+                home.homeDirectory = "/home/x";
+              })
+              ./home-manager/home.nix
+            ];
+          };
+        }
+      )
     );
 }

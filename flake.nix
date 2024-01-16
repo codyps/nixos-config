@@ -8,6 +8,7 @@
     home-manager.inputs.nixpkgs.follows = "nixpkgs";
     targo.url = "github:jmesmon/targo";
     targo.inputs.nixpkgs.follows = "nixpkgs";
+    targo.inputs.flake-utils.follows = "flake-utils";
   };
 
   outputs = { self, nixpkgs, flake-utils, targo, nix-darwin, home-manager }:
@@ -81,8 +82,8 @@
                 home = "/Users/x";
               };
             })
-            ./configuration.nix
-            ./linuxBuilder.nix
+            ./nix-darwin/configuration.nix
+            ./nix-darwin/linuxBuilder.nix
             home-manager.darwinModules.home-manager
             {
               nixpkgs = nixpkgsConfig;
@@ -90,8 +91,8 @@
               home-manager.useUserPackages = true;
               home-manager.users.x = {
                 imports = [
-                  ./home.nix
-                  ../home-manager/home.nix
+                  ./nix-darwin/home.nix
+                  ./home-manager/home.nix
                 ];
               };
             }
@@ -107,8 +108,8 @@
                 home = "/Users/cody";
               };
             })
-            ./configuration.nix
-            ./linuxBuilder.nix
+            ./nix-darwin/configuration.nix
+            ./nix-darwin/linuxBuilder.nix
             home-manager.darwinModules.home-manager
             {
               nixpkgs = nixpkgsConfig;
@@ -116,8 +117,8 @@
               home-manager.useUserPackages = true;
               home-manager.users.cody = {
                 imports = [
-                  ./home.nix
-                  ../home-manager/home.nix
+                  ./nix-darwin/home.nix
+                  ./home-manager/home.nix
                 ];
               };
             }

@@ -12,16 +12,16 @@
   };
 
   outputs = { self, nixpkgs, flake-utils, targo, nix-darwin, home-manager }:
-  let
-    overlays = [
-      (final: prev: {
-        targo = targo.packages.${prev.system}.default;
-        nvim-send = (import ./nixpkgs/pkgs/nvim-send.nix {
-          inherit (prev) rustPlatform fetchFromGitHub lib;
-        });
-      })
-    ];
-  in
+    let
+      overlays = [
+        (final: prev: {
+          targo = targo.packages.${prev.system}.default;
+          nvim-send = (import ./nixpkgs/pkgs/nvim-send.nix {
+            inherit (prev) rustPlatform fetchFromGitHub lib;
+          });
+        })
+      ];
+    in
     flake-utils.lib.eachDefaultSystem
       (system:
         let
@@ -41,6 +41,7 @@
           config.allowUnfreePredicate = pkg: builtins.elem (getName pkg) [
             "vscode"
           ];
+          inherit overlays;
         };
       in
       {

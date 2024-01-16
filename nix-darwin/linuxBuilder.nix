@@ -11,7 +11,11 @@ let
     configuration = ({ modulesPath, lib, ... }: {
       imports = [ "${modulesPath}/profiles/macos-builder.nix" ];
       virtualisation = {
-        host.pkgs = pkgs;
+        # FIXME: this _appears_ to result in using our modified (overlayed)
+        # nixpkgs, which then forces a rebuild, which requires we have a
+        # running linux builder. Non-ideal. Need to find a way to get the
+        # non-overlayed nixpkgs.
+        #host.pkgs = pkgs;
         darwin-builder.workingDirectory = dataDir;
       };
     });

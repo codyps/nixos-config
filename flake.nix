@@ -12,27 +12,27 @@
   };
 
   outputs = { self, nixpkgs, flake-utils, targo, nix-darwin, home-manager }:
+  let
+    overlays = [
+      (final: prev: {
+        targo = targo.packages.${prev.system}.default;
+        nvim-send = (import ./nixpkgs/pkgs/nvim-send.nix {
+          inherit (prev) rustPlatform fetchFromGitHub lib;
+        });
+      })
+    ];
+  in
     flake-utils.lib.eachDefaultSystem
       (system:
         let
           pkgs = import nixpkgs {
             inherit system;
+            inherit overlays;
           };
-          overlays = self.overlays;
-
         in
         {
           formatter = pkgs.nixpkgs-fmt;
-          overlays = [
-            (final: prev: {
-              targo = targo.packages.${prev.system}.default;
-              nvim-send = (import ../nixpkgs/pkgs/nvim-send.nix {
-                inherit (prev) rustPlatform fetchFromGitHub lib;
-              });
-            })
-          ];
         }
-
       ) //
     (
       let
@@ -129,14 +129,7 @@
           system = "x86_64-linux";
           pkgs = (import nixpkgs {
             inherit system;
-            overlays = [
-              (final: prev: {
-                targo = targo.packages.${system}.default;
-                nvim-send = (import ../nixpkgs/pkgs/nvim-send.nix {
-                  inherit (prev) rustPlatform fetchFromGitHub lib;
-                });
-              })
-            ];
+            inherit overlays;
           });
         in
         {

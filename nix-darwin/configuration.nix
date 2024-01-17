@@ -26,11 +26,12 @@
   services.nix-daemon.enable = true;
   # nix.package = pkgs.nix;
 
-
-  # Necessary for using flakes on this system.
-  nix.settings.experimental-features = "nix-command flakes";
-
-  nix.settings.trusted-users = [ "root" "@admin" ];
+  nix.settings = {
+    experimental-features = "nix-command flakes repl-flake";
+    max-jobs = "auto";
+    extra-nix-path = "nixpkgs=flake:nixpkgs";
+    trusted-users = [ "root" "@admin" ];
+  };
 
   nix.buildMachines = [{
     hostName = "arnold";

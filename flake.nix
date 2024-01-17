@@ -110,6 +110,10 @@
                 home = "/Users/cody";
               };
               nixpkgs.hostPlatform = "x86_64-darwin";
+              nix.settings.use-case-hack = false;
+              nix.extraOptions = ''
+                #upgrade-nix-store-path-url = "https://install.determinate.systems/nix-upgrade/stable/universal";
+              '';	
             })
             ./nix-darwin/configuration.nix
             ./nix-darwin/linuxBuilder.nix

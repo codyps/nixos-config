@@ -110,9 +110,6 @@
                 home = "/Users/cody";
               };
               nixpkgs.hostPlatform = "x86_64-darwin";
-              nix.extraOptions = ''
-                use-case-hack = false
-              '';
             })
             ./nix-darwin/configuration.nix
             ./nix-darwin/linuxBuilder.nix

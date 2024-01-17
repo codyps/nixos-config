@@ -301,7 +301,7 @@
     KERNEL=="sd[a-z]*[0-9]*|mmcblk[0-9]*p[0-9]*|nvme[0-9]*n[0-9]*p[0-9]*|xvd[a-z]*[0-9]*", ENV{ID_FS_TYPE}=="zfs_member", ATTR{../queue/scheduler}="none"
   '';
 
-  system.extraSystemBuilderCmds = "ln -s ${../.} $out/full-config";
+  system.extraSystemBuilderCmds = "ln -s ${./.} $out/full-config";
 
   # This value determines the NixOS release from which the default
   # settings for stateful data, like file locations and database versions

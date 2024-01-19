@@ -127,6 +127,34 @@
             }
           ];
         };
+
+	darwinConfigurations."RIV-992348M" = nix-darwin.lib.darwinSystem {
+          specialArgs = { inherit self; };
+          modules = [
+            ({ ... }: {
+              users.users.codyschafer = {
+                name = "codyschafer";
+                home = "/Users/codyschafer";
+              };
+              nixpkgs.hostPlatform = "aarch64-darwin";
+            })
+            ./nix-darwin/configuration.nix
+            ./nix-darwin/linuxBuilder.nix
+            home-manager.darwinModules.home-manager
+            {
+              nixpkgs = nixpkgsConfig;
+              home-manager.useGlobalPkgs = true;
+              home-manager.useUserPackages = true;
+              home-manager.users.codyschafer = {
+                imports = [
+                  ./nix-darwin/home.nix
+                  ./home-manager/home.nix
+                ];
+              };
+            }
+          ];
+        };
+
       } // (
         let
           system = "x86_64-linux";

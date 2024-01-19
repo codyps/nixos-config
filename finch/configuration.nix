@@ -223,8 +223,7 @@
 
   users.mutableUsers = false;
   users.defaultUserShell = pkgs.zsh;
-  users.users.root = {
-  };
+  users.users.root = { };
   users.users.cody = {
     isNormalUser = true;
     extraGroups = [ "wheel" ];

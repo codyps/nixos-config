@@ -141,8 +141,7 @@
     defaultUserShell = pkgs.zsh;
     mutableUsers = false;
     users = {
-      root = {
-      };
+      root = { };
 
       y = {
         createHome = true;

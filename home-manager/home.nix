@@ -69,6 +69,9 @@ in
     pkgs.watch
     pkgs.xsv
     pkgs.yt-dlp
+
+    pkgs.krew
+    pkgs.kubectl
   ];
 
   programs.direnv = {

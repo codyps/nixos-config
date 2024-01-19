@@ -143,6 +143,7 @@
               nixpkgs.hostPlatform = "aarch64-darwin";
               nix.settings.use-case-hack = false;
               nix.extraOptions = ''
+                bash-prompt-prefix = (nix:$name)\040
                 #upgrade-nix-store-path-url = "https://install.determinate.systems/nix-upgrade/stable/universal";
               '';
             })

@@ -187,6 +187,19 @@
             ];
           };
 
+          # arnold
+          homeConfigurations."y@arnold" = home-manager.lib.homeManagerConfiguration {
+            inherit pkgs;
+
+            modules = [
+              ({ ... }: {
+                home.username = "y";
+                home.homeDirectory = "/home/y";
+              })
+              ./home-manager/home.nix
+            ];
+          };
+
           # vm on x-mbp
           homeConfigurations."x@adams" = home-manager.lib.homeManagerConfiguration {
             inherit pkgs;

@@ -16,9 +16,6 @@
       overlays = [
         (final: prev: {
           targo = targo.packages.${prev.system}.default;
-          nvim-send = (import ./nixpkgs/pkgs/nvim-send.nix {
-            inherit (prev) rustPlatform fetchFromGitHub lib;
-          });
         })
       ];
     in
@@ -53,6 +50,14 @@
               (import ./trunix/configuration.nix)
             ];
           };
+
+          # work utm vm
+	  maclay = nixpkgs.lib.nixosSystem {
+	    system = "aarch64-linux";
+	    modules = [
+	      (import ./maclay/configuration.nix)
+	    ];
+	  };
 
           # x-mbp vmware vm
           adams = nixpkgs.lib.nixosSystem {

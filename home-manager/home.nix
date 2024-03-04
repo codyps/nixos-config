@@ -53,7 +53,6 @@ in
     pkgs.ncdu
     pkgs.neovim
     pkgs.nodejs
-    pkgs.nvim-send
     pkgs.openssh
     pkgs.rclone
     pkgs.ripgrep

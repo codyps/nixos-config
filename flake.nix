@@ -16,9 +16,6 @@
       overlays = [
         (final: prev: {
           targo = targo.packages.${prev.system}.default;
-          nvim-send = (import ./nixpkgs/pkgs/nvim-send.nix {
-            inherit (prev) rustPlatform fetchFromGitHub lib;
-          });
         })
       ];
     in

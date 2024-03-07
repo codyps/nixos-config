@@ -24,6 +24,8 @@
 
   environment.shells = with pkgs; [ zsh ];
 
+  services.qemuGuest.enable = true;
+
   # Use the systemd-boot EFI boot loader.
   boot.loader.systemd-boot.enable = true;
   boot.loader.efi.canTouchEfiVariables = true;
@@ -47,7 +49,12 @@
     libinput.enable = true;
     desktopManager.xterm.enable = false;
 
-    displayManager.defaultSession = "none+i3";
+    displayManager = {
+      defaultSession = "none+i3";
+      sessionCommands = ''
+        ${pkgs.xorg.xrandr}/bin/xrandr -s 1920x1080
+      '';
+    };
 
     windowManager.i3 = {
        enable = true;
@@ -77,6 +84,7 @@
        kitty
        neovim
     ];
+    shell = pkgs.zsh;
   };
 
   environment.systemPackages = with pkgs; [
@@ -91,6 +99,16 @@
   };
 
   services.openssh.enable = true;
+
+  services.avahi = {
+    enable = true;
+    nssmdns4 = true;
+    publish = {
+      enable = true;
+      addresses = true;
+      workstation = true;
+    };
+  };
 
   # Open ports in the firewall.
   # networking.firewall.allowedTCPPorts = [ ... ];

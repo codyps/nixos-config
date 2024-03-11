@@ -90,12 +90,16 @@
   environment.systemPackages = with pkgs; [
      neovim 
      wget
+     pinentry-curses
   ];
 
   programs.mtr.enable = true;
   programs.gnupg.agent = {
     enable = true;
     enableSSHSupport = true;
+
+    # Added to get prompted on ssh?
+    pinentryFlavor = "gtk2";
   };
 
   services.openssh.enable = true;

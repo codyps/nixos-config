@@ -99,7 +99,7 @@
     enableSSHSupport = true;
 
     # Added to get prompted on ssh?
-    pinentryFlavor = "gtk2";
+    pinentryPackage = lib.mkForce pkgs.pinentry-gtk2;
   };
 
   services.openssh.enable = true;

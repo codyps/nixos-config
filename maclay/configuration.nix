@@ -14,11 +14,28 @@
     package = pkgs.nixFlakes;
     settings = {
       experimental-features = [ "nix-command" "flakes" ];
+      trusted-users = ["nix-ssh"];
     };
     gc = {
       automatic = true;
       dates = "weekly";
       options = "--delete-older-than 30d";
+    };
+    #buildMachines = [
+    #  {
+    #    hostname = "RIV-066789M";
+    #    system = "aarch64-darwin";
+    #    maxJobs = 8;
+    #    speedFactor = 1;
+    #  }
+    #];
+    #distributedBuilds = true;
+    sshServe = {
+      enable = true;
+      write = true;
+      keys = [
+        
+      ];
     };
   };
 
@@ -82,7 +99,6 @@
     packages = with pkgs; [
        firefox
        kitty
-       neovim
     ];
     shell = pkgs.zsh;
   };
@@ -91,6 +107,7 @@
      neovim 
      wget
      pinentry-curses
+     xclip
   ];
 
   programs.mtr.enable = true;

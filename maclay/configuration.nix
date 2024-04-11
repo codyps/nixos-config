@@ -29,6 +29,7 @@
     sshServe = {
       enable = true;
       write = true;
+      protocol = "ssh-ng";
       keys = [
         "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAINnPgVJMpHAMdQ8M87JtufVrZ833hgROViMEexg+sBp6 root@RIV-066789M"
         "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIMTg+MBb/ao0R1kBP5mHosOPADfy/4x2yKuQPx2c72Ie root@RIV-066789M"

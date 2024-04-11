@@ -153,7 +153,19 @@
               '';
             })
             ./nix-darwin/configuration.nix
-            ./nix-darwin/linuxBuilder.nix
+            #./nix-darwin/linuxBuilder.nix
+            ({...}: {
+              nix.buildMachines = [{
+                sshUser = "nix-ssh";
+                hostName = "maclay.local";
+                systems = ["aarch64-linux" "x86_64-linux"];
+                maxJobs = 4;
+                sshKey = "/etc/nix/keys/maclay_ed25519";
+                publicHostKey = "c3NoLWVkMjU1MTkgQUFBQUMzTnphQzFsWkRJMU5URTVBQUFBSVA5NVdyeTBGOUFjbWp2cldZOWVJZnQ3TGdPWDF2NU9HdnN1cjBIb29oWWIgcm9vdEBuaXhvcwo=";
+                supportedFeatures = [ "benchmark" "big-parallel" "kvm" ];
+                protocol = "ssh-ng";
+              }];
+            })
             home-manager.darwinModules.home-manager
             {
               nixpkgs = nixpkgsConfig;

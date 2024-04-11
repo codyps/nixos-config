@@ -34,23 +34,20 @@
   };
 
   nix.buildMachines = [{
+    sshUser = "nix";
     hostName = "arnold-local";
     systems = ["x86_64-linux" "aarch64-linux"];
     maxJobs = 4;
-    supportedFeatures = [ "nixos-test" "benchmark" "big-parallel" "kvm" ];
+    sshKey = "/etc/nix/keys/arnold_ed25519";
+    #publicHostKey = "c3NoLWVkMjU1MTkgQUFBQUMzTnphQzFsWkRJMU5URTVBQUFBSUZMTHRvZmM5aEFUb0daZmFmcmx2OC80dEU1VzBJQVJROG5IczhEcEJNU2sgcm9vdEBhcm5vbGQK";
+    supportedFeatures = [ "benchmark" "big-parallel" "kvm" ];
     protocol = "ssh-ng";
   }];
   
-  environment.etc."nix/ssh_config.d/arnold".text = ''
+  environment.etc."ssh/ssh_config.d/100-arnold-local.conf".text = ''
     Host arnold-local
-      User nix
       HostName 192.168.6.10
-      IdentityFile /etc/nix/keys/arnold_ed25519
-      UserKnownHostsFile /etc/nix/ssh_known_hosts.d/arnold
-  '';
-
-  environment.etc."nix/ssh_known_hosts.d/arnold".text = ''
-    192.168.6.10 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIFLLtofc9hAToGZfafrlv8/4tE5W0IARQ8nHs8DpBMSk
+      HostKeyAlias arnold
   '';
 
   nix.settings.substituters = [ "https://nix-community.cachix.org" ];
@@ -59,6 +56,19 @@
     builders-use-substitutes = true
     builders = @/etc/nix/machines
   '';
+
+  # FIXME: customize so this does the right thing for x86_64 and aarch64
+  nix.linux-builder = {
+    enable = true;
+    systems = [ "x86_64-linux" "aarch64-linux" ];
+    speedFactor = 10;
+    maxJobs = 4;
+    config  = ({...}:
+      {
+        boot.binfmt.emulatedSystems = [ "x86_64-linux"];
+      }
+    );
+  };
 
   # Create /etc/zshrc that loads the nix-darwin environment.
   programs.zsh.enable = true; # default shell on catalina

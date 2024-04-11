@@ -1,7 +1,3 @@
-# Edit this configuration file to define what should be installed on
-# your system. Help is available in the configuration.nix(5) man page, on
-# https://search.nixos.org/options and in the NixOS manual (`nixos-help`).
-
 { config, lib, pkgs, ... }:
 
 {
@@ -14,7 +10,7 @@
     package = pkgs.nixFlakes;
     settings = {
       experimental-features = [ "nix-command" "flakes" ];
-      trusted-users = ["nix-ssh"];
+      trusted-users = ["nix-ssh" "@wheel"];
     };
     gc = {
       automatic = true;
@@ -34,7 +30,8 @@
       enable = true;
       write = true;
       keys = [
-        
+        "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAINnPgVJMpHAMdQ8M87JtufVrZ833hgROViMEexg+sBp6 root@RIV-066789M"
+        "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIMTg+MBb/ao0R1kBP5mHosOPADfy/4x2yKuQPx2c72Ie root@RIV-066789M"
       ];
     };
   };

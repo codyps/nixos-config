@@ -1,12 +1,13 @@
-# ex: set sts=2 ts=2 sw=2 et
+# ex: set sts=2 ts=2 sw=2 et:
 
-{ config, lib, pkgs, ... }:
+{ config, lib, pkgs, home-manager, ... }:
 
 {
   imports =
     [
       # Include the results of the hardware scan.
       ./hardware-configuration.nix
+      home-manager.nixosModules.home-manager
     ];
 
   nix = {
@@ -72,12 +73,13 @@
   # hardware.pulseaudio.enable = true;
 
   # Enable touchpad support (enabled default in most desktopManager).
-  services.xserver.libinput.enable = true;
+  services.libinput.enable = true;
 
   # Define a user account. Don't forget to set a password with ‘passwd’.
   users.users.cody = {
     isNormalUser = true;
     extraGroups = [ "wheel" ];
+    shell = pkgs.zsh;
     packages = with pkgs; [
       firefox
       yubikey-personalization
@@ -86,14 +88,19 @@
       yubikey-manager
     ];
   };
-  # users.users.alice = {
-  #   isNormalUser = true;
-  #   extraGroups = [ "wheel" ]; # Enable ‘sudo’ for the user.
-  #   packages = with pkgs; [
-  #     firefox
-  #     tree
-  #   ];
-  # };
+
+  programs.zsh.enable = true;
+
+  home-manager.useGlobalPkgs = true;
+  home-manager.useUserPackages = true;
+  home-manager.users.cody = { pkgs, ... }: {
+    home.packages = [ ];
+    programs.zsh.enable = true;
+    programs.direnv.enable = true;
+    programs.atuin.enable = true;
+
+    home.stateVersion = "23.11";
+  };
 
   # List packages installed in system profile. To search, run:
   # $ nix search wget

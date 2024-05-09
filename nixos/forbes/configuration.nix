@@ -102,6 +102,12 @@
       flags = ["--disable-up-arrow"];
     };
 
+    programs.git = {
+      enable = true;
+      userName = "Cody Schafer";
+      userEmail = "dev@codyps.com";
+    };
+
     home.stateVersion = "23.11";
   };
 

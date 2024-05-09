@@ -4,12 +4,13 @@
 
 {
   imports =
-    [ # Include the results of the hardware scan.
+    [
+      # Include the results of the hardware scan.
       ./hardware-configuration.nix
     ];
 
   nix = {
-    settings.experimental-features = ["flakes" "nix-command"];
+    settings.experimental-features = [ "flakes" "nix-command" ];
   };
 
   # Use the systemd-boot EFI boot loader.
@@ -25,7 +26,7 @@
   networking.hostId = "69f47595";
   # Pick only one of the below networking options.
   # networking.wireless.enable = true;  # Enables wireless support via wpa_supplicant.
-  networking.networkmanager.enable = true;  # Easiest to use and most distros use this by default.
+  networking.networkmanager.enable = true; # Easiest to use and most distros use this by default.
 
   hardware.gpgSmartcards.enable = true;
   hardware.ledger.enable = true;
@@ -57,7 +58,7 @@
   # Enable the GNOME Desktop Environment.
   services.xserver.displayManager.gdm.enable = true;
   services.xserver.desktopManager.gnome.enable = true;
-  
+
 
   # Configure keymap in X11
   # services.xserver.xkb.layout = "us";
@@ -78,11 +79,11 @@
     isNormalUser = true;
     extraGroups = [ "wheel" ];
     packages = with pkgs; [
-        firefox
-	yubikey-personalization
-	yubikey-personalization-gui
-	yubikey-manager-qt
-	yubikey-manager
+      firefox
+      yubikey-personalization
+      yubikey-personalization-gui
+      yubikey-manager-qt
+      yubikey-manager
     ];
   };
   # users.users.alice = {

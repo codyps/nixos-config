@@ -2,7 +2,7 @@ final: prev: {
   targo = with prev; (callPackage ./pkgs/targo.nix {
     inherit fetchFromGitHub rustPlatform;
   });
-  
+
   # Workaround for nix+zig bug on darwin
   # https://github.com/NixOS/nixpkgs/issues/287861#issuecomment-1962225863
   ncdu = prev.ncdu.overrideAttrs {

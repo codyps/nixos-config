@@ -145,7 +145,7 @@
           ];
         };
 
-	darwinConfigurations."RIV-066789M" = nix-darwin.lib.darwinSystem {
+        darwinConfigurations."RIV-066789M" = nix-darwin.lib.darwinSystem {
           specialArgs = { inherit self; };
           modules = [
             ({ ... }: {
@@ -162,11 +162,11 @@
             })
             ./nix-darwin/configuration.nix
             #./nix-darwin/linuxBuilder.nix
-            ({...}: {
+            ({ ... }: {
               nix.buildMachines = [{
                 sshUser = "nix-ssh";
                 hostName = "maclay.local";
-                systems = ["aarch64-linux" "x86_64-linux"];
+                systems = [ "aarch64-linux" "x86_64-linux" ];
                 maxJobs = 4;
                 sshKey = "/etc/nix/keys/maclay_ed25519";
                 publicHostKey = "c3NoLWVkMjU1MTkgQUFBQUMzTnphQzFsWkRJMU5URTVBQUFBSVA5NVdyeTBGOUFjbWp2cldZOWVJZnQ3TGdPWDF2NU9HdnN1cjBIb29oWWIgcm9vdEBuaXhvcwo=";

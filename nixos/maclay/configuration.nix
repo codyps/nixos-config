@@ -2,7 +2,8 @@
 
 {
   imports =
-    [ # Include the results of the hardware scan.
+    [
+      # Include the results of the hardware scan.
       ./hardware-configuration.nix
     ];
 
@@ -10,7 +11,7 @@
     package = pkgs.nixFlakes;
     settings = {
       experimental-features = [ "nix-command" "flakes" ];
-      trusted-users = ["nix-ssh" "@wheel"];
+      trusted-users = [ "nix-ssh" "@wheel" ];
     };
     gc = {
       automatic = true;
@@ -72,11 +73,11 @@
     };
 
     windowManager.i3 = {
-       enable = true;
-       extraPackages = with pkgs; [
-         dmenu
-         i3status
-       ];
+      enable = true;
+      extraPackages = with pkgs; [
+        dmenu
+        i3status
+      ];
     };
   };
 
@@ -95,17 +96,17 @@
     isNormalUser = true;
     extraGroups = [ "wheel" ];
     packages = with pkgs; [
-       firefox
-       kitty
+      firefox
+      kitty
     ];
     shell = pkgs.zsh;
   };
 
   environment.systemPackages = with pkgs; [
-     neovim 
-     wget
-     pinentry-curses
-     xclip
+    neovim
+    wget
+    pinentry-curses
+    xclip
   ];
 
   programs.mtr.enable = true;

@@ -97,7 +97,10 @@
     home.packages = [ ];
     programs.zsh.enable = true;
     programs.direnv.enable = true;
-    programs.atuin.enable = true;
+    programs.atuin = {
+      enable = true;
+      flags = ["--disable-up-arrow"];
+    };
 
     home.stateVersion = "23.11";
   };

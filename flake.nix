@@ -43,28 +43,36 @@
       in
       {
         nixosConfigurations = {
+          # x220
+          forbes = nixpkgs.lib.nixosSystem {
+            system = "x86_64-linux";
+            modules = [
+              (import ./nixos/forbes/configuration.nix)
+            ];
+          };
+
           # work vmware vm
           trunix = nixpkgs.lib.nixosSystem {
             system = "x86_64-linux";
             modules = [
-              (import ./trunix/configuration.nix)
+              (import ./nixos/trunix/configuration.nix)
             ];
           };
 
           # work utm vm
-	  maclay = nixpkgs.lib.nixosSystem {
-	    system = "aarch64-linux";
-	    modules = [
-	      (import ./maclay/configuration.nix)
-	    ];
-	  };
+          maclay = nixpkgs.lib.nixosSystem {
+            system = "aarch64-linux";
+            modules = [
+              (import ./nixos/maclay/configuration.nix)
+            ];
+          };
 
           # x-mbp vmware vm
           adams = nixpkgs.lib.nixosSystem {
             system = "x86_64-linux";
 
             modules = [
-              (import ./adams/configuration.nix)
+              (import ./nixos/adams/configuration.nix)
             ];
           };
 
@@ -72,7 +80,7 @@
             system = "x86_64-linux";
 
             modules = [
-              (import ./calvin/configuration.nix)
+              (import ./nixos/calvin/configuration.nix)
             ];
           };
         };

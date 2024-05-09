@@ -96,7 +96,19 @@
   home-manager.users.cody = { pkgs, ... }: {
     home.packages = [ ];
     programs.zsh.enable = true;
-    programs.direnv.enable = true;
+
+    programs.bash = {
+      enable = true;
+      initExtra = ''
+        HISTTIMEFORMAT="%F %T "
+      '';
+    };
+
+    programs.direnv = {
+      enable = true;
+      nix-direnv.enable = true;
+    };
+
     programs.atuin = {
       enable = true;
       flags = ["--disable-up-arrow"];

@@ -13,7 +13,7 @@
 
   # Bootloader.
   boot.loader.grub.enable = true;
-  boot.loader.grub.device = "/dev/disk/by-uuid/d2a9e3f3-06df-4350-ada2-2ccf60f8d098";
+  boot.loader.grub.device = "/dev/disk/by-id/wwn-0x500a0751e6d4d4a7";
   boot.loader.grub.useOSProber = true;
 
   nix.settings.experimental-features = [ "nix-command" "flakes" ];
@@ -141,6 +141,12 @@
 
       in
       [ "${automount_opts},credentials=/home/cody/smb-secrets" ];
+  };
+
+  hardware.opengl = {
+    enable = true;
+    driSupport = true;
+    extraPackages = [ pkgs.mesa.drivers ];
   };
 
   # This value determines the NixOS release from which the default

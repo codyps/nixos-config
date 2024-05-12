@@ -6,7 +6,8 @@
 
 {
   imports =
-    [ # Include the results of the hardware scan.
+    [
+      # Include the results of the hardware scan.
       ./hardware-configuration.nix
     ];
 
@@ -57,8 +58,8 @@
 
   # Configure keymap in X11
   services.xserver = {
-    layout = "us";
-    xkbVariant = "";
+    xkb.layout = "us";
+    xkb.variant = "";
   };
 
   # Enable CUPS to print documents.
@@ -95,7 +96,7 @@
     extraGroups = [ "networkmanager" "wheel" ];
     packages = with pkgs; [
       firefox
-    #  thunderbird
+      #  thunderbird
     ];
   };
 
@@ -132,12 +133,14 @@
   # networking.firewall.enable = false;
 
   fileSystems."/tank" = {
-      device = "//arnold/tank";
-      fsType = "cifs";
-      options = let
+    device = "//arnold/tank";
+    fsType = "cifs";
+    options =
+      let
         automount_opts = "x-systemd.automount,noauto,x-systemd.idle-timeout=60,x-systemd.device-timeout=5s,x-systemd.mount-timeout=5s";
 
-      in ["${automount_opts},credentials=/home/cody/smb-secrets"];
+      in
+      [ "${automount_opts},credentials=/home/cody/smb-secrets" ];
   };
 
   # This value determines the NixOS release from which the default

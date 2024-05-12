@@ -12,7 +12,7 @@
 
   # Bootloader.
   boot.loader.grub.enable = true;
-  boot.loader.grub.device = "/dev/sda";
+  boot.loader.grub.device = "/dev/disk/by-uuid/d2a9e3f3-06df-4350-ada2-2ccf60f8d098";
   boot.loader.grub.useOSProber = true;
 
   nix.settings.experimental-features = [ "nix-command" "flakes" ];
@@ -25,10 +25,6 @@
   system.autoUpgrade.enable = true;
   services.tailscale.enable = true;
   services.homed.enable = true;
-
-  # Configure network proxy if necessary
-  # networking.proxy.default = "http://user:password@proxy:port/";
-  # networking.proxy.noProxy = "127.0.0.1,localhost,internal.domain";
 
   # Enable networking
   networking.networkmanager.enable = true;
@@ -106,8 +102,8 @@
   # Allow unfree packages
   nixpkgs.config.allowUnfree = true;
 
-programs.neovim.enable = true;
-programs.neovim.defaultEditor = true;
+  programs.neovim.enable = true;
+  programs.neovim.defaultEditor = true;
 
   # List packages installed in system profile. To search, run:
   # $ nix search wget

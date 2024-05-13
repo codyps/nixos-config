@@ -10,6 +10,7 @@ let
     system = linuxSystem;
     configuration = ({ modulesPath, lib, ... }: {
       imports = [ "${modulesPath}/profiles/macos-builder.nix" ];
+      boot.binfmt.emulatedSystems = [ "x86_64-linux" ];
       virtualisation = {
         # FIXME: this _appears_ to result in using our modified (overlayed)
         # nixpkgs, which then forces a rebuild, which requires we have a
@@ -38,12 +39,7 @@ in
       [127.0.0.1]:31022 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIJBWcxb/Blaqt1auOtE+F8QUWrUotiC5qBJ+UuEWdVCb
     '';
 
-    # We can't/want to edit /var/root/.ssh/config so instead we create the config at another location and tell ssh to use that instead by modifying NIX_SSHOPTS
     environment.etc."nix/ssh_config".text = ''
-      Include /etc/nix/ssh_config.d/*
-    '';
-
-    environment.etc."nix/ssh_config.d/linux-builder".text = ''
       Host linux-builder
         User builder
         HostName 127.0.0.1
@@ -51,9 +47,6 @@ in
         IdentityFile ${dataDir}/keys/builder_ed25519
         UserKnownHostsFile /etc/nix/ssh_known_hosts.d/linux-builder
     '';
-
-    # Tell nix-daemon to use our custom SSH config
-    nix.envVars = { NIX_SSHOPTS = "-F /etc/nix/ssh_config"; };
 
     launchd.daemons.linux-builder = {
       command = "${darwin-builder}/bin/create-builder";

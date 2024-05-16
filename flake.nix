@@ -158,8 +158,9 @@
               nix.buildMachines = [{
                 sshUser = "nix-ssh";
                 hostName = "maclay.local";
-                systems = ["aarch64-linux" "x86_64-linux"];
+                systems = ["aarch64-linux"];
                 maxJobs = 4;
+                speedFactor = 20;
                 sshKey = "/etc/nix/keys/maclay_ed25519";
                 publicHostKey = "c3NoLWVkMjU1MTkgQUFBQUMzTnphQzFsWkRJMU5URTVBQUFBSVA5NVdyeTBGOUFjbWp2cldZOWVJZnQ3TGdPWDF2NU9HdnN1cjBIb29oWWIgcm9vdEBuaXhvcwo=";
                 supportedFeatures = [ "benchmark" "big-parallel" "kvm" ];

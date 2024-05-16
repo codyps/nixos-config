@@ -60,12 +60,19 @@
   # FIXME: customize so this does the right thing for x86_64 and aarch64
   nix.linux-builder = {
     enable = true;
-    systems = [ "x86_64-linux" "aarch64-linux" ];
+    # FIXME: qemu-x86_64 SIGSEV, so removed extra system
+    # > qemu-x86_64: QEMU internal SIGSEGV {code=MAPERR, addr=0x20}
+    systems = if pkgs.system == "aarch64-linux" then
+      [ "aarch64-linux" ]
+    else
+      [ "x86_64-linux" "aarch64-linux"]
+    ;
     speedFactor = 10;
     maxJobs = 4;
     config  = ({...}:
       {
-        boot.binfmt.emulatedSystems = [ "x86_64-linux"];
+        boot.binfmt.emulatedSystems = if pkgs.system == "aarch64-linux" then [ "x86_64-linux"] else [ "aarch64-linux" ];
+        virtualisation.cores = if pkgs.system == "aarch64-linux" then 16 else 8;
       }
     );
   };

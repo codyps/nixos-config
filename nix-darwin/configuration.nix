@@ -36,14 +36,14 @@
   nix.buildMachines = [{
     sshUser = "nix";
     hostName = "arnold-local";
-    systems = ["x86_64-linux" "aarch64-linux"];
+    systems = [ "x86_64-linux" "aarch64-linux" ];
     maxJobs = 4;
     sshKey = "/etc/nix/keys/arnold_ed25519";
     #publicHostKey = "c3NoLWVkMjU1MTkgQUFBQUMzTnphQzFsWkRJMU5URTVBQUFBSUZMTHRvZmM5aEFUb0daZmFmcmx2OC80dEU1VzBJQVJROG5IczhEcEJNU2sgcm9vdEBhcm5vbGQK";
     supportedFeatures = [ "benchmark" "big-parallel" "kvm" ];
     protocol = "ssh-ng";
   }];
-  
+
   environment.etc."ssh/ssh_config.d/100-arnold-local.conf".text = ''
     Host arnold-local
       HostName 192.168.6.10
@@ -69,7 +69,7 @@
     ;
     speedFactor = 10;
     maxJobs = 4;
-    config  = ({...}:
+    config = ({ ... }:
       {
         boot.binfmt.emulatedSystems = if pkgs.system == "aarch64-linux" then [ "x86_64-linux"] else [ "aarch64-linux" ];
         virtualisation.cores = if pkgs.system == "aarch64-linux" then 16 else 8;

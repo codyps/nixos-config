@@ -62,7 +62,7 @@
     enable = true;
     # FIXME: qemu-x86_64 SIGSEV, so removed extra system
     # > qemu-x86_64: QEMU internal SIGSEGV {code=MAPERR, addr=0x20}
-    systems = if pkgs.system == "aarch64-linux" then
+    systems = if pkgs.system == "aarch64-darwin" then
       [ "aarch64-linux" ]
     else
       [ "x86_64-linux" "aarch64-linux"]
@@ -71,8 +71,8 @@
     maxJobs = 4;
     config = ({ ... }:
       {
-        boot.binfmt.emulatedSystems = if pkgs.system == "aarch64-linux" then [ "x86_64-linux"] else [ "aarch64-linux" ];
-        virtualisation.cores = if pkgs.system == "aarch64-linux" then 16 else 8;
+        boot.binfmt.emulatedSystems = if pkgs.system == "aarch64-darwin" then [ "x86_64-linux"] else [ "aarch64-linux" ];
+        virtualisation.cores = if pkgs.system == "aarch64-darwin" then 16 else 8;
       }
     );
   };

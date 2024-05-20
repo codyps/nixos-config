@@ -10,7 +10,7 @@ let
     system = linuxSystem;
     configuration = ({ modulesPath, lib, ... }: {
       imports = [ "${modulesPath}/profiles/macos-builder.nix" ];
-      boot.binfmt.emulatedSystems = [ "x86_64-linux"];
+      boot.binfmt.emulatedSystems = [ "x86_64-linux" ];
       virtualisation = {
         # FIXME: this _appears_ to result in using our modified (overlayed)
         # nixpkgs, which then forces a rebuild, which requires we have a

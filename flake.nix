@@ -43,28 +43,45 @@
       in
       {
         nixosConfigurations = {
+          constance = nixpkgs.lib.nixosSystem {
+            system = "x86_64-linux";
+            specialArgs = { inherit home-manager; };
+            modules = [
+              (import ./nixos/constance/configuration.nix)
+            ];
+          };
+
+          # x220
+          forbes = nixpkgs.lib.nixosSystem {
+            system = "x86_64-linux";
+            specialArgs = { inherit home-manager; };
+            modules = [
+              (import ./nixos/forbes/configuration.nix)
+            ];
+          };
+
           # work vmware vm
           trunix = nixpkgs.lib.nixosSystem {
             system = "x86_64-linux";
             modules = [
-              (import ./trunix/configuration.nix)
+              (import ./nixos/trunix/configuration.nix)
             ];
           };
 
           # work utm vm
-	  maclay = nixpkgs.lib.nixosSystem {
-	    system = "aarch64-linux";
-	    modules = [
-	      (import ./maclay/configuration.nix)
-	    ];
-	  };
+          maclay = nixpkgs.lib.nixosSystem {
+            system = "aarch64-linux";
+            modules = [
+              (import ./nixos/maclay/configuration.nix)
+            ];
+          };
 
           # x-mbp vmware vm
           adams = nixpkgs.lib.nixosSystem {
             system = "x86_64-linux";
 
             modules = [
-              (import ./adams/configuration.nix)
+              (import ./nixos/adams/configuration.nix)
             ];
           };
 
@@ -72,7 +89,7 @@
             system = "x86_64-linux";
 
             modules = [
-              (import ./calvin/configuration.nix)
+              (import ./nixos/calvin/configuration.nix)
             ];
           };
         };
@@ -137,7 +154,7 @@
           ];
         };
 
-	darwinConfigurations."RIV-066789M" = nix-darwin.lib.darwinSystem {
+        darwinConfigurations."RIV-066789M" = nix-darwin.lib.darwinSystem {
           specialArgs = { inherit self; };
           modules = [
             ({ ... }: {
@@ -154,11 +171,11 @@
             })
             ./nix-darwin/configuration.nix
             #./nix-darwin/linuxBuilder.nix
-            ({...}: {
+            ({ ... }: {
               nix.buildMachines = [{
                 sshUser = "nix-ssh";
                 hostName = "maclay.local";
-                systems = ["aarch64-linux" "x86_64-linux"];
+                systems = [ "aarch64-linux" "x86_64-linux" ];
                 maxJobs = 4;
                 sshKey = "/etc/nix/keys/maclay_ed25519";
                 publicHostKey = "c3NoLWVkMjU1MTkgQUFBQUMzTnphQzFsWkRJMU5URTVBQUFBSVA5NVdyeTBGOUFjbWp2cldZOWVJZnQ3TGdPWDF2NU9HdnN1cjBIb29oWWIgcm9vdEBuaXhvcwo=";

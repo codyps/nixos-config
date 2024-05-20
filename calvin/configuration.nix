@@ -6,7 +6,6 @@
       ./hardware-configuration.nix
     ];
 
-
   nix = {
     package = pkgs.nixFlakes;
     settings.auto-optimise-store = true;
@@ -26,6 +25,11 @@
       ];
   };
 
+  # TODO: add tailscale to initrd & use tpm to encrypt/authenticate data
+  #boot.initrd = {
+  #  kernelModules = ["tpm_crb"];
+  #};
+
   boot.initrd.postDeviceCommands = lib.mkAfter ''
     zfs rollback -r calvin/local/root@blank
   '';
@@ -35,6 +39,20 @@
       device = "/dev/disk/by-uuid/cac206a2-6cf7-433d-99e5-51d0105d4a38";
       allowDiscards = true;
       preLVM = true;
+      bypassWorkqueues = true;
+    };
+  };
+
+  boot.initrd.network = {
+    enable = true;
+    ssh = {
+      enable = true;
+      authorizedKeys = [
+          "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAILO6B2Cx3SVmD65J9sJsmxhjZq/AGprzpRMcrqbCuu6Y cody@u3.bed.einic.org"
+      ];
+      hostKeys = [
+         "/persist/etc/secrets/initrd/ssh_host_ed25519_key"
+      ];
     };
   };
 
@@ -141,25 +159,34 @@
     defaultUserShell = pkgs.zsh;
     mutableUsers = false;
     users = {
-      root = { };
+      root = {
+	openssh.authorizedKeys.keys = [
+          "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAILO6B2Cx3SVmD65J9sJsmxhjZq/AGprzpRMcrqbCuu6Y cody@u3.bed.einic.org"
+        ];
+	hashedPasswordFile = "/persist/etc/password/root";
+	initialHashedPassword = "$y$j9T$.XitCJWQZXR6Jp7.qY4zb1$sjNfm460uI5Y9AXji0zcDsUUm.8HPSHo8ofkHrsT8AD";
+      };
 
       y = {
-        createHome = true;
-        extraGroups = [ "wheel" ];
-        group = "users";
-        uid = 1000;
-        home = "/home/y";
         isNormalUser = true;
+        extraGroups = [ "wheel" ];
+        uid = 1000;
+	openssh.authorizedKeys.keys = [
+          "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAILO6B2Cx3SVmD65J9sJsmxhjZq/AGprzpRMcrqbCuu6Y cody@u3.bed.einic.org"
+        ];
+	hashedPasswordFile = "/persist/etc/password/y";
+	initialHashedPassword = "$y$j9T$GX71.gVg8bfPGUvNPQRcL/$xfOX53jJft97hV7C49TO2WftZHpr6hSZoHvzt2UivB3";
       };
+
       nix = {
-        createHome = true;
-        home = "/home/nix";
         group = "users-remote";
         uid = 1100;
         useDefaultShell = true;
         isNormalUser = true;
       };
     };
+
+    groups.users-remote = {};
   };
 
   # Some programs need SUID wrappers, can be configured further or are

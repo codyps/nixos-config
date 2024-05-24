@@ -90,12 +90,14 @@ in
       }
     ];
 
-    extraConfig = ''
-    [core]
+    extraConfig = {
+      core = {
         precomposeUnicode = true;
-    [credential "https://dev.azure.com"]
-        useHttpPath = true
-    '';
+      };
+      credential."https://dev.azure.com" = {
+        useHttpPath = true;
+      };
+    };
 
     lfs.enable = true;
   };

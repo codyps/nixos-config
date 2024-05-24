@@ -76,10 +76,10 @@ in
   programs.git = {
     enable = true;
     includes = [
-      { path = "~/.config/git/general" }
-      { path = "~/.config/git/msmtp" }
-      { path = "~/.config/git/id" }
-      { path = "~/priv/gitconfig" }
+      { path = "~/.config/git/general"; }
+      { path = "~/.config/git/msmtp"; }
+      { path = "~/.config/git/id"; }
+      { path = "~/priv/gitconfig"; }
       {
         path = "~/.config/git/id.rivian";
         condition = "gitdir:~/rivian/";

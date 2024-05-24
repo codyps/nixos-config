@@ -73,6 +73,33 @@ in
     pkgs.kubectl
   ];
 
+  programs.git = {
+    enable = true;
+    includes = [
+      { path = "~/.config/git/general" }
+      { path = "~/.config/git/msmtp" }
+      { path = "~/.config/git/id" }
+      { path = "~/priv/gitconfig" }
+      {
+        path = "~/.config/git/id.rivian";
+        condition = "gitdir:~/rivian/";
+      }
+      {
+        path = "~/.config/git/id.rivian";
+        condition = "gitdir:/Volumes/dev/rivian/";
+      }
+    ];
+
+    extraConfig = ''
+    [core]
+        precomposeUnicode = true;
+    [credential "https://dev.azure.com"]
+        useHttpPath = true
+    '';
+
+    lfs.enable = true;
+  };
+
   programs.direnv = {
     enable = true;
     nix-direnv.enable = true;

@@ -34,32 +34,48 @@
   };
 
   nix.buildMachines = [{
-    hostName = "arnold";
-    system = "x86_64-linux";
+    sshUser = "nix";
+    hostName = "arnold-local";
+    systems = [ "x86_64-linux" "aarch64-linux" ];
     maxJobs = 4;
-    supportedFeatures = [ "nixos-test" "benchmark" "big-parallel" "kvm" ];
+    sshKey = "/etc/nix/keys/arnold_ed25519";
+    #publicHostKey = "c3NoLWVkMjU1MTkgQUFBQUMzTnphQzFsWkRJMU5URTVBQUFBSUZMTHRvZmM5aEFUb0daZmFmcmx2OC80dEU1VzBJQVJROG5IczhEcEJNU2sgcm9vdEBhcm5vbGQK";
+    supportedFeatures = [ "benchmark" "big-parallel" "kvm" ];
     protocol = "ssh-ng";
   }];
 
-  environment.etc."nix/ssh_config.d/linux-builder".text = ''
-    Host arnold
-      User nix
-      HostName 100.96.147.23
-      IdentityFile /etc/nix/keys/arnold_ed25519
-      UserKnownHostsFile /etc/nix/ssh_known_hosts.d/arnold
+  environment.etc."ssh/ssh_config.d/100-arnold-local.conf".text = ''
+    Host arnold-local
+      HostName 192.168.6.10
+      HostKeyAlias arnold
   '';
 
-  environment.etc."nix/ssh_known_hosts.d/arnold".text = ''
-    100.96.147.23 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIFLLtofc9hAToGZfafrlv8/4tE5W0IARQ8nHs8DpBMSk
-  '';
-
-  ##ssh-ng://nix@100.96.147.23?ssh-key=/etc/nix/arnold_ed25519
   nix.settings.substituters = [ "https://nix-community.cachix.org" ];
   nix.settings.trusted-public-keys = [ "nix-community.cachix.org-1:mB9FSh9qf2dCimDSUo8Zy7bkq5CX+/rkCWyvRCYg3Fs=" "builder-name:V3galmyKya9h+w11jUnPeq7bZ7h+G8mxl2F6rR0avPQ=" ];
   nix.extraOptions = ''
     builders-use-substitutes = true
     builders = @/etc/nix/machines
   '';
+
+  # FIXME: customize so this does the right thing for x86_64 and aarch64
+  nix.linux-builder = {
+    enable = true;
+    # FIXME: qemu-x86_64 SIGSEV, so removed extra system
+    # > qemu-x86_64: QEMU internal SIGSEGV {code=MAPERR, addr=0x20}
+    systems = if pkgs.system == "aarch64-darwin" then
+      [ "aarch64-linux" ]
+    else
+      [ "x86_64-linux" "aarch64-linux"]
+    ;
+    speedFactor = 10;
+    maxJobs = 4;
+    config = ({ ... }:
+      {
+        boot.binfmt.emulatedSystems = if pkgs.system == "aarch64-darwin" then [ "x86_64-linux"] else [ "aarch64-linux" ];
+        virtualisation.cores = if pkgs.system == "aarch64-darwin" then 16 else 8;
+      }
+    );
+  };
 
   # Create /etc/zshrc that loads the nix-darwin environment.
   programs.zsh.enable = true; # default shell on catalina

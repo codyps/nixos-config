@@ -1,12 +1,9 @@
-# Edit this configuration file to define what should be installed on
-# your system. Help is available in the configuration.nix(5) man page, on
-# https://search.nixos.org/options and in the NixOS manual (`nixos-help`).
-
 { config, lib, pkgs, ... }:
 
 {
   imports =
-    [ # Include the results of the hardware scan.
+    [
+      # Include the results of the hardware scan.
       ./hardware-configuration.nix
     ];
 
@@ -14,11 +11,30 @@
     package = pkgs.nixFlakes;
     settings = {
       experimental-features = [ "nix-command" "flakes" ];
+      trusted-users = [ "nix-ssh" "@wheel" ];
     };
     gc = {
       automatic = true;
       dates = "weekly";
       options = "--delete-older-than 30d";
+    };
+    #buildMachines = [
+    #  {
+    #    hostname = "RIV-066789M";
+    #    system = "aarch64-darwin";
+    #    maxJobs = 8;
+    #    speedFactor = 1;
+    #  }
+    #];
+    #distributedBuilds = true;
+    sshServe = {
+      enable = true;
+      write = true;
+      protocol = "ssh-ng";
+      keys = [
+        "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAINnPgVJMpHAMdQ8M87JtufVrZ833hgROViMEexg+sBp6 root@RIV-066789M"
+        "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIMTg+MBb/ao0R1kBP5mHosOPADfy/4x2yKuQPx2c72Ie root@RIV-066789M"
+      ];
     };
   };
 
@@ -57,11 +73,11 @@
     };
 
     windowManager.i3 = {
-       enable = true;
-       extraPackages = with pkgs; [
-         dmenu
-         i3status
-       ];
+      enable = true;
+      extraPackages = with pkgs; [
+        dmenu
+        i3status
+      ];
     };
   };
 
@@ -80,17 +96,17 @@
     isNormalUser = true;
     extraGroups = [ "wheel" ];
     packages = with pkgs; [
-       firefox
-       kitty
-       neovim
+      firefox
+      kitty
     ];
     shell = pkgs.zsh;
   };
 
   environment.systemPackages = with pkgs; [
-     neovim 
-     wget
-     pinentry-curses
+    neovim
+    wget
+    pinentry-curses
+    xclip
   ];
 
   programs.mtr.enable = true;
@@ -99,7 +115,7 @@
     enableSSHSupport = true;
 
     # Added to get prompted on ssh?
-    pinentryFlavor = "gtk2";
+    pinentryPackage = lib.mkForce pkgs.pinentry-gtk2;
   };
 
   services.openssh.enable = true;

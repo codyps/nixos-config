@@ -107,7 +107,6 @@
               nixpkgs.hostPlatform = "x86_64-darwin";
             })
             ./nix-darwin/configuration.nix
-            ./nix-darwin/linuxBuilder.nix
             home-manager.darwinModules.home-manager
             {
               nixpkgs = nixpkgsConfig;
@@ -138,7 +137,6 @@
               '';
             })
             ./nix-darwin/configuration.nix
-            ./nix-darwin/linuxBuilder.nix
             home-manager.darwinModules.home-manager
             {
               nixpkgs = nixpkgsConfig;
@@ -170,7 +168,6 @@
               '';
             })
             ./nix-darwin/configuration.nix
-            #./nix-darwin/linuxBuilder.nix
             ({ ... }: {
               nix.buildMachines = [{
                 sshUser = "nix-ssh";

@@ -60,12 +60,13 @@
     },
     "nixpkgs": {
       "locked": {
-        "lastModified": 1710272261,
-        "narHash": "sha256-g0bDwXFmTE7uGDOs9HcJsfLFhH7fOsASbAuOzDC+fhQ=",
-        "owner": "NixOS",
-        "repo": "nixpkgs",
-        "rev": "0ad13a6833440b8e238947e47bea7f11071dc2b2",
-        "type": "github"
+        "lastModified": 1710472909,
+        "narHash": "sha256-bazdEkRk7vsmfN9XeYPQW512SX5YOVUMwDsJgsvKNvI=",
+        "ref": "refs/heads/fix-atuin-apple-sdk-11",
+        "rev": "769eb0923220a0de3f1e7ab6c51d50f5d6259709",
+        "revCount": 597024,
+        "type": "git",
+        "url": "file:///Users/cody/d/nixpkgs"
       },
       "original": {
         "id": "nixpkgs",

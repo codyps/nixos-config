@@ -41,6 +41,13 @@
 
   programs.zsh.enable = true;
   users.users.nixos.shell = pkgs.zsh;
+  programs.gnupg.agent = {
+    enable = true;
+    enableSSHSupport = true;
+
+    # Added to get prompted on ssh?
+    pinentryPackage = lib.mkForce pkgs.pinentry-gtk2;
+  };
 
   #virtualisation.docker = {
   #  enable = true;

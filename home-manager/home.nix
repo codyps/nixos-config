@@ -77,8 +77,31 @@ in
     defaultEditor = true;
     viAlias = true;
     vimAlias = true;
-    plugins = [
-
+    plugins = with pkgs.vimPlugins; [
+      ctrlp-vim
+      securemodelines
+      vim-sneak
+      vim-lastplace
+      vim-rooter
+      fzf-vim
+      fzfWrapper
+      coc-rust-analyzer
+      coc-go
+      coc-toml
+      coc-yaml
+      coc-sh
+      coc-nvim
+      rust-vim
+      vim-toml
+      vim-airline
+      #v-vim
+      zig-vim
+      vim-terraform
+      vim-nix
+      #cargo-limit
+      copilot-vim
+      kotlin-vim
+      #jenkinsfile-vim-syntax
     ];
   };
 
@@ -86,11 +109,16 @@ in
     enable = true;
   };
 
+  programs.bash = {
+    enable = true;
+    initExtra = ''
+      HISTTIMEFORMAT="%F %T "
+    '';
+  };
+
   programs.fzf = {
     enable = true;
   };
-  
-  programs.bash.enable = true;
 
   programs.git = {
     userName = "Cody P Schafer";
@@ -145,7 +173,7 @@ in
         ui = "auto";
       };
       alias = {
-        post = "!sh -c '${pkgs.git}/bin/git format-patch --stdout $1 | ${pkgs.ix}/bin/ix' -" ;
+        post = "!sh -c '${pkgs.git}/bin/git format-patch --stdout $1 | ${pkgs.ix}/bin/ix' -";
         ci = "commit -v";
         st = "status";
         co = "checkout";
@@ -177,7 +205,7 @@ in
         useHttpPath = true;
       };
       sendemail = {
-	      confirm = "auto";
+        confirm = "auto";
         smtpserver = "${pkgs.msmtp}/bin/msmtp";
         #smtpserveroption = "--read-envelope-from";
         chainreplyto = false;
@@ -193,6 +221,11 @@ in
   programs.direnv = {
     enable = true;
     nix-direnv.enable = true;
+  };
+
+  programs.atuin = {
+    enable = true;
+    flags = [ "--disable-up-arrow" ];
   };
 
   # Home Manager is pretty good at managing dotfiles. The primary way to manage
@@ -228,6 +261,4 @@ in
 
   # Let Home Manager install and manage itself.
   programs.home-manager.enable = true;
-
-  programs.atuin.enable = true;
 }

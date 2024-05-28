@@ -16,7 +16,7 @@
     nixos-vscode-server.nixosModules.default
   ];
 
-   wsl = {
+  wsl = {
     enable = true;
     defaultUser = "nixos";
     wslConf.automount.root = "/mnt";

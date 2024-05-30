@@ -93,35 +93,7 @@
 
   home-manager.useGlobalPkgs = true;
   home-manager.useUserPackages = true;
-  home-manager.users.cody = { pkgs, ... }: {
-    home.packages = [ ];
-    programs.zsh.enable = true;
-
-    programs.bash = {
-      enable = true;
-      initExtra = ''
-        HISTTIMEFORMAT="%F %T "
-      '';
-    };
-
-    programs.direnv = {
-      enable = true;
-      nix-direnv.enable = true;
-    };
-
-    programs.atuin = {
-      enable = true;
-      flags = [ "--disable-up-arrow" ];
-    };
-
-    programs.git = {
-      enable = true;
-      userName = "Cody Schafer";
-      userEmail = "dev@codyps.com";
-    };
-
-    home.stateVersion = "23.11";
-  };
+  home-manager.users.cody = import ../../home-manager/home.nix;
 
   # List packages installed in system profile. To search, run:
   # $ nix search wget

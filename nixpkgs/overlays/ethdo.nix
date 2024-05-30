@@ -3,13 +3,12 @@ self: super: {
     pname = "ethdo";
     version = "1.30.0";
 
-    #src = super.fetchFromGitHub {
-    #  owner = "wealdtech";
-    #  repo = "ethdo";
-    #  rev = "v${version}";
-    #  hash = "sha256-prV1sfvjUe1VPqh/M8C9d1flfTYU1nYTw6GIdJe4src=";
-    #};
-    src = /home/y/d/ethdo;
+    src = super.fetchFromGitHub {
+      owner = "wealdtech";
+      repo = "ethdo";
+      rev = "v${version}";
+      hash = "sha256-prV1sfvjUe1VPqh/M8C9d1flfTYU1nYTw6GIdJe4src=";
+    };
 
     vendorHash = "sha256-iA1CEZOKwQq8khsIcQVJaJKhiIsQ5YPPQ+RInfQLP6c=";
 

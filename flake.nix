@@ -1,6 +1,12 @@
 {
   inputs = {
     nixpkgs.url = "nixpkgs/nixos-unstable";
+    nixos-wsl.url = "github:nix-community/NixOS-WSL/main";
+    nixos-wsl.inputs.nixpkgs.follows = "nixpkgs";
+    nixos-wsl.inputs.flake-utils.follows = "flake-utils";
+    nixos-vscode-server.url = "github:nix-community/nixos-vscode-server";
+    nixos-vscode-server.inputs.nixpkgs.follows = "nixpkgs";
+    nixos-vscode-server.inputs.flake-utils.follows = "flake-utils";
     flake-utils.url = "github:numtide/flake-utils";
     nix-darwin.url = "github:LnL7/nix-darwin";
     nix-darwin.inputs.nixpkgs.follows = "nixpkgs";
@@ -11,7 +17,7 @@
     targo.inputs.flake-utils.follows = "flake-utils";
   };
 
-  outputs = { self, nixpkgs, flake-utils, targo, nix-darwin, home-manager }:
+  outputs = { self, nixpkgs, flake-utils, targo, nix-darwin, home-manager, nixos-wsl, nixos-vscode-server }:
     let
       overlays = [
         (final: prev: {
@@ -40,9 +46,28 @@
           ];
           inherit overlays;
         };
+
+        nixosSystem = nixpkgs.lib.nixosSystem;
       in
       {
         nixosConfigurations = {
+          # framework wsl
+          findley = nixosSystem {
+            system = "x86_64-linux";
+            specialArgs = { inherit home-manager nixos-wsl nixos-vscode-server; };
+            modules = [
+              (import ./nixos/findley/configuration.nix)
+              home-manager.nixosModules.home-manager
+              {
+                nixpkgs = nixpkgsConfig;
+                home-manager.useGlobalPkgs = true;
+                home-manager.useUserPackages = true;
+                home-manager.users.nixos = import ./home-manager/home.nix;
+              }
+            ];
+          };
+
+          # old sony vaio	
           constance = nixpkgs.lib.nixosSystem {
             system = "x86_64-linux";
             specialArgs = { inherit home-manager; };
@@ -107,7 +132,6 @@
               nixpkgs.hostPlatform = "x86_64-darwin";
             })
             ./nix-darwin/configuration.nix
-            ./nix-darwin/linuxBuilder.nix
             home-manager.darwinModules.home-manager
             {
               nixpkgs = nixpkgsConfig;
@@ -138,7 +162,6 @@
               '';
             })
             ./nix-darwin/configuration.nix
-            ./nix-darwin/linuxBuilder.nix
             home-manager.darwinModules.home-manager
             {
               nixpkgs = nixpkgsConfig;
@@ -170,13 +193,13 @@
               '';
             })
             ./nix-darwin/configuration.nix
-            #./nix-darwin/linuxBuilder.nix
             ({ ... }: {
               nix.buildMachines = [{
                 sshUser = "nix-ssh";
                 hostName = "maclay.local";
                 systems = [ "aarch64-linux" "x86_64-linux" ];
                 maxJobs = 4;
+                speedFactor = 20;
                 sshKey = "/etc/nix/keys/maclay_ed25519";
                 publicHostKey = "c3NoLWVkMjU1MTkgQUFBQUMzTnphQzFsWkRJMU5URTVBQUFBSVA5NVdyeTBGOUFjbWp2cldZOWVJZnQ3TGdPWDF2NU9HdnN1cjBIb29oWWIgcm9vdEBuaXhvcwo=";
                 supportedFeatures = [ "benchmark" "big-parallel" "kvm" ];

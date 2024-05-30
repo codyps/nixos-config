@@ -61,17 +61,19 @@
   # };
 
   # Enable the X11 windowing system.
+  services.libinput.enable = true;
+
+  services.displayManager = {
+    defaultSession = "none+i3";
+  };
+
   services.xserver = {
     enable = true;
-    libinput.enable = true;
     desktopManager.xterm.enable = false;
 
-    displayManager = {
-      defaultSession = "none+i3";
-      sessionCommands = ''
-        ${pkgs.xorg.xrandr}/bin/xrandr -s 1920x1080
-      '';
-    };
+    #displayManager.sessionCommands = ''
+    #    ${pkgs.xorg.xrandr}/bin/xrandr -s 1920x1080
+    #'';
 
     windowManager.i3 = {
       enable = true;

@@ -130,6 +130,8 @@ in
 
     enable = true;
     initExtra = (builtins.readFile ./bashrc);
+
+    # goes in `~/.profile`, `~/.bash_profile` is empty
     profileExtra = (builtins.readFile ./profile.sh);
   };
 

@@ -103,7 +103,14 @@ in
       kotlin-vim
       #jenkinsfile-vim-syntax
     ];
+
+    extraConfig = ''
+      set runtimepath^=~/.config/nvim/raw runtimepath+=~/.config/nvim/raw/after
+      source ~/.config/nvim/raw/init.vim
+    '';
   };
+
+  xdg.configFile."nvim/raw".source = ./nvim;
 
   programs.zsh = {
     enable = true;

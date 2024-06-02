@@ -12,7 +12,7 @@
     nix-darwin.inputs.nixpkgs.follows = "nixpkgs";
     home-manager.url = "github:nix-community/home-manager";
     home-manager.inputs.nixpkgs.follows = "nixpkgs";
-    targo.url = "github:jmesmon/targo";
+    targo.url = "github:codyps/targo";
     targo.inputs.nixpkgs.follows = "nixpkgs";
     targo.inputs.flake-utils.follows = "flake-utils";
   };

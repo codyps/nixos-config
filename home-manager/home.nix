@@ -67,6 +67,7 @@ in
     pkgs.watch
     pkgs.xsv
     pkgs.yt-dlp
+    pkgs.bazelisk
 
     pkgs.krew
     pkgs.kubectl

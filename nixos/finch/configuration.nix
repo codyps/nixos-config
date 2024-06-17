@@ -57,6 +57,8 @@
     depends = [ "/persist" ];
   };
 
+  fileSystems."/persist".neededForBoot = true;
+
   /*
     fileSystems."/etc/zfs/zfs-list.cache" = {
     device = "/persist/var/cache/zfs/zfs-list.cache";

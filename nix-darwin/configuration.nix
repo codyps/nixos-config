@@ -1,4 +1,11 @@
-{ self, pkgs, ... }: {
+{ self, pkgs, ... }:
+
+let
+  processor = pkgs.stdenv.hostPlatform.uname.processor;
+  nonnative_processor = if processor == "x86_64" then "aarch64" else "x86_64";
+  nonnative_linux = "${nonnative_processor}-linux";
+in
+{
   # List packages installed in system profile. To search by name, run:
   # $ nix-env -qaP | grep wget
   environment.systemPackages = with pkgs; [
@@ -60,12 +67,20 @@
   # FIXME: customize so this does the right thing for x86_64 and aarch64
   nix.linux-builder = {
     enable = true;
-    systems = [ "x86_64-linux" "aarch64-linux" ];
+    # FIXME: qemu-x86_64 SIGSEV, so removed extra system
+    # > qemu-x86_64: QEMU internal SIGSEGV {code=MAPERR, addr=0x20}
+    systems =
+      if processor == "aarch64" then
+        [ "${processor}-linux" ]
+      else
+        [ "${processor}-linux" "${nonnative_linux}" ]
+    ;
     speedFactor = 10;
     maxJobs = 4;
     config = ({ ... }:
       {
-        boot.binfmt.emulatedSystems = [ "x86_64-linux" ];
+        boot.binfmt.emulatedSystems = [ nonnative_linux ];
+        virtualisation.cores = if processor == "aarch64" then 16 else 8;
       }
     );
   };

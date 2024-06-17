@@ -1,0 +1,29 @@
+From df7609bb5c75ab70f0c60f92bc01765e35b7b7df Mon Sep 17 00:00:00 2001
+From: Cody P Schafer <dev@codyps.com>
+Date: Tue, 25 Apr 2023 15:07:22 -0400
+Subject: [PATCH] show address from public key too
+
+---
+ cmd/account/derive/output.go | 5 ++++-
+ 1 file changed, 4 insertions(+), 1 deletion(-)
+
+diff --git a/cmd/account/derive/output.go b/cmd/account/derive/output.go
+index d4ef2d5..bb1ec48 100644
+--- a/cmd/account/derive/output.go
++++ b/cmd/account/derive/output.go
+@@ -47,8 +47,11 @@ func output(_ context.Context, data *dataOut) (string, error) {
+ 		withdrawalCredentials[0] = byte(0) // BLS_WITHDRAWAL_PREFIX
+ 		builder.WriteString(fmt.Sprintf("Withdrawal credentials: %#x\n", withdrawalCredentials))
+ 	}
+-	if !(data.showPrivateKey || data.showWithdrawalCredentials) {
++	if !(data.showWithdrawalCredentials && data.showPrivateKey) {
+ 		builder.WriteString(fmt.Sprintf("Public key: %#x\n", data.key.PublicKey().Marshal()))
++		// generate the address by using Keccak256 on the public key and taking the last 20 bytes
++		address := util.Keccak256(data.key.PublicKey().Marshal())[12:]
++		builder.WriteString(fmt.Sprintf("Address: %#x\n", address))
+ 	}
+ 
+ 	return builder.String(), nil
+-- 
+2.44.0
+

@@ -1,0 +1,6 @@
+{
+	"clangd.fallbackFlags": ["-std=c++20"],
+	"rust-analyzer.procMacro.enable": true,
+	"rust-analyzer.cargo.loadOutDirsFromCheck": true,
+	"clangd.path": "~/.config/coc/extensions/coc-clangd-data/install/13.0.0/clangd_13.0.0/bin/clangd"
+}

@@ -51,7 +51,6 @@ in
     pkgs.gnupg
     pkgs.htop
     pkgs.ncdu
-    pkgs.neovim
     pkgs.nodejs
     pkgs.openssh
     pkgs.rclone
@@ -73,9 +72,180 @@ in
     pkgs.kubectl
   ];
 
+  programs.neovim = {
+    enable = true;
+    defaultEditor = true;
+    viAlias = true;
+    vimAlias = true;
+    plugins = with pkgs.vimPlugins; [
+      ctrlp-vim
+      securemodelines
+      vim-sneak
+      vim-lastplace
+      vim-rooter
+      fzf-vim
+      fzfWrapper
+      coc-rust-analyzer
+      coc-go
+      coc-toml
+      coc-yaml
+      coc-sh
+      coc-nvim
+      rust-vim
+      vim-toml
+      vim-airline
+      #v-vim
+      zig-vim
+      vim-terraform
+      vim-nix
+      #cargo-limit
+      copilot-vim
+      kotlin-vim
+      #jenkinsfile-vim-syntax
+    ];
+
+    extraConfig = ''
+      set runtimepath^=~/.config/nvim/raw runtimepath+=~/.config/nvim/raw/after
+      source ~/.config/nvim/raw/init.vim
+    '';
+  };
+
+  xdg.configFile."nvim/raw".source = ./nvim;
+
+  programs.zsh = {
+    enable = true;
+    history = {
+      extended = true;
+      save = 10000;
+      size = 20000;
+      share = false;
+    };
+    initExtra = (builtins.readFile ./zshrc);
+  };
+
+  programs.bash = {
+    historyFileSize = -1;
+    historySize = -1;
+    historyFile = "\${HOME}/.bash_history_eternal";
+
+    enable = true;
+    initExtra = (builtins.readFile ./bashrc);
+
+    # goes in `~/.profile`, `~/.bash_profile` is empty
+    profileExtra = (builtins.readFile ./profile.sh);
+  };
+
+  programs.nix-index.enable = true;
+  programs.fzf = {
+    enable = true;
+  };
+
+  programs.git = {
+    userName = "Cody P Schafer";
+    userEmail = "dev@codyps.com";
+
+    enable = true;
+    includes = [
+      { path = "~/priv/gitconfig"; }
+      {
+        path = "~/.config/git/id.rivian";
+        condition = "gitdir:~/rivian/";
+      }
+      {
+        path = "~/.config/git/id.rivian";
+        condition = "gitdir:/Volumes/dev/rivian/";
+      }
+    ];
+
+    ignores = [
+      ".*.swp"
+      ".*.swo"
+      "*~"
+      ".DS_Store"
+      ".direnv"
+      ".vim/"
+    ];
+
+    signing = {
+      signByDefault = true;
+      key = "881CEAC38C98647F6F660956794D748B8B8BF912";
+    };
+
+    extraConfig = {
+      core = {
+        fscache = true;
+        preloadindex = true;
+        precomposeUnicode = true;
+      };
+      credential."https://dev.azure.com" = {
+        useHttpPath = true;
+      };
+      pull = {
+        ff = "only";
+      };
+      push = {
+        default = "current";
+      };
+      log = {
+        date = "iso";
+      };
+      color = {
+        ui = "auto";
+      };
+      alias = {
+        post = "!sh -c '${pkgs.git}/bin/git format-patch --stdout $1 | ${pkgs.ix}/bin/ix' -";
+        ci = "commit -v";
+        st = "status";
+        co = "checkout";
+        b = "branch -v";
+        dc = "describe --contains";
+        fp = "format-patch -k -M -N";
+        tree = "log --graph --decorate --pretty=oneline --abbrev-commit";
+        sm = "submodule";
+        submod = "submodule";
+      };
+      am = {
+        keepcr = "no";
+      };
+      rerere = {
+        enabled = true;
+      };
+      advice = {
+        detachedHead = false;
+      };
+      color.diff = {
+        whitespace = "red reverse";
+      };
+      gc = {
+        auto = "256";
+      };
+      # TODO: use absolute path
+      credential = {
+        helper = "!${pkgs.pass-git-helper}/bin/pass-git-helper $0";
+        useHttpPath = true;
+      };
+      sendemail = {
+        confirm = "auto";
+        smtpserver = "${pkgs.msmtp}/bin/msmtp";
+        #smtpserveroption = "--read-envelope-from";
+        chainreplyto = false;
+        aliasfiletype = "mutt";
+        aliasesfile = "~/.muttaliases";
+        envelopesender = "auto";
+      };
+    };
+
+    lfs.enable = true;
+  };
+
   programs.direnv = {
     enable = true;
     nix-direnv.enable = true;
+  };
+
+  programs.atuin = {
+    enable = true;
+    flags = [ "--disable-up-arrow" ];
   };
 
   # Home Manager is pretty good at managing dotfiles. The primary way to manage
@@ -111,6 +281,4 @@ in
 
   # Let Home Manager install and manage itself.
   programs.home-manager.enable = true;
-
-  programs.atuin.enable = true;
 }

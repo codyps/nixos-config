@@ -15,9 +15,10 @@
     targo.url = "github:codyps/targo";
     targo.inputs.nixpkgs.follows = "nixpkgs";
     targo.inputs.flake-utils.follows = "flake-utils";
+    impermanence.url = "github:nix-community/impermanence";
   };
 
-  outputs = { self, nixpkgs, flake-utils, targo, nix-darwin, home-manager, nixos-wsl, nixos-vscode-server }:
+  outputs = { self, nixpkgs, flake-utils, targo, nix-darwin, home-manager, nixos-wsl, nixos-vscode-server, impermanence }:
     let
       overlays = [
         (final: prev: {
@@ -59,6 +60,7 @@
             modules = [
               (import ./nixos/ward/configuration.nix)
               (import ./nixos/common.nix)
+              impermanence.nixosModules.impermanence
               home-manager.nixosModules.home-manager
               {
                 nixpkgs = nixpkgsConfig;

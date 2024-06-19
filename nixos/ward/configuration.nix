@@ -19,6 +19,23 @@ in
   # hashedPasswordFile reads from this
   fileSystems."/persist".neededForBoot = true;
 
+  environment.persistence."/persist" = {
+    hideMounts = true;
+    directories = [
+      "/var/log"
+      "/var/lib/bluetooth"
+      "/var/lib/nixos"
+      "/var/lib/upower"
+      "/var/lib/tailscale"
+      "/var/lib/systemd/coredump"
+      "/etc/NetworkManager/system-connections"
+      { directory = "/var/lib/colord"; user = "colord"; group = "colord"; mode = "u=rwx,g=rx,o="; }
+    ];
+    files = [
+      "/etc/machine-id"
+    ];
+  };
+
   boot.initrd = {
     systemd.enable = true;
 

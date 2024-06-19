@@ -70,7 +70,6 @@ in
 
   time.timeZone = "America/New_York";
 
-  i18n.defaultLocale = "en_US.UTF-8";
   # console = {
   #   font = "Lat2-Terminus16";
   #   keyMap = "us";
@@ -124,10 +123,6 @@ in
   ];
 
   programs.mtr.enable = true;
-  programs.gnupg.agent = {
-    enable = true;
-    enableSSHSupport = true;
-  };
 
   services.openssh = {
     enable = true;

@@ -43,6 +43,7 @@
         nixpkgsConfig = {
           config.allowUnfreePredicate = pkg: builtins.elem (getName pkg) [
             "vscode"
+	    "copilot.vim"
           ];
           inherit overlays;
         };
@@ -51,6 +52,22 @@
       in
       {
         nixosConfigurations = {
+          # router
+          ward = nixosSystem {
+            system = "x86_64-linux";
+            specialArgs = { inherit home-manager; };
+            modules = [
+              (import ./nixos/ward/configuration.nix)
+              home-manager.nixosModules.home-manager
+              {
+                nixpkgs = nixpkgsConfig;
+                home-manager.useGlobalPkgs = true;
+                home-manager.useUserPackages = true;
+                home-manager.users.cody = import ./home-manager/home.nix;
+              }
+            ];
+          };
+
           # framework wsl
           findley = nixosSystem {
             system = "x86_64-linux";

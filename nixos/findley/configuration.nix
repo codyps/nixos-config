@@ -39,12 +39,7 @@
     ];
   };
 
-  programs.zsh.enable = true;
-  users.users.nixos.shell = pkgs.zsh;
   programs.gnupg.agent = {
-    enable = true;
-    enableSSHSupport = true;
-
     # Added to get prompted on ssh?
     pinentryPackage = lib.mkForce pkgs.pinentry-gtk2;
   };
@@ -61,7 +56,6 @@
   services.vscode-server.enable = true;
   #wsl.docker-desktop.enable = true;
 
-  nix.settings.experimental-features = [ "nix-command" "flakes" ];
   networking.hostName = "findley";
 
   virtualisation.docker.rootless.enable = true;

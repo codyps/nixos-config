@@ -52,6 +52,23 @@
       in
       {
         nixosConfigurations = {
+          # router
+          ward = nixosSystem {
+            system = "x86_64-linux";
+            specialArgs = { inherit home-manager; };
+            modules = [
+              (import ./nixos/ward/configuration.nix)
+              (import ./nixos/common.nix)
+              home-manager.nixosModules.home-manager
+              {
+                nixpkgs = nixpkgsConfig;
+                home-manager.useGlobalPkgs = true;
+                home-manager.useUserPackages = true;
+                home-manager.users.cody = import ./home-manager/home.nix;
+              }
+            ];
+          };
+
           # framework wsl
           findley = nixosSystem {
             system = "x86_64-linux";
@@ -233,7 +250,7 @@
         {
 
           # chromeos
-          homeConfigurations."cody@penguin" = home-manager.lib.homeManagerConfiguration {
+          homeConfigurations."cody@peyton" = home-manager.lib.homeManagerConfiguration {
             inherit pkgs;
 
             modules = [

@@ -58,6 +58,7 @@
             specialArgs = { inherit home-manager; };
             modules = [
               (import ./nixos/ward/configuration.nix)
+              (import ./nixos/common.nix)
               home-manager.nixosModules.home-manager
               {
                 nixpkgs = nixpkgsConfig;

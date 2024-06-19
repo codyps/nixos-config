@@ -1,9 +1,8 @@
 { config, lib, pkgs, ... }:
 
 let
-  authorizedKeys = [
-    "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAILO6B2Cx3SVmD65J9sJsmxhjZq/AGprzpRMcrqbCuu6Y cody@u3.bed.einic.org"
-  ];
+  ssh-auth = (import ../ssh-auth.nix);
+  authorizedKeys = ssh-auth.authorizedKeys;
 in
 {
   imports =

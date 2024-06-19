@@ -75,6 +75,7 @@
             specialArgs = { inherit home-manager nixos-wsl nixos-vscode-server; };
             modules = [
               (import ./nixos/findley/configuration.nix)
+              (import ./nixos/common.nix)
               home-manager.nixosModules.home-manager
               {
                 nixpkgs = nixpkgsConfig;

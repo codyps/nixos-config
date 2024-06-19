@@ -43,6 +43,7 @@
         nixpkgsConfig = {
           config.allowUnfreePredicate = pkg: builtins.elem (getName pkg) [
             "vscode"
+            "copilot.vim"
           ];
           inherit overlays;
         };

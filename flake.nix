@@ -232,7 +232,7 @@
         {
 
           # chromeos
-          homeConfigurations."cody@penguin" = home-manager.lib.homeManagerConfiguration {
+          homeConfigurations."cody@peyton" = home-manager.lib.homeManagerConfiguration {
             inherit pkgs;
 
             modules = [

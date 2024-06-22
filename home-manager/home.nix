@@ -13,7 +13,7 @@
       size = 20000;
       share = false;
     };
-    initExtra = (builtins.readFile ./zshrc);
+    initExtra = (builtins.readFile ../config/.zshrc);
   };
 
   programs.bash = {
@@ -23,9 +23,9 @@
     historySize = -1;
     historyFile = "\${HOME}/.bash_history_eternal";
 
-    initExtra = (builtins.readFile ./bashrc);
+    initExtra = (builtins.readFile ../config/.bashrc);
 
     # goes in `~/.profile`, `~/.bash_profile` is empty
-    profileExtra = (builtins.readFile ./profile.sh);
+    profileExtra = (builtins.readFile ../config/.profile);
   };
 }

@@ -253,7 +253,7 @@
                 home.username = "y";
                 home.homeDirectory = "/home/y";
               })
-              ./home-manager/home.nix
+              ./home-manager/home-no-shell.nix
             ];
           };
 

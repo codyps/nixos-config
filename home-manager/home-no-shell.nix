@@ -189,6 +189,7 @@ in
     #   org.gradle.daemon.idletimeout=3600000
     # '';
     "${cache-home}/nix/current-home-flake".source = ../.;
+    ".tmux.conf".source = ../config/.tmux.conf;
   };
   
   programs.neovim = {

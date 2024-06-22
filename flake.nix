@@ -25,6 +25,15 @@
           targo = targo.packages.${prev.system}.default;
         })
       ];
+
+      getName = pkg: pkg.pname or (builtins.parseDrvName pkg.name).name;
+      nixpkgsConfig = {
+        config.allowUnfreePredicate = pkg: builtins.elem (getName pkg) [
+          "vscode"
+          "copilot.vim"
+        ];
+        inherit overlays;
+      };
     in
     flake-utils.lib.eachDefaultSystem
       (system:
@@ -40,15 +49,6 @@
       ) //
     (
       let
-        getName = pkg: pkg.pname or (builtins.parseDrvName pkg.name).name;
-        nixpkgsConfig = {
-          config.allowUnfreePredicate = pkg: builtins.elem (getName pkg) [
-            "vscode"
-            "copilot.vim"
-          ];
-          inherit overlays;
-        };
-
         nixosSystem = nixpkgs.lib.nixosSystem;
       in
       {
@@ -248,6 +248,7 @@
           pkgs = (import nixpkgs {
             inherit system;
             inherit overlays;
+            inherit (nixpkgsConfig) config;
           });
         in
         {

@@ -12,12 +12,13 @@
     nix-darwin.inputs.nixpkgs.follows = "nixpkgs";
     home-manager.url = "github:nix-community/home-manager";
     home-manager.inputs.nixpkgs.follows = "nixpkgs";
-    targo.url = "github:jmesmon/targo";
+    targo.url = "github:codyps/targo";
     targo.inputs.nixpkgs.follows = "nixpkgs";
     targo.inputs.flake-utils.follows = "flake-utils";
+    impermanence.url = "github:nix-community/impermanence";
   };
 
-  outputs = { self, nixpkgs, flake-utils, targo, nix-darwin, home-manager, nixos-wsl, nixos-vscode-server }:
+  outputs = { self, nixpkgs, flake-utils, targo, nix-darwin, home-manager, nixos-wsl, nixos-vscode-server, impermanence }:
     let
       overlays = [
         (final: prev: {
@@ -43,6 +44,7 @@
         nixpkgsConfig = {
           config.allowUnfreePredicate = pkg: builtins.elem (getName pkg) [
             "vscode"
+            "copilot.vim"
           ];
           inherit overlays;
         };
@@ -51,12 +53,31 @@
       in
       {
         nixosConfigurations = {
+          # router
+          ward = nixosSystem {
+            system = "x86_64-linux";
+            specialArgs = { inherit home-manager; };
+            modules = [
+              (import ./nixos/ward/configuration.nix)
+              (import ./nixos/common.nix)
+              impermanence.nixosModules.impermanence
+              home-manager.nixosModules.home-manager
+              {
+                nixpkgs = nixpkgsConfig;
+                home-manager.useGlobalPkgs = true;
+                home-manager.useUserPackages = true;
+                home-manager.users.cody = import ./home-manager/home.nix;
+              }
+            ];
+          };
+
           # framework wsl
           findley = nixosSystem {
             system = "x86_64-linux";
             specialArgs = { inherit home-manager nixos-wsl nixos-vscode-server; };
             modules = [
               (import ./nixos/findley/configuration.nix)
+              (import ./nixos/common.nix)
               home-manager.nixosModules.home-manager
               {
                 nixpkgs = nixpkgsConfig;
@@ -232,7 +253,7 @@
         {
 
           # chromeos
-          homeConfigurations."cody@penguin" = home-manager.lib.homeManagerConfiguration {
+          homeConfigurations."cody@peyton" = home-manager.lib.homeManagerConfiguration {
             inherit pkgs;
 
             modules = [

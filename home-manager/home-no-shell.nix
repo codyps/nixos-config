@@ -72,49 +72,6 @@ in
     pkgs.kubectl
   ];
 
-  programs.neovim = {
-    enable = true;
-    defaultEditor = true;
-    viAlias = true;
-    vimAlias = true;
-    plugins = with pkgs.vimPlugins; [
-      ctrlp-vim
-      securemodelines
-      vim-sneak
-      vim-lastplace
-      vim-rooter
-      fzf-vim
-      fzfWrapper
-      coc-rust-analyzer
-      coc-go
-      coc-toml
-      coc-yaml
-      coc-sh
-      coc-nvim
-      rust-vim
-      vim-toml
-      vim-airline
-      #v-vim
-      zig-vim
-      vim-terraform
-      vim-nix
-      #cargo-limit
-      copilot-vim
-      kotlin-vim
-      #jenkinsfile-vim-syntax
-    ];
-  };
-
-  programs.zsh = {
-    enable = true;
-  };
-
-  programs.bash = {
-    initExtra = ''
-      HISTTIMEFORMAT="%F %T "
-    '';
-  };
-
   programs.fzf = {
     enable = true;
   };
@@ -220,6 +177,90 @@ in
   programs.direnv = {
     enable = true;
     nix-direnv.enable = true;
+  };
+
+  programs.atuin = {
+    enable = true;
+    flags = [ "--disable-up-arrow" ];
+  };
+
+  # Home Manager is pretty good at managing dotfiles. The primary way to manage
+  # plain files is through 'home.file'.
+  home.file = {
+    # # Building this configuration will create a copy of 'dotfiles/screenrc' in
+    # # the Nix store. Activating the configuration will then make '~/.screenrc' a
+    # # symlink to the Nix store copy.
+    # ".screenrc".source = dotfiles/screenrc;
+
+    # # You can also set the file content immediately.
+    # ".gradle/gradle.properties".text = ''
+    #   org.gradle.console=verbose
+    #   org.gradle.daemon.idletimeout=3600000
+    # '';
+    "${cache-home}/nix/current-home-flake".source = ../.;
+  };
+
+
+  # You can also manage environment variables but you will have to manually
+  # source
+  #
+  #  ~/.nix-profile/etc/profile.d/hm-session-vars.sh
+  #
+  # or
+  #
+  #  /etc/profiles/per-user/cody/etc/profile.d/hm-session-vars.sh
+  #
+  # if you don't want to manage your shell through Home Manager.
+  home.sessionVariables = {
+    # EDITOR = "emacs";
+  };
+
+  # Let Home Manager install and manage itself.
+  programs.home-manager.enable = true;
+  
+  programs.neovim = {
+    enable = true;
+    defaultEditor = true;
+    viAlias = true;
+    vimAlias = true;
+    plugins = with pkgs.vimPlugins; [
+      #cargo-limit
+      #jenkinsfile-vim-syntax
+      #v-vim
+      coc-go
+      coc-nvim
+      coc-rust-analyzer
+      coc-sh
+      coc-toml
+      coc-yaml
+      copilot-vim
+      ctrlp-vim
+      fzf-vim
+      fzfWrapper
+      kotlin-vim
+      rust-vim
+      securemodelines
+      vim-airline
+      vim-lastplace
+      vim-nix
+      vim-rooter
+      vim-sneak
+      vim-terraform
+      vim-toml
+      zig-vim
+    ];
+
+    extraConfig = ''
+      set runtimepath^=~/.config/nvim/raw runtimepath+=~/.config/nvim/raw/after
+      source ~/.config/nvim/raw/init.vim
+    '';
+  };
+
+  xdg.configFile."nvim/raw".source = ./nvim;
+
+  programs.nix-index.enable = true;
+  programs.fzf = {
+    enable = true;
   };
 
   programs.atuin = {

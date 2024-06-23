@@ -30,6 +30,7 @@ in
   nix.settings = {
     experimental-features = [ "nix-command" "flakes" ];
     trusted-users = [ "root" "@wheel" ];
+    builders-use-substitutes = true;
   };
 
   networking.hostName = "constance"; # Define your hostname.

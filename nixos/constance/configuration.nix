@@ -27,7 +27,10 @@ in
   boot.loader.grub.device = "/dev/disk/by-id/wwn-0x500a0751e6d4d4a7";
   boot.loader.grub.useOSProber = true;
 
-  nix.settings.experimental-features = [ "nix-command" "flakes" ];
+  nix.settings = {
+    experimental-features = [ "nix-command" "flakes" ];
+    trusted-users = [ "root" "@wheel" ];
+  };
 
   networking.hostName = "constance"; # Define your hostname.
   # networking.wireless.enable = true;  # Enables wireless support via wpa_supplicant.

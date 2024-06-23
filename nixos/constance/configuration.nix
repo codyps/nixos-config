@@ -13,6 +13,15 @@ in
       ./hardware-configuration.nix
     ];
 
+  nixpkgs.overlays = [
+    (final: prev: {
+      lighthouse = prev.lighthouse.overrideAttrs (_: {
+        # Otherwise, SIGILL occurs
+        buildFeatures = ["portable"];
+      });
+    })
+  ];
+
   # Bootloader.
   boot.loader.grub.enable = true;
   boot.loader.grub.device = "/dev/disk/by-id/wwn-0x500a0751e6d4d4a7";
@@ -162,14 +171,16 @@ in
 
   services.geth.holesky = {
     enable = true;
+    ipc.enable = true;
     network = "holesky";
     authrpc.jwtsecret = execution_jwt_path;
   };
 
   services.lighthouse = {
     beacon = {
-    	enable = true;
+      enable = true;
       execution.jwtPath = execution_jwt_path;
+      extraArgs = "--checkpoint-sync-url 'https://checkpoint-sync.holesky.ethpandaops.io/'";
     };
     validator.enable = true;
     network = "holesky";

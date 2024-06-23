@@ -3,7 +3,9 @@
 # and in the NixOS manual (accessible by running ‘nixos-help’).
 
 { config, pkgs, ... }:
-
+let
+  execution_jwt_path = "/etc/secrets/lighthouse-jwt.hex";
+in
 {
   imports =
     [
@@ -89,7 +91,8 @@
   # Enable touchpad support (enabled default in most desktopManager).
   # services.xserver.libinput.enable = true;
 
-  # Define a user account. Don't forget to set a password with ‘passwd’.
+  users.defaultUserShell = pkgs.zsh;
+
   users.users.cody2 = {
     isNormalUser = true;
     description = "Cody 2";
@@ -105,12 +108,14 @@
 
   programs.neovim.enable = true;
   programs.neovim.defaultEditor = true;
+  programs.zsh.enable = true;
 
   # List packages installed in system profile. To search, run:
   # $ nix search wget
   environment.systemPackages = with pkgs; [
     neovim
     cifs-utils
+    #zsh
   ];
 
   # Some programs need SUID wrappers, can be configured further or are
@@ -143,9 +148,8 @@
       [ "${automount_opts},credentials=/home/cody/smb-secrets" ];
   };
 
-  hardware.opengl = {
+  hardware.graphics = {
     enable = true;
-    driSupport = true;
     extraPackages = [ pkgs.mesa.drivers ];
   };
 
@@ -159,10 +163,14 @@
   services.geth.holesky = {
     enable = true;
     network = "holesky";
+    authrpc.jwtsecret = execution_jwt_path;
   };
 
   services.lighthouse = {
-    beacon.enable = true;
+    beacon = {
+    	enable = true;
+      execution.jwtPath = execution_jwt_path;
+    };
     validator.enable = true;
     network = "holesky";
   };

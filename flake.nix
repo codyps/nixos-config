@@ -291,6 +291,18 @@
               ./home-manager/home.nix
             ];
           };
+
+          homeConfigurations."cody@constance" = home-manager.lib.homeManagerConfiguration {
+            inherit pkgs;
+
+            modules = [
+              ({ ... }: {
+                home.username = "cody";
+                home.homeDirectory = "/home/cody";
+              })
+              ./home-manager/home.nix
+            ];
+          };
         }
       )
     );

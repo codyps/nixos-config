@@ -15,9 +15,12 @@ in
 
   nixpkgs.overlays = [
     (final: prev: {
-      lighthouse = prev.lighthouse.overrideAttrs (_: {
+      lighthouse = prev.lighthouse.overrideAttrs (orig: {
         # Otherwise, SIGILL occurs
-        buildFeatures = ["portable"];
+        cargoBuildFeatures = (builtins.filter (x: x != "modern") orig.cargoBuildFeatures) ++ ["portable"];
+        # Builds are really slow on this system, as are running tests. Get
+        # distributed builds working and/or hydra on some faster system.
+        doCheck = false;
       });
     })
   ];
@@ -68,6 +71,7 @@ in
 
   # Enable the Pantheon Desktop Environment.
   services.xserver.displayManager.lightdm.enable = true;
+  services.xserver.displayManager.lightdm.greeters.pantheon.enable = true;
   services.xserver.desktopManager.pantheon.enable = true;
   services.gvfs.enable = true;
 

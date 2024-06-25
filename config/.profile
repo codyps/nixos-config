@@ -94,7 +94,7 @@ fi
 
 export EDITOR="nvim"
 export RUSTC_WRAPPER="sccache"
-export CMAKE="cmake-ccache"
+#export CMAKE="cmake-ccache"
 export PATH="$HOME/.local/bin:$PATH"
 export PATH="$HOME/.local/bin/ccache.d:$PATH"
 

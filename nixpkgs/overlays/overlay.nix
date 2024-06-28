@@ -19,7 +19,7 @@ final: prev: {
       CC=$(command -v $CC)
       CXX=$(command -v $CXX)
     '';
-  }); 
+  });
 
   s2 = with prev; (callPackage ./pkgs/s2.nix {
     inherit fetchFromGitHub lib buildGoModule;

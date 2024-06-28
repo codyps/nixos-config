@@ -17,7 +17,7 @@ in
     (final: prev: {
       lighthouse = prev.lighthouse.overrideAttrs (orig: {
         # Otherwise, SIGILL occurs
-        cargoBuildFeatures = (builtins.filter (x: x != "modern") orig.cargoBuildFeatures) ++ ["portable"];
+        cargoBuildFeatures = (builtins.filter (x: x != "modern") orig.cargoBuildFeatures) ++ [ "portable" ];
         # Builds are really slow on this system, as are running tests. Get
         # distributed builds working and/or hydra on some faster system.
         doCheck = false;
@@ -170,7 +170,7 @@ in
     extraPackages = [ pkgs.mesa.drivers ];
   };
 
-  services.xserver.videoDrivers =  [
+  services.xserver.videoDrivers = [
     #"radeon"
     "intel"
     "modesetting"

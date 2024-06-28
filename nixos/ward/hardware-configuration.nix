@@ -5,7 +5,8 @@
 
 {
   imports =
-    [ (modulesPath + "/installer/scan/not-detected.nix")
+    [
+      (modulesPath + "/installer/scan/not-detected.nix")
     ];
 
   boot.initrd.availableKernelModules = [ "xhci_pci" "ahci" "nvme" "usbhid" "usb_storage" "sd_mod" ];
@@ -14,33 +15,39 @@
   boot.extraModulePackages = [ ];
 
   fileSystems."/" =
-    { device = "ward/temp/root";
+    {
+      device = "ward/temp/root";
       fsType = "zfs";
     };
 
   fileSystems."/home" =
-    { device = "ward/keep/home";
+    {
+      device = "ward/keep/home";
       fsType = "zfs";
     };
 
   fileSystems."/boot" =
-    { device = "/dev/disk/by-uuid/D04B-D453";
+    {
+      device = "/dev/disk/by-uuid/D04B-D453";
       fsType = "vfat";
       options = [ "fmask=0022" "dmask=0022" ];
     };
 
   fileSystems."/nix" =
-    { device = "ward/keep/nix";
+    {
+      device = "ward/keep/nix";
       fsType = "zfs";
     };
 
   fileSystems."/persist" =
-    { device = "ward/keep/persist";
+    {
+      device = "ward/keep/persist";
       fsType = "zfs";
     };
 
   fileSystems."/etc/nixos" =
-    { device = "/persist/etc/nixos";
+    {
+      device = "/persist/etc/nixos";
       fsType = "none";
       options = [ "bind" ];
     };

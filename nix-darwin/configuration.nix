@@ -13,7 +13,7 @@ in
     curl
     fd
     git
-    ncdu
+    #ncdu
     neovim
     nix-direnv
     nodejs

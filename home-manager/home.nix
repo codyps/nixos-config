@@ -50,7 +50,7 @@ in
     pkgs.git-crypt
     pkgs.gnupg
     pkgs.htop
-    pkgs.ncdu
+    #pkgs.ncdu
     pkgs.nodejs
     pkgs.openssh
     pkgs.rclone

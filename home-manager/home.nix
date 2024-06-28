@@ -225,6 +225,9 @@ in
         helper = "!${pkgs.pass-git-helper}/bin/pass-git-helper $0";
         useHttpPath = true;
       };
+
+      url."ssh://git@gitlab.com/".insteadOf = "https://gitlab.com/";
+
       sendemail = {
         confirm = "auto";
         smtpserver = "${pkgs.msmtp}/bin/msmtp";

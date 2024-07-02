@@ -70,6 +70,23 @@
             ];
           };
 
+          # storage vps
+          finch = nixosSystem {
+            system = "x86_64-linux";
+            modules = [
+              (import ./nixos/finch/configuration.nix)
+              (import ./nixos/common.nix)
+              impermanence.nixosModules.impermanence
+              home-manager.nixosModules.home-manager
+              {
+                nixpkgs = nixpkgsConfig;
+                home-manager.useGlobalPkgs = true;
+                home-manager.useUserPackages = true;
+                home-manager.users.cody = import ./home-manager/home.nix;
+              }
+            ];
+          };
+
           # router
           ward = nixosSystem {
             system = "x86_64-linux";
@@ -304,6 +321,18 @@
               ({ ... }: {
                 home.username = "x";
                 home.homeDirectory = "/home/x";
+              })
+              ./home-manager/home.nix
+            ];
+          };
+
+          homeConfigurations."cody@constance" = home-manager.lib.homeManagerConfiguration {
+            inherit pkgs;
+
+            modules = [
+              ({ ... }: {
+                home.username = "cody";
+                home.homeDirectory = "/home/cody";
               })
               ./home-manager/home.nix
             ];

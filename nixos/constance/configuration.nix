@@ -3,7 +3,9 @@
 # and in the NixOS manual (accessible by running ‘nixos-help’).
 
 { config, pkgs, ... }:
-
+let
+  execution_jwt_path = "/etc/secrets/lighthouse-jwt.hex";
+in
 {
   imports =
     [
@@ -11,12 +13,28 @@
       ./hardware-configuration.nix
     ];
 
+  nixpkgs.overlays = [
+    (final: prev: {
+      lighthouse = prev.lighthouse.overrideAttrs (orig: {
+        # Otherwise, SIGILL occurs
+        cargoBuildFeatures = (builtins.filter (x: x != "modern") orig.cargoBuildFeatures) ++ [ "portable" ];
+        # Builds are really slow on this system, as are running tests. Get
+        # distributed builds working and/or hydra on some faster system.
+        doCheck = false;
+      });
+    })
+  ];
+
   # Bootloader.
   boot.loader.grub.enable = true;
   boot.loader.grub.device = "/dev/disk/by-id/wwn-0x500a0751e6d4d4a7";
   boot.loader.grub.useOSProber = true;
 
-  nix.settings.experimental-features = [ "nix-command" "flakes" ];
+  nix.settings = {
+    experimental-features = [ "nix-command" "flakes" ];
+    trusted-users = [ "root" "@wheel" ];
+    builders-use-substitutes = true;
+  };
 
   networking.hostName = "constance"; # Define your hostname.
   # networking.wireless.enable = true;  # Enables wireless support via wpa_supplicant.
@@ -53,6 +71,7 @@
 
   # Enable the Pantheon Desktop Environment.
   services.xserver.displayManager.lightdm.enable = true;
+  services.xserver.displayManager.lightdm.greeters.pantheon.enable = true;
   services.xserver.desktopManager.pantheon.enable = true;
   services.gvfs.enable = true;
 
@@ -89,7 +108,8 @@
   # Enable touchpad support (enabled default in most desktopManager).
   # services.xserver.libinput.enable = true;
 
-  # Define a user account. Don't forget to set a password with ‘passwd’.
+  users.defaultUserShell = pkgs.zsh;
+
   users.users.cody2 = {
     isNormalUser = true;
     description = "Cody 2";
@@ -105,12 +125,14 @@
 
   programs.neovim.enable = true;
   programs.neovim.defaultEditor = true;
+  programs.zsh.enable = true;
 
   # List packages installed in system profile. To search, run:
   # $ nix search wget
   environment.systemPackages = with pkgs; [
     neovim
     cifs-utils
+    #zsh
   ];
 
   # Some programs need SUID wrappers, can be configured further or are
@@ -143,13 +165,12 @@
       [ "${automount_opts},credentials=/home/cody/smb-secrets" ];
   };
 
-  hardware.opengl = {
+  hardware.graphics = {
     enable = true;
-    driSupport = true;
     extraPackages = [ pkgs.mesa.drivers ];
   };
 
-  services.xserver.videoDrivers =  [
+  services.xserver.videoDrivers = [
     #"radeon"
     "intel"
     "modesetting"
@@ -158,11 +179,17 @@
 
   services.geth.holesky = {
     enable = true;
+    ipc.enable = true;
     network = "holesky";
+    authrpc.jwtsecret = execution_jwt_path;
   };
 
   services.lighthouse = {
-    beacon.enable = true;
+    beacon = {
+      enable = true;
+      execution.jwtPath = execution_jwt_path;
+      extraArgs = "--checkpoint-sync-url 'https://checkpoint-sync.holesky.ethpandaops.io/'";
+    };
     validator.enable = true;
     network = "holesky";
   };

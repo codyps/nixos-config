@@ -37,10 +37,14 @@ in
     # (pkgs.writeShellScriptBin "my-hello" ''
     #   echo "Hello, ${config.home.username}!"
     # '')
+
+
+    #pkgs.cargo-outdated
+    #pkgs.ncdu
     pkgs.atuin
+    pkgs.bazelisk
     pkgs.cargo-generate
     pkgs.cargo-limit
-    #pkgs.cargo-outdated
     pkgs.ccache
     pkgs.curl
     pkgs.exiftool
@@ -50,7 +54,8 @@ in
     pkgs.git-crypt
     pkgs.gnupg
     pkgs.htop
-    pkgs.ncdu
+    pkgs.krew
+    pkgs.kubectl
     pkgs.nodejs
     pkgs.openssh
     pkgs.rclone
@@ -67,9 +72,6 @@ in
     pkgs.watch
     pkgs.xsv
     pkgs.yt-dlp
-
-    pkgs.krew
-    pkgs.kubectl
   ];
 
   programs.git = {
@@ -151,11 +153,13 @@ in
       gc = {
         auto = "256";
       };
-      # TODO: use absolute path
       credential = {
         helper = "!${pkgs.pass-git-helper}/bin/pass-git-helper $0";
         useHttpPath = true;
       };
+
+      url."ssh://git@gitlab.com/".insteadOf = "https://gitlab.com/";
+
       sendemail = {
         confirm = "auto";
         smtpserver = "${pkgs.msmtp}/bin/msmtp";
@@ -170,28 +174,6 @@ in
     lfs.enable = true;
   };
 
-  programs.direnv = {
-    enable = true;
-    nix-direnv.enable = true;
-  };
-
-  # Home Manager is pretty good at managing dotfiles. The primary way to manage
-  # plain files is through 'home.file'.
-  home.file = {
-    # # Building this configuration will create a copy of 'dotfiles/screenrc' in
-    # # the Nix store. Activating the configuration will then make '~/.screenrc' a
-    # # symlink to the Nix store copy.
-    # ".screenrc".source = dotfiles/screenrc;
-
-    # # You can also set the file content immediately.
-    # ".gradle/gradle.properties".text = ''
-    #   org.gradle.console=verbose
-    #   org.gradle.daemon.idletimeout=3600000
-    # '';
-    "${cache-home}/nix/current-home-flake".source = ../.;
-    ".tmux.conf".source = ../config/.tmux.conf;
-  };
-  
   programs.neovim = {
     enable = true;
     defaultEditor = true;
@@ -230,17 +212,31 @@ in
     '';
   };
 
-  xdg.configFile."nvim/raw".source = ./nvim;
+  # Let Home Manager install and manage itself.
+  programs.home-manager.enable = true;
 
   programs.nix-index.enable = true;
+
   programs.fzf = {
     enable = true;
+  };
+
+  programs.direnv = {
+    enable = true;
+    nix-direnv.enable = true;
   };
 
   programs.atuin = {
     enable = true;
     flags = [ "--disable-up-arrow" ];
   };
+
+  home.file = {
+    "${cache-home}/nix/current-home-flake".source = ../.;
+    ".tmux.conf".source = ../config/.tmux.conf;
+  };
+
+  xdg.configFile."nvim/raw".source = ./nvim;
 
   # You can also manage environment variables but you will have to manually
   # source
@@ -255,7 +251,4 @@ in
   home.sessionVariables = {
     # EDITOR = "emacs";
   };
-
-  # Let Home Manager install and manage itself.
-  programs.home-manager.enable = true;
 }

@@ -43,12 +43,12 @@ in
       description = "Rollback ZFS datasets to a pristine state";
       wantedBy = [
         "initrd.target"
-      ]; 
+      ];
       after = [
         # TODO: use systemd generated targets instead
         "zfs-import-ward.service"
       ];
-      before = [ 
+      before = [
         "sysroot.mount"
       ];
       path = with pkgs; [
@@ -70,7 +70,7 @@ in
       };
     };
 
-    kernelModules = [ "usb_storage" "igc" "tpm_crb" ]; 
+    kernelModules = [ "usb_storage" "igc" "tpm_crb" ];
 
     luks.devices = {
       luksroot = {
@@ -100,7 +100,7 @@ in
   # Enable the GNOME Desktop Environment.
   services.xserver.displayManager.gdm.enable = true;
   services.xserver.desktopManager.gnome.enable = true;
-  
+
 
   # Configure keymap in X11
   # services.xserver.xkb.layout = "us";

@@ -51,6 +51,22 @@
       in
       {
         nixosConfigurations = {
+
+          # storage vps
+          finch = nixosSystem {
+            system = "x86_64-linux";
+            modules = [
+              (import ./nixos/finch/configuration.nix)
+              home-manager.nixosModules.home-manager
+              {
+                nixpkgs = nixpkgsConfig;
+                home-manager.useGlobalPkgs = true;
+                home-manager.useUserPackages = true;
+                home-manager.users.cody = import ./home-manager/home.nix;
+              }
+            ];
+          };
+
           # framework wsl
           findley = nixosSystem {
             system = "x86_64-linux";

@@ -9,29 +9,7 @@
     [
       ./hardware-configuration.nix
       (modulesPath + "/virtualisation/xen-domU.nix")
-      <impermanence/nixos.nix>
     ];
-
-
-
-  nix = {
-    package = pkgs.nixFlakes;
-    settings = {
-      auto-optimise-store = true;                                                    
-      experimental-features = [ "nix-command" "flakes" ];
-    };
-    gc = {                                    
-      automatic = true;
-      dates = "weekly";                     
-      options = "--delete-older-than 30d";
-    };
-    nixPath =
-      [
-        "nixpkgs=/nix/var/nix/profiles/per-user/root/channels/nixos"
-        "nixos-config=/persist/etc/nixos/configuration.nix"
-        "/nix/var/nix/profiles/per-user/root/channels"
-      ];
-  };
 
   services.logrotate.checkConfig = false;
 

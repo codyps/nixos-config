@@ -6,14 +6,15 @@
 
 {
   imports =
-    [ # Include the results of the hardware scan.
+    [
+      # Include the results of the hardware scan.
       ./hardware-configuration.nix
     ];
 
   # Bootloader.
   boot.loader.systemd-boot.enable = true;
   boot.loader.efi.canTouchEfiVariables = true;
-  
+
   virtualisation.vmware.guest.enable = true;
 
   networking.hostName = "mifflin"; # Define your hostname.
@@ -100,15 +101,15 @@
   nixpkgs.config.allowUnfree = true;
 
   environment.systemPackages = with pkgs; [
-      neovim
-      wget
-      curl
+    neovim
+    wget
+    curl
   ];
 
   programs.mtr.enable = true;
   programs.gnupg.agent = {
-     enable = true;
-     enableSSHSupport = true;
+    enable = true;
+    enableSSHSupport = true;
   };
 
   services.openssh.enable = true;

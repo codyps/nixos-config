@@ -51,45 +51,45 @@
   boot.initrd.extraFiles."/etc/zfs/zfs-list.cache".source = /persist/var/cache/zfs/zfs-list.cache;
   boot.initrd.extraFiles."/etc/zfs/zpool.cache".source = /persist/var/cache/zfs/zpool.cache;
 
-  swapDevices = [ {
+  swapDevices = [{
     device = "/dev/rpool/local/swap";
-  } ];
+  }];
 
   fileSystems."/persist".neededForBoot = true;
 
   fileSystems."/var/lib" = {
     device = "/persist/var/lib";
-    options = ["bind" "x-systemd.requires-mounts-for=/persist"];
-    depends = ["/persist"];
+    options = [ "bind" "x-systemd.requires-mounts-for=/persist" ];
+    depends = [ "/persist" ];
     neededForBoot = true;
   };
 
   fileSystems."/var/log" = {
     device = "/persist/var/log";
-    options = ["bind" "x-systemd.requires-mounts-for=/persist"];
-    depends = ["/persist"];
+    options = [ "bind" "x-systemd.requires-mounts-for=/persist" ];
+    depends = [ "/persist" ];
     neededForBoot = true;
   };
 
   fileSystems."/etc/zfs/zfs-list.cache" = {
     device = "/persist/var/cache/zfs/zfs-list.cache";
-    options = ["bind" "x-systemd.requires-mounts-for=/persist"];
-    depends = ["/persist"];
+    options = [ "bind" "x-systemd.requires-mounts-for=/persist" ];
+    depends = [ "/persist" ];
     neededForBoot = true;
   };
 
   fileSystems."/etc/zfs/zpool.cache" = {
     device = "/persist/var/cache/zfs/zpool.cache";
-    options = ["bind" "x-systemd.requires-mounts-for=/persist"];
-    depends = ["/persist"];
+    options = [ "bind" "x-systemd.requires-mounts-for=/persist" ];
+    depends = [ "/persist" ];
     neededForBoot = true;
   };
 
   /*
-  systemd.tmpfiles.rules = [
+    systemd.tmpfiles.rules = [
     "L /etc/zfs/zfs-list.cache - - - - /persist/var/cache/zfs/zfs-list.cache"
     "L /etc/zfs/zpool.cache - - - - /persist/var/cache/zfs/zpool.cache"
-  ];
+    ];
   */
   environment.etc."machine-id".source = "/persist/etc/machine-id";
 
@@ -107,18 +107,18 @@
   };
 
   /*
-  services.harmonia = {
+    services.harmonia = {
     enable = false;
     signKeyPath = "/persist/var/lib/secrets/harmonia.secret";
     # let's not bind to the wildcard address.
     settings = {
       bind = "[::1]:5000";
     };
-  };
+    };
   */
 
   /*
-  services.atticd = {
+    services.atticd = {
     # Replace with absolute path to your credentials file
     credentialsFile = "/persist/etc/atticd.env";
 
@@ -148,18 +148,18 @@
         max-size = 256 * 1024; # 256 KiB
       };
     };
-  };
+    };
   */
 
   /*
-  services.hydra = {
+    services.hydra = {
     enable = false;
     hydraURL = "https://hydra.finch.einic.org/";
     notificationSender = "hydra@localhost";
     buildMachinesFiles = [];
     useSubstitutes = true;
     listenHost = "localhost";
-  };
+    };
   */
 
   services.caddy = {
@@ -171,13 +171,13 @@
     #  reverse_proxy :3000
     #'';
     virtualHosts."syncthing.finch.einic.org".extraConfig = ''
-      basicauth {
-	      y JDJhJDE0JFJrSWZYek5FQU4yZFhPYXE1VlUuVGUuLm9hcndXQXJWLzRGcFJxZllpcy9KUmpLNmRwS01h
-      }
-      reverse_proxy :8384 {
-	      # https://docs.syncthing.net/users/faq.html#why-do-i-get-host-check-error-in-the-gui-api
-	      header_up +Host "localhost"
-      }
+            basicauth {
+      	      y JDJhJDE0JFJrSWZYek5FQU4yZFhPYXE1VlUuVGUuLm9hcndXQXJWLzRGcFJxZllpcy9KUmpLNmRwS01h
+            }
+            reverse_proxy :8384 {
+      	      # https://docs.syncthing.net/users/faq.html#why-do-i-get-host-check-error-in-the-gui-api
+      	      header_up +Host "localhost"
+            }
     '';
   };
 
@@ -187,7 +187,7 @@
 
   systemd.network = {
     enable = true;
-    networks."10-enX0" = { 
+    networks."10-enX0" = {
       matchConfig.Name = "enX0";
       dns = [
         "1.1.1.1"
@@ -196,7 +196,7 @@
       address = [
         "207.90.192.55/24"
       ];
-      gateway = ["207.90.192.1"];
+      gateway = [ "207.90.192.1" ];
     };
 
     networks."10-enX1" = {
@@ -208,14 +208,14 @@
       address = [
         "2602:ffd5:0001:1e7:0000:0000:0000:0001/36"
       ];
-      gateway = ["2602:ffd5:1:100::1"];
+      gateway = [ "2602:ffd5:1:100::1" ];
     };
   };
 
 
-/*
-  # system specific details
-  networking = {
+  /*
+    # system specific details
+    networking = {
     useDHCP = false;
     dhcpcd.enable = false;
     useNetworkd = true;
@@ -236,8 +236,8 @@
       #interface = "enX1";
     };
     nameservers = [ "8.8.8.8" ];
-  };
-*/
+    };
+  */
 
   time.timeZone = "America/New_York";
   i18n.defaultLocale = "en_US.UTF-8";

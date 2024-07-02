@@ -12,22 +12,26 @@
   boot.extraModulePackages = [ ];
 
   fileSystems."/" =
-    { device = "rpool/local/root";
+    {
+      device = "rpool/local/root";
       fsType = "zfs";
     };
 
   fileSystems."/nix" =
-    { device = "rpool/local/nix";
+    {
+      device = "rpool/local/nix";
       fsType = "zfs";
     };
 
   fileSystems."/persist" =
-    { device = "rpool/safe/persist";
+    {
+      device = "rpool/safe/persist";
       fsType = "zfs";
     };
 
   fileSystems."/boot" =
-    { device = "/dev/disk/by-uuid/bb208bef-1c49-4c3f-adb1-969039d27c07";
+    {
+      device = "/dev/disk/by-uuid/bb208bef-1c49-4c3f-adb1-969039d27c07";
       fsType = "ext4";
     };
 

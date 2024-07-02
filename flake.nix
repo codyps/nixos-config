@@ -53,6 +53,23 @@
       in
       {
         nixosConfigurations = {
+          # u3 macbook vmware vm
+          mifflin = nixosSystem {
+            system = "x86_64-linux";
+            specialArgs = { inherit home-manager; };
+            modules = [
+              (import ./nixos/mifflin/configuration.nix)
+              (import ./nixos/common.nix)
+              home-manager.nixosModules.home-manager
+              {
+                nixpkgs = nixpkgsConfig;
+                home-manager.useGlobalPkgs = true;
+                home-manager.useUserPackages = true;
+                home-manager.users.cody = import ./home-manager/home.nix;
+              }
+            ];
+          };
+
           # router
           ward = nixosSystem {
             system = "x86_64-linux";

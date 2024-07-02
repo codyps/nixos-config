@@ -61,6 +61,8 @@
     #xkb.variant = "";
   };
 
+  services.tailscale.enable = true;
+
   # Enable CUPS to print documents.
   services.printing.enable = true;
 

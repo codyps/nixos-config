@@ -82,6 +82,15 @@ in
     };
   };
 
+  systemd.services.tailscale-web = {
+    wantedBy = [
+      "multi-user.target"
+    ];
+    script = ''
+      tailscale web
+    '';
+  };
+
   networking.hostName = "ward";
   networking.hostId = "5c794628";
 

@@ -11,6 +11,19 @@
       (modulesPath + "/virtualisation/xen-domU.nix")
     ];
 
+  system.autoUpgrade = {
+    enable = true;
+    flake = inputs.self.outPath;
+    flags = [
+      "--update-input"
+      "nixpkgs"
+      "--no-write-lock-file"
+      "-L" # print build logs
+    ];
+    dates = "02:00";
+    randomizedDelaySec = "45min";
+  };
+
   services.logrotate.checkConfig = false;
 
   boot.zfs.extraPools = [ "tank" ];
@@ -45,6 +58,15 @@
     serviceConfig.Type = "oneshot";
     script = ''
       zfs rollback -r rpool/local/root@blank && echo "  >> >> rollback complete << <<"
+    '';
+  };
+
+  systemd.services.tailscale-web = {
+    wantedBy = [
+      "multi-user.target"
+    ];
+    script = ''
+      tailscale web
     '';
   };
 

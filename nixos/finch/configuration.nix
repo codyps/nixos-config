@@ -2,7 +2,7 @@
 # your system.  Help is available in the configuration.nix(5) man page
 # and in the NixOS manual (accessible by running ‘nixos-help’).
 
-{ config, pkgs, lib, modulesPath, ... }:
+{ config, pkgs, lib, modulesPath, self, ... }:
 
 {
   imports =
@@ -13,7 +13,7 @@
 
   system.autoUpgrade = {
     enable = true;
-    flake = inputs.self.outPath;
+    flake = self.outPath;
     flags = [
       "--update-input"
       "nixpkgs"
@@ -66,7 +66,7 @@
       "multi-user.target"
     ];
     script = ''
-      tailscale web
+      ${pkgs.tailscale}/bin/tailscale web
     '';
   };
 

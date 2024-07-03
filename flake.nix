@@ -73,6 +73,7 @@
           # storage vps
           finch = nixosSystem {
             system = "x86_64-linux";
+            specialArgs = { inherit self; };
             modules = [
               (import ./nixos/finch/configuration.nix)
               (import ./nixos/common.nix)
@@ -90,7 +91,7 @@
           # router
           ward = nixosSystem {
             system = "x86_64-linux";
-            specialArgs = { inherit home-manager; };
+            specialArgs = { inherit home-manager self; };
             modules = [
               (import ./nixos/ward/configuration.nix)
               (import ./nixos/common.nix)

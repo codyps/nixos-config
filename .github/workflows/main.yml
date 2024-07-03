@@ -1,4 +1,4 @@
-name: Bump flake.lock
+name: nix flake update
 
 on:
   schedule:
@@ -9,23 +9,13 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-
+    permissions:
+      contents: write
     steps:
-      - uses: actions/checkout@v3
-        with:
-          fetch-depth: 0
-
-      - uses: cachix/install-nix-action@v20
-
+      - uses: actions/checkout@v4
+      - uses: cachix/install-nix-action@v27
       - run: nix flake update
-
-      - uses: stefanzweifel/git-auto-commit-action@v4
+      - uses: stefanzweifel/git-auto-commit-action@v5
         with:
-          commit_message: Bump flake.lock
-          branch: main
-          commit_options: '--no-verify --signoff'
+          commit_message: nix flake update
           file_pattern: flake.lock
-          commit_user_name: Flake Bot # defaults to "GitHub Actions"
-          commit_author: Flake Bot <actions@github.com> # defaults to author of the commit that triggered the run
-          skip_dirty_check: false    
-          skip_fetch: true

@@ -45,7 +45,7 @@
   # Use the systemd-boot EFI boot loader.
   boot.loader.systemd-boot.enable = true;
   boot.loader.efi.canTouchEfiVariables = true;
-  boot.binfmt.emulatedSystems = [ "x86_64-linux"];
+  boot.binfmt.emulatedSystems = [ "x86_64-linux" ];
 
   networking.hostName = "maclay";
   time.timeZone = "America/New_York";

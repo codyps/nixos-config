@@ -43,12 +43,12 @@ in
       description = "Rollback ZFS datasets to a pristine state";
       wantedBy = [
         "initrd.target"
-      ]; 
+      ];
       after = [
         # TODO: use systemd generated targets instead
         "zfs-import-ward.service"
       ];
-      before = [ 
+      before = [
         "sysroot.mount"
       ];
       path = with pkgs; [
@@ -70,7 +70,7 @@ in
       };
     };
 
-    kernelModules = [ "usb_storage" "igc" "tpm_crb" ]; 
+    kernelModules = [ "usb_storage" "igc" "tpm_crb" ];
 
     luks.devices = {
       luksroot = {
@@ -80,6 +80,15 @@ in
         keyFile = "/dev/disk/by-id/usb-Samsung_Type-C_0396123100002458-0:0-part5";
       };
     };
+  };
+
+  systemd.services.tailscale-web = {
+    wantedBy = [
+      "multi-user.target"
+    ];
+    script = ''
+      tailscale web
+    '';
   };
 
   networking.hostName = "ward";
@@ -100,7 +109,7 @@ in
   # Enable the GNOME Desktop Environment.
   services.xserver.displayManager.gdm.enable = true;
   services.xserver.desktopManager.gnome.enable = true;
-  
+
 
   # Configure keymap in X11
   # services.xserver.xkb.layout = "us";

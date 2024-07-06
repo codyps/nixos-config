@@ -2,73 +2,119 @@
 # your system.  Help is available in the configuration.nix(5) man page
 # and in the NixOS manual (accessible by running ‘nixos-help’).
 
-{ config, pkgs, lib, modulesPath, ... }:
+{ config, pkgs, lib, modulesPath, self, ... }:
 
 {
   imports =
     [
       ./hardware-configuration.nix
       (modulesPath + "/virtualisation/xen-domU.nix")
-      #<impermanence/nixos.nix>
     ];
 
-
-  nix = {
-    package = pkgs.nixFlakes;
-    settings = {
-      auto-optimise-store = true;
-      experimental-features = [ "nix-command" "flakes" ];
-    };
-    gc = {
-      automatic = true;
-      dates = "weekly";
-      options = "--delete-older-than 30d";
-    };
-    nixPath =
-      [
-        "nixpkgs=/nix/var/nix/profiles/per-user/root/channels/nixos"
-        "nixos-config=/persist/etc/nixos/configuration.nix"
-        "/nix/var/nix/profiles/per-user/root/channels"
-      ];
+  system.autoUpgrade = {
+    enable = true;
+    flake = self.outPath;
+    flags = [
+      "--update-input"
+      "nixpkgs"
+      "--no-write-lock-file"
+      "-L" # print build logs
+    ];
+    dates = "02:00";
+    randomizedDelaySec = "45min";
   };
+
+  services.logrotate.checkConfig = false;
+
+  boot.zfs.extraPools = [ "tank" ];
 
   # Without this, boot ends up in grup rescue.
   boot.loader.grub.device = lib.mkForce "/dev/xvda";
   boot.zfs.devNodes = "/dev/disk/by-partuuid";
 
   # source: https://grahamc.com/blog/erase-your-darlings
-  boot.initrd.postDeviceCommands = lib.mkAfter ''
-    zfs rollback -r rpool/local/root@blank
-  '';
+  #boot.initrd.postDeviceCommands = lib.mkAfter ''
+  #  zfs rollback -r rpool/local/root@blank
+  #'';
+
+  # https://discourse.nixos.org/t/zfs-rollback-not-working-using-boot-initrd-systemd/37195/3
+  boot.initrd.systemd.enable = lib.mkDefault true;
+  boot.initrd.systemd.services.rollback = {
+    description = "Rollback root filesystem to a pristine state on boot";
+    wantedBy = [
+      # "zfs.target"
+      "initrd.target"
+    ];
+    after = [
+      "zfs-import-rpool.service"
+    ];
+    before = [
+      "sysroot.mount"
+    ];
+    path = with pkgs; [
+      zfs
+    ];
+    unitConfig.DefaultDependencies = "no";
+    serviceConfig.Type = "oneshot";
+    script = ''
+      zfs rollback -r rpool/local/root@blank && echo "  >> >> rollback complete << <<"
+    '';
+  };
+
+  systemd.services.tailscale-web = {
+    wantedBy = [
+      "multi-user.target"
+    ];
+    script = ''
+      ${pkgs.tailscale}/bin/tailscale web
+    '';
+  };
+
+  services.cockpit.enable = true;
+
+  boot.initrd.extraFiles."/etc/zfs/zfs-list.cache".source = /persist/var/cache/zfs/zfs-list.cache;
+  boot.initrd.extraFiles."/etc/zfs/zpool.cache".source = /persist/var/cache/zfs/zpool.cache;
 
   swapDevices = [{
     device = "/dev/rpool/local/swap";
   }];
 
+  fileSystems."/persist".neededForBoot = true;
+
   fileSystems."/var/lib" = {
     device = "/persist/var/lib";
     options = [ "bind" "x-systemd.requires-mounts-for=/persist" ];
     depends = [ "/persist" ];
+    neededForBoot = true;
   };
 
   fileSystems."/var/log" = {
     device = "/persist/var/log";
     options = [ "bind" "x-systemd.requires-mounts-for=/persist" ];
     depends = [ "/persist" ];
+    neededForBoot = true;
+  };
+
+  fileSystems."/etc/zfs/zfs-list.cache" = {
+    device = "/persist/var/cache/zfs/zfs-list.cache";
+    options = [ "bind" "x-systemd.requires-mounts-for=/persist" ];
+    depends = [ "/persist" ];
+    neededForBoot = true;
+  };
+
+  fileSystems."/etc/zfs/zpool.cache" = {
+    device = "/persist/var/cache/zfs/zpool.cache";
+    options = [ "bind" "x-systemd.requires-mounts-for=/persist" ];
+    depends = [ "/persist" ];
+    neededForBoot = true;
   };
 
   /*
-    fileSystems."/etc/zfs/zfs-list.cache" = {
-    device = "/persist/var/cache/zfs/zfs-list.cache";
-    options = ["bind" "x-systemd.requires-mounts-for=/persist"];
-    depends = ["/persist"];
-    };
-  */
-  systemd.tmpfiles.rules = [
+    systemd.tmpfiles.rules = [
     "L /etc/zfs/zfs-list.cache - - - - /persist/var/cache/zfs/zfs-list.cache"
     "L /etc/zfs/zpool.cache - - - - /persist/var/cache/zfs/zpool.cache"
-  ];
-
+    ];
+  */
   environment.etc."machine-id".source = "/persist/etc/machine-id";
 
   #fileSystems."/var/lib/tailscale" = {
@@ -84,14 +130,16 @@
     interval = "monthly";
   };
 
-  services.harmonia = {
+  /*
+    services.harmonia = {
     enable = false;
     signKeyPath = "/persist/var/lib/secrets/harmonia.secret";
     # let's not bind to the wildcard address.
     settings = {
       bind = "[::1]:5000";
     };
-  };
+    };
+  */
 
   /*
     services.atticd = {
@@ -127,14 +175,16 @@
     };
   */
 
-  services.hydra = {
+  /*
+    services.hydra = {
     enable = false;
     hydraURL = "https://hydra.finch.einic.org/";
     notificationSender = "hydra@localhost";
-    buildMachinesFiles = [ ];
+    buildMachinesFiles = [];
     useSubstitutes = true;
     listenHost = "localhost";
-  };
+    };
+  */
 
   services.caddy = {
     enable = true;
@@ -146,7 +196,7 @@
     #'';
     virtualHosts."syncthing.finch.einic.org".extraConfig = ''
             basicauth {
-              import /persist/etc/caddy/syncthing.auth.*
+      	      y JDJhJDE0JFJrSWZYek5FQU4yZFhPYXE1VlUuVGUuLm9hcndXQXJWLzRGcFJxZllpcy9KUmpLNmRwS01h
             }
             reverse_proxy :8384 {
       	      # https://docs.syncthing.net/users/faq.html#why-do-i-get-host-check-error-in-the-gui-api
@@ -223,10 +273,13 @@
 
   users.mutableUsers = false;
   users.defaultUserShell = pkgs.zsh;
-  users.users.root = { };
+  users.users.root = {
+    initialHashedPassword = "$y$j9T$RDwENzx4wyAGDhB63WVYm/$hnpqSL1.VdDpYgEWI0sOCbW2e7ehYU47iqV5sDlhmX/";
+  };
   users.users.cody = {
     isNormalUser = true;
     extraGroups = [ "wheel" ];
+    initialHashedPassword = "$y$j9T$cAgF883T.YalezAQ/LTb/1$arVSwPQpkW5I3hdeoSm6s//oBvJcCwUUDQa19wX6JlA";
   };
 
   environment.systemPackages = with pkgs; [
@@ -236,10 +289,6 @@
   ];
 
   programs.zsh.enable = true;
-
-  # Some programs need SUID wrappers, can be configured further or are
-  # started in user sessions.
-  # programs.mtr.enable = true;
   programs.gnupg.agent = {
     enable = true;
     enableSSHSupport = true;
@@ -278,7 +327,7 @@
   networking.firewall.allowedUDPPorts = [ 443 22000 41641 ];
   networking.firewall.trustedInterfaces = [ "tailscale0" ];
 
-  system.copySystemConfiguration = true;
+  #system.copySystemConfiguration = true;
 
   systemd.generators."zfs-mount-generator" = "${config.boot.zfs.package}/lib/systemd/system-generator/zfs-mount-generator";
   environment.etc."zfs/zed.d/history_event-zfs-list-cacher.sh".source = "${config.boot.zfs.package}/etc/zfs/zed.d/history_event-zfs-list-cacher.sh";
@@ -300,7 +349,7 @@
     KERNEL=="sd[a-z]*[0-9]*|mmcblk[0-9]*p[0-9]*|nvme[0-9]*n[0-9]*p[0-9]*|xvd[a-z]*[0-9]*", ENV{ID_FS_TYPE}=="zfs_member", ATTR{../queue/scheduler}="none"
   '';
 
-  system.extraSystemBuilderCmds = "ln -s ${../.} $out/full-config";
+  system.extraSystemBuilderCmds = "ln -s ${./.} $out/full-config";
 
   # This value determines the NixOS release from which the default
   # settings for stateful data, like file locations and database versions
@@ -309,5 +358,4 @@
   # Before changing this value read the documentation for this option
   # (e.g. man configuration.nix or on https://nixos.org/nixos/options.html).
   system.stateVersion = "22.11"; # Did you read the comment?
-
 }

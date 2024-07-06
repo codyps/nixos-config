@@ -53,10 +53,45 @@
       in
       {
         nixosConfigurations = {
+          # u3 macbook vmware vm
+          mifflin = nixosSystem {
+            system = "x86_64-linux";
+            specialArgs = { inherit home-manager; };
+            modules = [
+              (import ./nixos/mifflin/configuration.nix)
+              (import ./nixos/common.nix)
+              home-manager.nixosModules.home-manager
+              {
+                nixpkgs = nixpkgsConfig;
+                home-manager.useGlobalPkgs = true;
+                home-manager.useUserPackages = true;
+                home-manager.users.cody = import ./home-manager/home.nix;
+              }
+            ];
+          };
+
+          # storage vps
+          finch = nixosSystem {
+            system = "x86_64-linux";
+            specialArgs = { inherit self; };
+            modules = [
+              (import ./nixos/finch/configuration.nix)
+              (import ./nixos/common.nix)
+              impermanence.nixosModules.impermanence
+              home-manager.nixosModules.home-manager
+              {
+                nixpkgs = nixpkgsConfig;
+                home-manager.useGlobalPkgs = true;
+                home-manager.useUserPackages = true;
+                home-manager.users.cody = import ./home-manager/home.nix;
+              }
+            ];
+          };
+
           # router
           ward = nixosSystem {
             system = "x86_64-linux";
-            specialArgs = { inherit home-manager; };
+            specialArgs = { inherit home-manager self; };
             modules = [
               (import ./nixos/ward/configuration.nix)
               (import ./nixos/common.nix)

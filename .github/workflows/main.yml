@@ -1,0 +1,21 @@
+name: nix flake update
+
+on:
+  schedule:
+    - cron: "40 6 * * *"
+
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: cachix/install-nix-action@v27
+      - run: nix flake update
+      - uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: nix flake update
+          file_pattern: flake.lock

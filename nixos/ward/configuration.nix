@@ -82,6 +82,8 @@ in
     };
   };
 
+  programs.nix-ld.enable = true;
+
   systemd.services.tailscale-web = {
     wantedBy = [
       "multi-user.target"

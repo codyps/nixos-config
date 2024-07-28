@@ -5,6 +5,7 @@
       experimental-features = [ "nix-command" "flakes" ];
       trusted-users = [ "nix-ssh" "@wheel" ];
     };
+    optimise.automatic = true;
     gc = {
       automatic = true;
       dates = "weekly";

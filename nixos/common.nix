@@ -20,6 +20,19 @@
     };
   };
 
+  system.autoUpgrade = {
+    enable = true;
+    flake = self.outPath;
+    flags = [
+      "--update-input"
+      "nixpkgs"
+      "--no-write-lock-file"
+      "-L" # print build logs
+    ];
+    dates = "02:00";
+    randomizedDelaySec = "45min";
+  };
+
   i18n.defaultLocale = "en_US.UTF-8";
 
   programs.gnupg.agent = {
@@ -43,4 +56,8 @@
     after = [ "network.target" ];
     wantedBy = [ "default.target" ];
   };
+
+  services.tailscale.enable = true;
+
+  system.extraSystemBuilderCmds = "ln -s ${./.} $out/full-config";
 }

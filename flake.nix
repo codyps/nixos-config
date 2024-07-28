@@ -56,7 +56,7 @@
           # u3 macbook vmware vm
           mifflin = nixosSystem {
             system = "x86_64-linux";
-            specialArgs = { inherit home-manager; };
+            specialArgs = { inherit home-manager self; };
             modules = [
               (import ./nixos/mifflin/configuration.nix)
               (import ./nixos/common.nix)
@@ -109,7 +109,7 @@
           # framework wsl
           findley = nixosSystem {
             system = "x86_64-linux";
-            specialArgs = { inherit home-manager nixos-wsl nixos-vscode-server; };
+            specialArgs = { inherit home-manager nixos-wsl nixos-vscode-server self; };
             modules = [
               (import ./nixos/findley/configuration.nix)
               (import ./nixos/common.nix)

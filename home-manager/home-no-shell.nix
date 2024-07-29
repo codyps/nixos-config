@@ -57,7 +57,6 @@ in
     pkgs.krew
     pkgs.kubectl
     pkgs.nodejs
-    pkgs.openssh
     pkgs.rclone
     pkgs.ripgrep
     pkgs.rsync

@@ -70,7 +70,6 @@ in
     pkgs.universal-ctags
     pkgs.watch
     pkgs.xsv
-    pkgs.yt-dlp
   ];
 
   programs.git = {

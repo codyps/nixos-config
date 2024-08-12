@@ -82,12 +82,7 @@ in
     includes = [
       { path = "~/priv/gitconfig"; }
       {
-        path = "~/.config/git/id.rivian";
-        condition = "gitdir:~/rivian/";
-      }
-      {
-        path = "~/.config/git/id.rivian";
-        condition = "gitdir:/Volumes/dev/rivian/";
+        path = "work";
       }
     ];
 

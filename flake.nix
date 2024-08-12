@@ -153,6 +153,7 @@
           maclay = nixpkgs.lib.nixosSystem {
             system = "aarch64-linux";
             modules = [
+              (import ./nixos/common.nix)
               (import ./nixos/maclay/configuration.nix)
             ];
           };

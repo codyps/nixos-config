@@ -8,16 +8,6 @@
     ];
 
   nix = {
-    package = pkgs.nixFlakes;
-    settings = {
-      experimental-features = [ "nix-command" "flakes" ];
-      trusted-users = [ "nix-ssh" "@wheel" ];
-    };
-    gc = {
-      automatic = true;
-      dates = "weekly";
-      options = "--delete-older-than 30d";
-    };
     #buildMachines = [
     #  {
     #    hostname = "RIV-066789M";
@@ -114,9 +104,6 @@
 
   programs.mtr.enable = true;
   programs.gnupg.agent = {
-    enable = true;
-    enableSSHSupport = true;
-
     # Added to get prompted on ssh?
     pinentryPackage = lib.mkForce pkgs.pinentry-gtk2;
   };

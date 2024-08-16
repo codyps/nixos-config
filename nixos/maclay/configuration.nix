@@ -60,6 +60,7 @@
   services.xserver = {
     enable = true;
     desktopManager.xterm.enable = false;
+    videoDrivers = [ "qxl" ];
 
     #displayManager.sessionCommands = ''
     #    ${pkgs.xorg.xrandr}/bin/xrandr -s 1920x1080
@@ -72,11 +73,12 @@
         i3status
       ];
     };
+
+    xkb.layout = "us";
+    xkb.options = "caps:escape";
   };
 
-  # Configure keymap in X11
-  services.xserver.xkb.layout = "us";
-  services.xserver.xkb.options = "caps:escape";
+  services.spice-vdagentd.enable = true;
 
   # Enable CUPS to print documents.
   # services.printing.enable = true;

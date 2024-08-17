@@ -11,19 +11,6 @@
       (modulesPath + "/virtualisation/xen-domU.nix")
     ];
 
-  system.autoUpgrade = {
-    enable = true;
-    flake = self.outPath;
-    flags = [
-      "--update-input"
-      "nixpkgs"
-      "--no-write-lock-file"
-      "-L" # print build logs
-    ];
-    dates = "02:00";
-    randomizedDelaySec = "45min";
-  };
-
   services.logrotate.checkConfig = false;
 
   boot.zfs.extraPools = [ "tank" ];
@@ -109,12 +96,11 @@
     neededForBoot = true;
   };
 
-  /*
-    systemd.tmpfiles.rules = [
+  systemd.tmpfiles.rules = [
     "L /etc/zfs/zfs-list.cache - - - - /persist/var/cache/zfs/zfs-list.cache"
     "L /etc/zfs/zpool.cache - - - - /persist/var/cache/zfs/zpool.cache"
-    ];
-  */
+  ];
+
   environment.etc."machine-id".source = "/persist/etc/machine-id";
 
   #fileSystems."/var/lib/tailscale" = {
@@ -264,7 +250,6 @@
   */
 
   time.timeZone = "America/New_York";
-  i18n.defaultLocale = "en_US.UTF-8";
   # console = {
   #   font = "Lat2-Terminus16";
   #   keyMap = "us";
@@ -287,14 +272,6 @@
     htop
     tmux
   ];
-
-  programs.zsh.enable = true;
-  programs.gnupg.agent = {
-    enable = true;
-    enableSSHSupport = true;
-  };
-
-  services.tailscale.enable = true;
 
   services.openssh = {
     enable = true;
@@ -327,8 +304,6 @@
   networking.firewall.allowedUDPPorts = [ 443 22000 41641 ];
   networking.firewall.trustedInterfaces = [ "tailscale0" ];
 
-  #system.copySystemConfiguration = true;
-
   systemd.generators."zfs-mount-generator" = "${config.boot.zfs.package}/lib/systemd/system-generator/zfs-mount-generator";
   environment.etc."zfs/zed.d/history_event-zfs-list-cacher.sh".source = "${config.boot.zfs.package}/etc/zfs/zed.d/history_event-zfs-list-cacher.sh";
   systemd.services.zfs-mount.enable = false;
@@ -348,8 +323,6 @@
   services.udev.extraRules = ''
     KERNEL=="sd[a-z]*[0-9]*|mmcblk[0-9]*p[0-9]*|nvme[0-9]*n[0-9]*p[0-9]*|xvd[a-z]*[0-9]*", ENV{ID_FS_TYPE}=="zfs_member", ATTR{../queue/scheduler}="none"
   '';
-
-  system.extraSystemBuilderCmds = "ln -s ${./.} $out/full-config";
 
   # This value determines the NixOS release from which the default
   # settings for stateful data, like file locations and database versions

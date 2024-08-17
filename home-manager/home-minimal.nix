@@ -1,4 +1,5 @@
 { config, pkgs, ... }:
+
 let
   cache-home =
     if pkgs.stdenv.isDarwin then
@@ -8,7 +9,6 @@ let
   ;
 in
 {
-
   # This value determines the Home Manager release that your configuration is
   # compatible with. This helps avoid breakage when a new Home Manager release
   # introduces backwards incompatible changes.
@@ -18,60 +18,47 @@ in
   # release notes.
   home.stateVersion = "23.05"; # Please read the comment before changing.
 
+  programs.zsh = {
+    enable = true;
+    history = {
+      extended = true;
+      save = 10000;
+      size = 20000;
+      share = false;
+    };
+    initExtra = (builtins.readFile ../config/.zshrc);
+  };
+
+  programs.bash = {
+    enable = true;
+
+    historyFileSize = -1;
+    historySize = -1;
+    historyFile = "\${HOME}/.bash_history_eternal";
+
+    initExtra = (builtins.readFile ../config/.bashrc);
+
+    # goes in `~/.profile`, `~/.bash_profile` is empty
+    profileExtra = (builtins.readFile ../config/.profile);
+  };
+
   # The home.packages option allows you to install Nix packages into your
   # environment.
   home.packages = [
-    # # Adds the 'hello' command to your environment. It prints a friendly
-    # # "Hello, world!" when run.
-    # pkgs.hello
-
-    # # It is sometimes useful to fine-tune packages, for example, by applying
-    # # overrides. You can do that directly here, just don't forget the
-    # # parentheses. Maybe you want to install Nerd Fonts with a limited number of
-    # # fonts?
-    # (pkgs.nerdfonts.override { fonts = [ "FantasqueSansMono" ]; })
-
-    # # You can also create simple shell scripts directly inside your
-    # # configuration. For example, this adds a command 'my-hello' to your
-    # # environment:
-    # (pkgs.writeShellScriptBin "my-hello" ''
-    #   echo "Hello, ${config.home.username}!"
-    # '')
-
-
-    #pkgs.cargo-outdated
-    #pkgs.ncdu
     pkgs.atuin
-    pkgs.bazelisk
-    pkgs.cargo-generate
-    pkgs.cargo-limit
-    pkgs.ccache
-    pkgs.curl
-    pkgs.exiftool
     pkgs.fd
     pkgs.fzf
     pkgs.git
     pkgs.git-crypt
     pkgs.gnupg
     pkgs.htop
-    pkgs.krew
-    pkgs.kubectl
-    pkgs.nodejs
     pkgs.openssh
     pkgs.rclone
     pkgs.ripgrep
     pkgs.rsync
-    pkgs.rust-bindgen
-    pkgs.rustup
-    pkgs.sccache
     pkgs.socat
-    pkgs.targo
     pkgs.tmux
-    pkgs.tokei
-    pkgs.universal-ctags
     pkgs.watch
-    pkgs.xsv
-    pkgs.yt-dlp
   ];
 
   programs.git = {
@@ -82,12 +69,7 @@ in
     includes = [
       { path = "~/priv/gitconfig"; }
       {
-        path = "~/.config/git/id.rivian";
-        condition = "gitdir:~/rivian/";
-      }
-      {
-        path = "~/.config/git/id.rivian";
-        condition = "gitdir:/Volumes/dev/rivian/";
+        path = "work";
       }
     ];
 

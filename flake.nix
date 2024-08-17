@@ -83,7 +83,7 @@
                 nixpkgs = nixpkgsConfig;
                 home-manager.useGlobalPkgs = true;
                 home-manager.useUserPackages = true;
-                home-manager.users.cody = import ./home-manager/home.nix;
+                home-manager.users.cody = import ./home-manager/home-minimal.nix;
               }
             ];
           };

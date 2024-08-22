@@ -220,6 +220,21 @@ in
     ".config/atuin/config.toml".source = ../config/.config/atuin/config.toml;
   };
 
+  systemd.user.services.atuind = {
+    Service = {
+      # TODO: consider removing unix socket, it existing causes issues
+      ExecStart = "${pkgs.atuin}/bin/atuin daemon";
+      Environment = "ATUIN_LOG=info";
+    };
+    Install = {
+      WantedBy = [ "default.target" ];
+    };
+    Unit = {
+      After = [ "network.target" ];
+    };
+  };
+
+
   xdg.configFile."nvim/raw".source = ./nvim;
 
   # You can also manage environment variables but you will have to manually

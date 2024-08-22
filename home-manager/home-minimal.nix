@@ -216,6 +216,8 @@ in
   home.file = {
     "${cache-home}/nix/current-home-flake".source = ../.;
     ".tmux.conf".source = ../config/.tmux.conf;
+    ".config/kitty/kitty.conf".source = ../config/.config/kitty/kitty.conf;
+    ".config/atuin/config.toml".source = ../config/.config/atuin/config.toml;
   };
 
   xdg.configFile."nvim/raw".source = ./nvim;

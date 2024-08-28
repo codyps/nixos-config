@@ -326,7 +326,11 @@ in
   networking.firewall.trustedInterfaces = [ "tailscale0" ];
 
   services.tailscale.permitCertUid = "caddy";
-  services.tailscaleAuth.enable = true;
+  services.tailscaleAuth = {
+    enable = true;
+    user = "caddy";
+    group = "caddy";
+  };
 
   systemd.generators."zfs-mount-generator" = "${config.boot.zfs.package}/lib/systemd/system-generator/zfs-mount-generator";
   environment.etc."zfs/zed.d/history_event-zfs-list-cacher.sh".source = "${config.boot.zfs.package}/etc/zfs/zed.d/history_event-zfs-list-cacher.sh";

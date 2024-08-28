@@ -192,6 +192,20 @@ in
           # https://docs.syncthing.net/users/faq.html#why-do-i-get-host-check-error-in-the-gui-api
           header_up +Host "localhost"
         }
+
+        forward_auth unix//run/tailscale-nginx-auth/tailscale-nginx-auth.sock {
+          uri /auth
+          header_up Remote-Addr {remote_host}
+          header_up Remote-Port {remote_port}
+          header_up Original-URI {uri}
+          copy_headers {
+            Tailscale-User>X-Webauth-User
+            Tailscale-Name>X-Webauth-Name
+            Tailscale-Login>X-Webauth-Login
+            Tailscale-Tailnet>X-Webauth-Tailnet
+            Tailscale-Profile-Picture>X-Webauth-Profile-Picture
+          }
+        }
       '';
     };
   };
@@ -310,6 +324,8 @@ in
   networking.firewall.allowedTCPPorts = [ 22 443 80 22000 ];
   networking.firewall.allowedUDPPorts = [ 443 22000 41641 ];
   networking.firewall.trustedInterfaces = [ "tailscale0" ];
+
+  services.tailscaleAuth.enable = true;
 
   systemd.generators."zfs-mount-generator" = "${config.boot.zfs.package}/lib/systemd/system-generator/zfs-mount-generator";
   environment.etc."zfs/zed.d/history_event-zfs-list-cacher.sh".source = "${config.boot.zfs.package}/etc/zfs/zed.d/history_event-zfs-list-cacher.sh";

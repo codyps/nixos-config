@@ -186,6 +186,7 @@ in
     #  reverse_proxy :3000
     #'';
     virtualHosts."syncthing.finch.einic.org".extraConfig = ''
+      bind 100.112.195.103
       import /persist/etc/caddy/basic-auth
       reverse_proxy :8384 {
         # https://docs.syncthing.net/users/faq.html#why-do-i-get-host-check-error-in-the-gui-api

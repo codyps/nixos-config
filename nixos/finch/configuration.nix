@@ -185,7 +185,7 @@ in
     #virtualHosts."hydra.finch.einic.org".extraConfig = ''
     #  reverse_proxy :3000
     #'';
-    virtualHosts."syncthing.finch.little-moth.ts.net" = {
+    virtualHosts."finch.little-moth.ts.net" = {
       listenAddresses = ["100.112.195.103"];
       extraConfig = ''
         reverse_proxy :8384 {

@@ -4,6 +4,10 @@
 
 { config, pkgs, lib, modulesPath, self, ... }:
 
+let
+  ssh-auth = (import ../ssh-auth.nix);
+  authorizedKeys = ssh-auth.authorizedKeys;
+in
 {
   imports =
     [
@@ -48,16 +52,17 @@
     '';
   };
 
-  systemd.services.tailscale-web = {
-    wantedBy = [
-      "multi-user.target"
-    ];
-    script = ''
-      ${pkgs.tailscale}/bin/tailscale web
-    '';
-  };
+  #systemd.services.tailscale-web = {
+  #  wantedBy = [
+  #    "multi-user.target"
+  #  ];
+  #  script = ''
+  #    ${pkgs.tailscale}/bin/tailscale web
+  #  '';
+  #};
 
-  services.cockpit.enable = true;
+  #services.cockpit.enable = true;
+  #systemd.sockets."cockpit".socketConfig.ListenStream = lib.mkForce "127.0.0.1:${options.services.cockpit.port}";
 
   boot.initrd.extraFiles."/etc/zfs/zfs-list.cache".source = /persist/var/cache/zfs/zfs-list.cache;
   boot.initrd.extraFiles."/etc/zfs/zpool.cache".source = /persist/var/cache/zfs/zpool.cache;
@@ -181,13 +186,11 @@
     #  reverse_proxy :3000
     #'';
     virtualHosts."syncthing.finch.einic.org".extraConfig = ''
-            basicauth {
-      	      y JDJhJDE0JFJrSWZYek5FQU4yZFhPYXE1VlUuVGUuLm9hcndXQXJWLzRGcFJxZllpcy9KUmpLNmRwS01h
-            }
-            reverse_proxy :8384 {
-      	      # https://docs.syncthing.net/users/faq.html#why-do-i-get-host-check-error-in-the-gui-api
-      	      header_up +Host "localhost"
-            }
+      import /persist/etc/caddy/basic-auth
+      reverse_proxy :8384 {
+        # https://docs.syncthing.net/users/faq.html#why-do-i-get-host-check-error-in-the-gui-api
+        header_up +Host "localhost"
+      }
     '';
   };
 
@@ -259,12 +262,14 @@
   users.mutableUsers = false;
   users.defaultUserShell = pkgs.zsh;
   users.users.root = {
-    initialHashedPassword = "$y$j9T$RDwENzx4wyAGDhB63WVYm/$hnpqSL1.VdDpYgEWI0sOCbW2e7ehYU47iqV5sDlhmX/";
+    openssh.authorizedKeys.keys = authorizedKeys;
+    hashedPasswordFile = "/persist/etc/passwd.d/root";
   };
   users.users.cody = {
     isNormalUser = true;
     extraGroups = [ "wheel" ];
-    initialHashedPassword = "$y$j9T$cAgF883T.YalezAQ/LTb/1$arVSwPQpkW5I3hdeoSm6s//oBvJcCwUUDQa19wX6JlA";
+    hashedPasswordFile = "/persist/etc/passwd.d/cody";
+    openssh.authorizedKeys.keys = authorizedKeys;
   };
 
   environment.systemPackages = with pkgs; [

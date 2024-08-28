@@ -325,6 +325,7 @@ in
   networking.firewall.allowedUDPPorts = [ 443 22000 41641 ];
   networking.firewall.trustedInterfaces = [ "tailscale0" ];
 
+  services.tailscale.permitCertUid = "caddy";
   services.tailscaleAuth.enable = true;
 
   systemd.generators."zfs-mount-generator" = "${config.boot.zfs.package}/lib/systemd/system-generator/zfs-mount-generator";

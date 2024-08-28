@@ -185,14 +185,15 @@ in
     #virtualHosts."hydra.finch.einic.org".extraConfig = ''
     #  reverse_proxy :3000
     #'';
-    virtualHosts."syncthing.finch.einic.org".extraConfig = ''
-      bind 100.112.195.103
-      import /persist/etc/caddy/basic-auth
-      reverse_proxy :8384 {
-        # https://docs.syncthing.net/users/faq.html#why-do-i-get-host-check-error-in-the-gui-api
-        header_up +Host "localhost"
-      }
-    '';
+    virtualHosts."syncthing.finch.little-moth.ts.net" = {
+      listenAddresses = ["100.112.195.103"];
+      extraConfig = ''
+        reverse_proxy :8384 {
+          # https://docs.syncthing.net/users/faq.html#why-do-i-get-host-check-error-in-the-gui-api
+          header_up +Host "localhost"
+        }
+      '';
+    };
   };
 
   networking.hostId = "8425e349";

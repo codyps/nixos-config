@@ -83,7 +83,7 @@
                 nixpkgs = nixpkgsConfig;
                 home-manager.useGlobalPkgs = true;
                 home-manager.useUserPackages = true;
-                home-manager.users.cody = import ./home-manager/home.nix;
+                home-manager.users.cody = import ./home-manager/home-minimal.nix;
               }
             ];
           };
@@ -152,8 +152,17 @@
           # work utm vm
           maclay = nixpkgs.lib.nixosSystem {
             system = "aarch64-linux";
+            specialArgs = { inherit home-manager self; };
             modules = [
+              (import ./nixos/common.nix)
               (import ./nixos/maclay/configuration.nix)
+              home-manager.nixosModules.home-manager
+              {
+                nixpkgs = nixpkgsConfig;
+                home-manager.useGlobalPkgs = true;
+                home-manager.useUserPackages = true;
+                home-manager.users.cody = import ./home-manager/home.nix;
+              }
             ];
           };
 

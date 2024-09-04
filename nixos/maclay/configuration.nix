@@ -8,16 +8,6 @@
     ];
 
   nix = {
-    package = pkgs.nixFlakes;
-    settings = {
-      experimental-features = [ "nix-command" "flakes" ];
-      trusted-users = [ "nix-ssh" "@wheel" ];
-    };
-    gc = {
-      automatic = true;
-      dates = "weekly";
-      options = "--delete-older-than 30d";
-    };
     #buildMachines = [
     #  {
     #    hostname = "RIV-066789M";
@@ -70,6 +60,7 @@
   services.xserver = {
     enable = true;
     desktopManager.xterm.enable = false;
+    videoDrivers = [ "qxl" ];
 
     #displayManager.sessionCommands = ''
     #    ${pkgs.xorg.xrandr}/bin/xrandr -s 1920x1080
@@ -82,11 +73,12 @@
         i3status
       ];
     };
+
+    xkb.layout = "us";
+    xkb.options = "caps:escape";
   };
 
-  # Configure keymap in X11
-  services.xserver.xkb.layout = "us";
-  services.xserver.xkb.options = "caps:escape";
+  services.spice-vdagentd.enable = true;
 
   # Enable CUPS to print documents.
   # services.printing.enable = true;
@@ -114,9 +106,6 @@
 
   programs.mtr.enable = true;
   programs.gnupg.agent = {
-    enable = true;
-    enableSSHSupport = true;
-
     # Added to get prompted on ssh?
     pinentryPackage = lib.mkForce pkgs.pinentry-gtk2;
   };
@@ -138,8 +127,6 @@
   # networking.firewall.allowedUDPPorts = [ ... ];
   # Or disable the firewall altogether.
   # networking.firewall.enable = false;
-
-  system.extraSystemBuilderCmds = "ln -s ${../.} $out/full-config";
 
   # This option defines the first version of NixOS you have installed on this particular machine,
   # and is used to maintain compatibility with application data (e.g. databases) created on older NixOS versions.

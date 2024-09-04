@@ -1,31 +1,42 @@
 { config, pkgs, ... }:
-
 {
   imports = [
-    ./home-no-shell.nix
+    ./home-minimal.nix
   ];
 
-  programs.zsh = {
-    enable = true;
-    history = {
-      extended = true;
-      save = 10000;
-      size = 20000;
-      share = false;
-    };
-    initExtra = (builtins.readFile ../config/.zshrc);
-  };
-
-  programs.bash = {
-    enable = true;
-
-    historyFileSize = -1;
-    historySize = -1;
-    historyFile = "\${HOME}/.bash_history_eternal";
-
-    initExtra = (builtins.readFile ../config/.bashrc);
-
-    # goes in `~/.profile`, `~/.bash_profile` is empty
-    profileExtra = (builtins.readFile ../config/.profile);
-  };
+  home.packages = [
+    #pkgs.cargo-outdated
+    #pkgs.ncdu
+    pkgs.atuin
+    pkgs.bazelisk
+    pkgs.cargo-generate
+    pkgs.cargo-limit
+    pkgs.ccache
+    pkgs.curl
+    pkgs.exiftool
+    pkgs.fd
+    pkgs.fzf
+    pkgs.git
+    pkgs.git-crypt
+    pkgs.gnupg
+    pkgs.htop
+    pkgs.krew
+    pkgs.kubectl
+    pkgs.nodejs
+    pkgs.openssh
+    pkgs.rclone
+    pkgs.ripgrep
+    pkgs.rsync
+    pkgs.rust-bindgen
+    pkgs.rustup
+    pkgs.sccache
+    pkgs.socat
+    pkgs.targo
+    pkgs.tmux
+    pkgs.tokei
+    pkgs.universal-ctags
+    pkgs.watch
+    pkgs.xsv
+    pkgs.yt-dlp
+  ];
 }

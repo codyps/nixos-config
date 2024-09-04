@@ -1,4 +1,4 @@
-final: prev: {
+final: prev: rec {
   targo = with prev; (callPackage ./pkgs/targo.nix {
     inherit fetchFromGitHub rustPlatform;
   });
@@ -24,4 +24,8 @@ final: prev: {
   s2 = with prev; (callPackage ./pkgs/s2.nix {
     inherit fetchFromGitHub lib buildGoModule;
   });
+
+  dagger = prev.callPackage ./pkgs/dagger {
+    inherit dagger;
+  };
 }

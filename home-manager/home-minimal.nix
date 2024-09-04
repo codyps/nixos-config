@@ -52,10 +52,6 @@ in
     pkgs.git-crypt
     pkgs.gnupg
     pkgs.htop
-    pkgs.krew
-    pkgs.kubectl
-    pkgs.nodejs
-    pkgs.rclone
     pkgs.ripgrep
     pkgs.rsync
     pkgs.socat

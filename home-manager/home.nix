@@ -38,5 +38,6 @@
     pkgs.watch
     pkgs.xsv
     pkgs.yt-dlp
+    pkgs.helm-diff
   ];
 }

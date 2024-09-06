@@ -101,6 +101,7 @@ in
     buildMachinesFiles = [];
     # you will probably also want, otherwise *everything* will be built from scratch
     useSubstitutes = true;
+    listenHost = "localhost";
   };
 
   services.caddy = {

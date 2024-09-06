@@ -104,12 +104,42 @@ in
     listenHost = "localhost";
   };
 
+  services.harmonia = {
+    enable = true;
+    signKeyPaths = [
+      "/persist/etc/nix-binary-cache/binary-cache.secret"
+    ];
+    bind = "[::1]:8916";
+  };
+
+  #services.atticd = {
+  #  enable = true;
+  #  credentialsFile = "/persist/etc/atticd.env";
+  #  settings = {
+  #    listen = "[::1]:8915";
+  #  }
+  #};
+
+  #services.nix-serve = {
+  #  enable = true;
+  #  secretKeyFile = "/persist/etc/nix-serve/cache-priv-key.pem";
+  #};
+
   services.caddy = {
     enable = true;
     virtualHosts."ward.little-moth.ts.net" = {
       listenAddresses = ["100.115.212.42"];
       extraConfig = ''
         root /srv
+
+        handle_path /harmonia/* {
+          reverse_proxy http://localhost:8916 {
+            #header_up Host {host}
+            #header_up X-Forwarded-For {remote}
+            #header_up Upgrade {upstream_http_upgrade}
+            #header_up Connection {upstream_http_connection}
+          }
+        }
 
         handle_path /hydra/* {
           reverse_proxy http://localhost:3000 {

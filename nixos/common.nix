@@ -4,6 +4,11 @@
     settings = {
       experimental-features = [ "nix-command" "flakes" ];
       trusted-users = [ "nix-ssh" "@wheel" ];
+
+      substituters = [ "https://ward.little-moth.ts.net/harmonia" ];
+      trusted-public-keys = [
+        "ward.einic.org-1:MVzXNXGliDxO/juzN9Vo+NHVrnRA6F/sHC4k1mb/iYI="
+      ];
     };
     optimise.automatic = true;
     gc = {

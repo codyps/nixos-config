@@ -105,12 +105,6 @@ in
 
   services.caddy = {
     enable = true;
-    #virtualHosts."nix-cache.finch.einic.org".extraConfig = ''
-    #  reverse_proxy :5000
-    #'';
-    #virtualHosts."hydra.finch.einic.org".extraConfig = ''
-    #  reverse_proxy :3000
-    #'';
     virtualHosts."ward.little-moth.ts.net" = {
       listenAddresses = ["100.115.212.42"];
       extraConfig = ''
@@ -119,6 +113,7 @@ in
         handle_path /hydra/* {
           reverse_proxy http://localhost:3000 {
             header_up Host {upstream_hostport}
+            header_up X-Request-Base /hydra
           }
         }
 

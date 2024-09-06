@@ -188,7 +188,14 @@ in
     virtualHosts."finch.little-moth.ts.net" = {
       listenAddresses = ["100.112.195.103"];
       extraConfig = ''
-        file_server browse
+        root /srv
+
+        file_server /roms/* {
+          root /tank/syncthing/Roms
+          browse {
+             reveal_symlinks
+          }
+        }
 
         handle_path /syncthing/* {
           reverse_proxy http://localhost:8384 {

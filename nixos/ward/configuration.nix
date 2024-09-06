@@ -93,6 +93,61 @@ in
     '';
   };
 
+  services.hydra = {
+    enable = true;
+    hydraURL = "https://ward.little-moth.ts.net/hydra";
+    notificationSender = "hydra@localhost"; # e-mail of hydra service
+    # a standalone hydra will require you to unset the buildMachinesFiles list to avoid using a nonexistant /etc/nix/machines
+    buildMachinesFiles = [];
+    # you will probably also want, otherwise *everything* will be built from scratch
+    useSubstitutes = true;
+  };
+
+  services.caddy = {
+    enable = true;
+    #virtualHosts."nix-cache.finch.einic.org".extraConfig = ''
+    #  reverse_proxy :5000
+    #'';
+    #virtualHosts."hydra.finch.einic.org".extraConfig = ''
+    #  reverse_proxy :3000
+    #'';
+    virtualHosts."ward.little-moth.ts.net" = {
+      listenAddresses = ["100.115.212.42"];
+      extraConfig = ''
+        root /srv
+
+        handle_path /hydra/* {
+          reverse_proxy http://localhost:3000 {
+            header_up Host {upstream_hostport}
+          }
+        }
+
+        forward_auth unix//run/tailscale-nginx-auth/tailscale-nginx-auth.sock {
+          uri /auth
+          header_up Remote-Addr {remote_host}
+          header_up Remote-Port {remote_port}
+          header_up Original-URI {uri}
+          copy_headers {
+            Tailscale-User>X-Webauth-User
+            Tailscale-Name>X-Webauth-Name
+            Tailscale-Login>X-Webauth-Login
+            Tailscale-Tailnet>X-Webauth-Tailnet
+            Tailscale-Profile-Picture>X-Webauth-Profile-Picture
+          }
+        }
+      '';
+    };
+  };
+
+  networking.firewall.trustedInterfaces = [ "tailscale0" ];
+
+  services.tailscale.permitCertUid = "caddy";
+  services.tailscaleAuth = {
+    enable = true;
+    user = "caddy";
+    group = "caddy";
+  };
+
   networking.hostName = "ward";
   networking.hostId = "5c794628";
 

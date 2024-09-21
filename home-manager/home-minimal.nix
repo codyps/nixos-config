@@ -1,4 +1,4 @@
-{ config, pkgs, ... }:
+{ config, lib, pkgs, ... }:
 
 let
   cache-home =
@@ -233,6 +233,22 @@ in
       After = [ "network.target" ];
     };
   };
+
+  launchd.agents = {
+    atuin-daemon = {
+        enable = true;
+        config = {
+            Program = pkgs.writeShellScriptBin "atuin-daemon" ''
+                mkdir -p ${config.home.homeDirectory}/.cache/atuin;
+                ${pkgs.atuin}/bin/atuin daemon;
+            '';
+            EnvironmentVariables.ATUIN_LOG = "info";
+            StandardErrorPath = "${config.home.homeDirectory}/.cache/atuin/atuin-daemon-error.log";
+            StandardOutPath = "${config.home.homeDirectory}/.cache/atuin/atuin-daemon-out.log";
+        };
+    };
+  };
+
 
 
   xdg.configFile."nvim/raw".source = ./nvim;

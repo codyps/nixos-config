@@ -239,12 +239,12 @@ in
         enable = true;
         config = {
             Program = pkgs.writeShellScriptBin "atuin-daemon" ''
-                mkdir -p ${config.home.homeDirectory}/.cache/atuin;
+                mkdir -p ${config.home.homeDirectory}/${cache-home}/atuin;
                 ${pkgs.atuin}/bin/atuin daemon;
             '';
             EnvironmentVariables.ATUIN_LOG = "info";
-            StandardErrorPath = "${config.home.homeDirectory}/.cache/atuin/atuin-daemon-error.log";
-            StandardOutPath = "${config.home.homeDirectory}/.cache/atuin/atuin-daemon-out.log";
+            StandardErrorPath = "${config.home.homeDirectory}/${cache-home}/atuin/atuin-daemon-error.log";
+            StandardOutPath = "${config.home.homeDirectory}/${cache-home}/atuin/atuin-daemon-out.log";
         };
     };
   };

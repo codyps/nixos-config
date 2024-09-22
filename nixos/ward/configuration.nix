@@ -109,7 +109,7 @@ in
     signKeyPaths = [
       "/persist/etc/nix-binary-cache/binary-cache.secret"
     ];
-    bind = "[::1]:8916";
+    settings.bind = "[::1]:8916";
   };
 
   #services.atticd = {

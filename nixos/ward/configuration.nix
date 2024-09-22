@@ -98,7 +98,7 @@ in
     hydraURL = "https://ward.little-moth.ts.net/hydra";
     notificationSender = "hydra@localhost"; # e-mail of hydra service
     # a standalone hydra will require you to unset the buildMachinesFiles list to avoid using a nonexistant /etc/nix/machines
-    buildMachinesFiles = [];
+    buildMachinesFiles = [ ];
     # you will probably also want, otherwise *everything* will be built from scratch
     useSubstitutes = true;
     listenHost = "localhost";
@@ -107,7 +107,7 @@ in
   services.caddy = {
     enable = true;
     virtualHosts."ward.little-moth.ts.net" = {
-      listenAddresses = ["100.115.212.42"];
+      listenAddresses = [ "100.115.212.42" ];
       extraConfig = ''
         root /srv
 

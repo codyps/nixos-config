@@ -186,7 +186,7 @@ in
     #  reverse_proxy :3000
     #'';
     virtualHosts."finch.little-moth.ts.net" = {
-      listenAddresses = ["100.112.195.103"];
+      listenAddresses = [ "100.112.195.103" ];
       extraConfig = ''
         root /srv
 

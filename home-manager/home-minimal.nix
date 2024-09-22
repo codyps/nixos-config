@@ -236,16 +236,23 @@ in
 
   launchd.agents = {
     atuin-daemon = {
-        enable = true;
-        config = {
-            Program = pkgs.writeShellScriptBin "atuin-daemon" ''
-                mkdir -p ${config.home.homeDirectory}/${cache-home}/atuin;
-                ${pkgs.atuin}/bin/atuin daemon;
+      enable = true;
+      config = {
+        #ProgramArguments = [ "${pkgs.atuin}/bin/atuin" "daemon" ];
+        ProgramArguments =
+          let
+            atuin-daemon = pkgs.writeShellScriptBin "atuin-daemon" ''
+              mkdir -p ${config.home.homeDirectory}/${cache-home}/atuin;
+              ${pkgs.atuin}/bin/atuin daemon;
             '';
-            EnvironmentVariables.ATUIN_LOG = "info";
-            StandardErrorPath = "${config.home.homeDirectory}/${cache-home}/atuin/atuin-daemon-error.log";
-            StandardOutPath = "${config.home.homeDirectory}/${cache-home}/atuin/atuin-daemon-out.log";
-        };
+          in
+          [ "${atuin-daemon}" ];
+        EnvironmentVariables.ATUIN_LOG = "info";
+        StandardErrorPath = "${config.home.homeDirectory}/${cache-home}/atuin/atuin-daemon-error.log";
+        StandardOutPath = "${config.home.homeDirectory}/${cache-home}/atuin/atuin-daemon-out.log";
+        RunAtLoad = true;
+        KeepAlive = true;
+      };
     };
   };
 

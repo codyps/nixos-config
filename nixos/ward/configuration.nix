@@ -84,13 +84,9 @@ in
 
   programs.nix-ld.enable = true;
 
-  systemd.services.tailscale-web = {
-    wantedBy = [
-      "multi-user.target"
-    ];
-    script = ''
-      tailscale web
-    '';
+  virtualisation.docker.rootless = {
+    enable = true;
+    setSocketVariable = true;
   };
 
   services.hydra = {

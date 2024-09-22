@@ -52,15 +52,6 @@ in
     '';
   };
 
-  #systemd.services.tailscale-web = {
-  #  wantedBy = [
-  #    "multi-user.target"
-  #  ];
-  #  script = ''
-  #    ${pkgs.tailscale}/bin/tailscale web
-  #  '';
-  #};
-
   #services.cockpit.enable = true;
   #systemd.sockets."cockpit".socketConfig.ListenStream = lib.mkForce "127.0.0.1:${options.services.cockpit.port}";
 

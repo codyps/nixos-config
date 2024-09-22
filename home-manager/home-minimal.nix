@@ -246,7 +246,7 @@ in
               ${pkgs.atuin}/bin/atuin daemon;
             '';
           in
-          [ "${atuin-daemon}" ];
+          [ "${atuin-daemon}/bin/atuin-daemon" ];
         EnvironmentVariables.ATUIN_LOG = "info";
         StandardErrorPath = "${config.home.homeDirectory}/${cache-home}/atuin/atuin-daemon-error.log";
         StandardOutPath = "${config.home.homeDirectory}/${cache-home}/atuin/atuin-daemon-out.log";

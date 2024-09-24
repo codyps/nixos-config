@@ -24,4 +24,5 @@ final: prev: {
   s2 = with prev; (callPackage ./pkgs/s2.nix {
     inherit fetchFromGitHub lib buildGoModule;
   });
+
 }

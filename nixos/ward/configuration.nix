@@ -121,13 +121,41 @@ in
   #  secretKeyFile = "/persist/etc/nix-serve/cache-priv-key.pem";
   #};
 
+  systemd.services.caddy.serviceConfig.EnvironmentFile = "/persist/etc/default/caddy";
   services.caddy = {
     enable = true;
+    package = (pkgs.callPackage ../../nixpkgs/overlays/pkgs/caddy/package.nix {}).withPlugins {
+      caddyModules = [
+        { repo = "github.com/caddy-dns/cloudflare"; version = "89f16b99c18ef49c8bb470a82f895bce01cbaece"; }
+      ];
+      vendorHash = "sha256-fTcMtg5GGEgclIwJCav0jjWpqT+nKw2OF1Ow0MEEitk=";
+    };
+
+    virtualHosts."*.ward.ts.einic.org" = {
+      listenAddresses = [ "100.115.212.42" ];
+      extraConfig = ''
+        tls {
+          dns cloudflare {env.CLOUDFLARE_API_TOKEN}
+        }
+        root /srv
+
+        @gramps host gramps.ward.ts.einic.org
+        handle @gramps {
+          reverse_proxy http://localhost:5000
+        }
+
+        handle {
+          abort
+        }
+      '';
+    };
+
     virtualHosts."ward.little-moth.ts.net" = {
       listenAddresses = [ "100.115.212.42" ];
       extraConfig = ''
         root /srv
 
+        redir /harmonia /harmonia/ 301
         handle_path /harmonia/* {
           reverse_proxy http://localhost:8916 {
             #header_up Host {host}
@@ -137,6 +165,7 @@ in
           }
         }
 
+        redir /hydra /hydra/ 301
         handle_path /hydra/* {
           reverse_proxy http://localhost:3000 {
             header_up Host {upstream_hostport}
@@ -253,4 +282,5 @@ in
 
   system.stateVersion = "23.11";
 }
+
 

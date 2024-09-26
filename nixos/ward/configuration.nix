@@ -131,6 +131,25 @@ in
       vendorHash = "sha256-fTcMtg5GGEgclIwJCav0jjWpqT+nKw2OF1Ow0MEEitk=";
     };
 
+    virtualHosts."*.ward.einic.org" = {
+      extraConfig = ''
+        tls {
+          dns cloudflare {env.CLOUDFLARE_API_TOKEN}
+        }
+        root /srv
+
+        @zd621 host zd621.ward.einic.org
+        handle @zd621 {
+          # D7J211001302.bed.einic.org
+          reverse_proxy http://192.168.6.192
+        }
+
+        handle {
+          abort
+        }
+      '';
+    };
+
     virtualHosts."*.ward.ts.einic.org" = {
       listenAddresses = [ "100.115.212.42" ];
       extraConfig = ''
@@ -142,6 +161,12 @@ in
         @gramps host gramps.ward.ts.einic.org
         handle @gramps {
           reverse_proxy http://localhost:5000
+        }
+
+        @zd621 host zd621.ward.ts.einic.org
+        handle @zd621 {
+          # D7J211001302.bed.einic.org
+          reverse_proxy http://192.168.6.192
         }
 
         handle {

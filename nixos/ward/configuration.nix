@@ -138,6 +138,8 @@ in
         }
         root /srv
 
+        import /persist/etc/caddy-auth-config
+
         @zd621 host zd621.ward.einic.org
         handle @zd621 {
           # D7J211001302.bed.einic.org

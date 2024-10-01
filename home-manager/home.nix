@@ -38,6 +38,11 @@
     pkgs.watch
     pkgs.xsv
     pkgs.yt-dlp
-    pkgs.helm-diff
+
+    (pkgs.wrapHelm pkgs.kubernetes-helm {
+      plugins = with pkgs.kubernetes-helmPlugins; [
+        helm-diff
+      ];
+    })
   ];
 }

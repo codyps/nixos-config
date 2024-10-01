@@ -28,4 +28,6 @@ final: prev: rec {
   dagger = prev.callPackage ./pkgs/dagger {
     inherit dagger;
   };
+
+  redpanda-connect = prev.callPackage ./pkgs/redpanda-connect {};
 }

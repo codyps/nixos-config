@@ -39,10 +39,14 @@
     pkgs.xsv
     pkgs.yt-dlp
 
+    pkgs.kubeswitch
+    pkgs.kubectx
     (pkgs.wrapHelm pkgs.kubernetes-helm {
       plugins = with pkgs.kubernetes-helmPlugins; [
         helm-diff
       ];
     })
+
+    pkgs.redpanda-connect
   ];
 }

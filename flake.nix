@@ -30,6 +30,9 @@
         (final: prev: {
           targo = targo.packages.${prev.system}.default;
         })
+        (final: prev: {
+          redpanda-connect = prev.callPackage ./nixpkgs/overlays/pkgs/redpanda-connect {};
+        })
       ];
 
       getName = pkg: pkg.pname or (builtins.parseDrvName pkg.name).name;

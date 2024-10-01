@@ -52,15 +52,6 @@ in
     '';
   };
 
-  #systemd.services.tailscale-web = {
-  #  wantedBy = [
-  #    "multi-user.target"
-  #  ];
-  #  script = ''
-  #    ${pkgs.tailscale}/bin/tailscale web
-  #  '';
-  #};
-
   #services.cockpit.enable = true;
   #systemd.sockets."cockpit".socketConfig.ListenStream = lib.mkForce "127.0.0.1:${options.services.cockpit.port}";
 
@@ -186,11 +177,24 @@ in
     #  reverse_proxy :3000
     #'';
     virtualHosts."finch.little-moth.ts.net" = {
-      listenAddresses = ["100.112.195.103"];
+      listenAddresses = [ "100.112.195.103" ];
       extraConfig = ''
-        reverse_proxy :8384 {
-          # https://docs.syncthing.net/users/faq.html#why-do-i-get-host-check-error-in-the-gui-api
-          header_up +Host "localhost"
+        root /srv
+
+        file_server /roms/* {
+          root /tank/syncthing/Roms
+          browse {
+             reveal_symlinks
+          }
+        }
+
+        handle_path /syncthing/* {
+          reverse_proxy http://localhost:8384 {
+              # https://docs.syncthing.net/users/reverseproxy.html
+              #header_up Host {upstream_hostport}
+              # https://docs.syncthing.net/users/faq.html#why-do-i-get-host-check-error-in-the-gui-api
+              header_up +Host "localhost"
+          }
         }
 
         forward_auth unix//run/tailscale-nginx-auth/tailscale-nginx-auth.sock {

@@ -16,9 +16,15 @@
     targo.inputs.nixpkgs.follows = "nixpkgs";
     targo.inputs.flake-utils.follows = "flake-utils";
     impermanence.url = "github:nix-community/impermanence";
+    ethereum-nix = {
+      url = "github:nix-community/ethereum.nix";
+      inputs.nixpkgs.follows = "nixpkgs";
+      inputs.flake-utils.follows = "flake-utils";
+    };
+    attic.url = "github:zhaofengli/attic";
   };
 
-  outputs = { self, nixpkgs, flake-utils, targo, nix-darwin, home-manager, nixos-wsl, nixos-vscode-server, impermanence }:
+  outputs = { self, nixpkgs, flake-utils, targo, nix-darwin, home-manager, nixos-wsl, nixos-vscode-server, impermanence, ethereum-nix, attic }:
     let
       overlays = [
         (final: prev: {
@@ -93,6 +99,8 @@
             system = "x86_64-linux";
             specialArgs = { inherit home-manager self; };
             modules = [
+              ethereum-nix.nixosModules.default
+              attic.nixosModules.atticd
               (import ./nixos/ward/configuration.nix)
               (import ./nixos/common.nix)
               impermanence.nixosModules.impermanence

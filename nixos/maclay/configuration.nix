@@ -57,10 +57,17 @@
     defaultSession = "none+i3";
   };
 
+  virtualisation.docker.enable = true;
+
+  virtualisation.docker.rootless = {
+    enable = true;
+    setSocketVariable = true;
+  };
+
   services.xserver = {
     enable = true;
     desktopManager.xterm.enable = false;
-    videoDrivers = [ "qxl" ];
+    #videoDrivers = [ "qxl" ];
 
     #displayManager.sessionCommands = ''
     #    ${pkgs.xorg.xrandr}/bin/xrandr -s 1920x1080
@@ -79,6 +86,7 @@
   };
 
   services.spice-vdagentd.enable = true;
+  hardware.graphics.enable = true;
 
   # Enable CUPS to print documents.
   # services.printing.enable = true;

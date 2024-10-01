@@ -84,13 +84,119 @@ in
 
   programs.nix-ld.enable = true;
 
-  systemd.services.tailscale-web = {
-    wantedBy = [
-      "multi-user.target"
+  virtualisation.docker.rootless = {
+    enable = true;
+    setSocketVariable = true;
+  };
+
+  services.hydra = {
+    enable = true;
+    hydraURL = "https://ward.little-moth.ts.net/hydra";
+    notificationSender = "hydra@localhost"; # e-mail of hydra service
+    # a standalone hydra will require you to unset the buildMachinesFiles list to avoid using a nonexistant /etc/nix/machines
+    buildMachinesFiles = [ ];
+    # you will probably also want, otherwise *everything* will be built from scratch
+    useSubstitutes = true;
+    listenHost = "localhost";
+  };
+
+  services.harmonia = {
+    enable = true;
+    signKeyPaths = [
+      "/persist/etc/nix-binary-cache/binary-cache.secret"
     ];
-    script = ''
-      tailscale web
-    '';
+    settings.bind = "[::1]:8916";
+  };
+
+  #services.atticd = {
+  #  enable = true;
+  #  credentialsFile = "/persist/etc/atticd.env";
+  #  settings = {
+  #    listen = "[::1]:8915";
+  #  }
+  #};
+
+  #services.nix-serve = {
+  #  enable = true;
+  #  secretKeyFile = "/persist/etc/nix-serve/cache-priv-key.pem";
+  #};
+
+  systemd.services.caddy.serviceConfig.EnvironmentFile = "/persist/etc/default/caddy";
+  services.caddy = {
+    enable = true;
+    package = (pkgs.callPackage ../../nixpkgs/overlays/pkgs/caddy/package.nix {}).withPlugins {
+      caddyModules = [
+        { repo = "github.com/caddy-dns/cloudflare"; version = "89f16b99c18ef49c8bb470a82f895bce01cbaece"; }
+      ];
+      vendorHash = "sha256-fTcMtg5GGEgclIwJCav0jjWpqT+nKw2OF1Ow0MEEitk=";
+    };
+
+    virtualHosts."*.ward.ts.einic.org" = {
+      listenAddresses = [ "100.115.212.42" ];
+      extraConfig = ''
+        tls {
+          dns cloudflare {env.CLOUDFLARE_API_TOKEN}
+        }
+        root /srv
+
+        @gramps host gramps.ward.ts.einic.org
+        handle @gramps {
+          reverse_proxy http://localhost:5000
+        }
+
+        handle {
+          abort
+        }
+      '';
+    };
+
+    virtualHosts."ward.little-moth.ts.net" = {
+      listenAddresses = [ "100.115.212.42" ];
+      extraConfig = ''
+        root /srv
+
+        redir /harmonia /harmonia/ 301
+        handle_path /harmonia/* {
+          reverse_proxy http://localhost:8916 {
+            #header_up Host {host}
+            #header_up X-Forwarded-For {remote}
+            #header_up Upgrade {upstream_http_upgrade}
+            #header_up Connection {upstream_http_connection}
+          }
+        }
+
+        redir /hydra /hydra/ 301
+        handle_path /hydra/* {
+          reverse_proxy http://localhost:3000 {
+            header_up Host {upstream_hostport}
+            header_up X-Request-Base /hydra
+          }
+        }
+
+        forward_auth unix//run/tailscale-nginx-auth/tailscale-nginx-auth.sock {
+          uri /auth
+          header_up Remote-Addr {remote_host}
+          header_up Remote-Port {remote_port}
+          header_up Original-URI {uri}
+          copy_headers {
+            Tailscale-User>X-Webauth-User
+            Tailscale-Name>X-Webauth-Name
+            Tailscale-Login>X-Webauth-Login
+            Tailscale-Tailnet>X-Webauth-Tailnet
+            Tailscale-Profile-Picture>X-Webauth-Profile-Picture
+          }
+        }
+      '';
+    };
+  };
+
+  networking.firewall.trustedInterfaces = [ "tailscale0" ];
+
+  services.tailscale.permitCertUid = "caddy";
+  services.tailscaleAuth = {
+    enable = true;
+    user = "caddy";
+    group = "caddy";
   };
 
   networking.hostName = "ward";
@@ -176,4 +282,5 @@ in
 
   system.stateVersion = "23.11";
 }
+
 

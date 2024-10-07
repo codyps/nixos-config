@@ -52,8 +52,6 @@ in
     pkgs.git-crypt
     pkgs.gnupg
     pkgs.htop
-    pkgs.openssh
-    pkgs.rclone
     pkgs.ripgrep
     pkgs.rsync
     pkgs.socat

@@ -143,7 +143,9 @@ in
         @zd621 host zd621.ward.einic.org
         handle @zd621 {
           # D7J211001302.bed.einic.org
-          reverse_proxy http://192.168.6.192
+          reverse_proxy http://192.168.6.192 {
+            header_up Authorization "Basic YWRtaW46MTIzNA=="
+          }
         }
 
         handle {
@@ -165,10 +167,12 @@ in
           reverse_proxy http://localhost:5000
         }
 
-        @zd621 host zd621.ward.ts.einic.org
-        handle @zd621 {
+        @zd621_ts host zd621.ward.ts.einic.org
+        handle @zd621_ts {
           # D7J211001302.bed.einic.org
-          reverse_proxy http://192.168.6.192
+          reverse_proxy http://192.168.6.192 {
+            header_up Authorization "Basic YWRtaW46MTIzNA=="
+          }
         }
 
         handle {
@@ -218,6 +222,8 @@ in
   };
 
   networking.firewall.trustedInterfaces = [ "tailscale0" ];
+  networking.firewall.allowedTCPPorts = [ 80 443 ];
+
 
   services.tailscale.permitCertUid = "caddy";
   services.tailscaleAuth = {

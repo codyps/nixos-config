@@ -224,6 +224,17 @@ in
   networking.firewall.trustedInterfaces = [ "tailscale0" ];
   networking.firewall.allowedTCPPorts = [ 80 443 ];
 
+  networking.hostName = "ward";
+  networking.hostId = "5c794628";
+
+  systemd.network = {
+    enable = true;
+    networks."10-enp2s0.network" = {
+      networkConfig.DHCP = "ipv4";
+      matchConfig.Name = "enp2s0";
+    };
+    wait-online.anyInterface = true;
+  };
 
   services.tailscale.permitCertUid = "caddy";
   services.tailscaleAuth = {
@@ -231,9 +242,6 @@ in
     user = "caddy";
     group = "caddy";
   };
-
-  networking.hostName = "ward";
-  networking.hostId = "5c794628";
 
   time.timeZone = "America/New_York";
 

@@ -7,10 +7,11 @@ in
       experimental-features = [ "nix-command" "flakes" ];
       trusted-users = [ "nix-ssh" "@wheel" ];
 
-      substituters = if hostname != "ward" then [ "https://ward.little-moth.ts.net/harmonia" ] else [];
-      trusted-public-keys = if hostname != "ward" then [
-        "ward.einic.org-1:MVzXNXGliDxO/juzN9Vo+NHVrnRA6F/sHC4k1mb/iYI="
-      ] else [];
+      substituters = if hostname != "ward" then [ "https://ward.little-moth.ts.net/harmonia" ] else [ ];
+      trusted-public-keys =
+        if hostname != "ward" then [
+          "ward.einic.org-1:MVzXNXGliDxO/juzN9Vo+NHVrnRA6F/sHC4k1mb/iYI="
+        ] else [ ];
     };
     optimise.automatic = true;
     gc = {

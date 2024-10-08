@@ -124,7 +124,7 @@ in
   systemd.services.caddy.serviceConfig.EnvironmentFile = "/persist/etc/default/caddy";
   services.caddy = {
     enable = true;
-    package = (pkgs.callPackage ../../nixpkgs/overlays/pkgs/caddy/package.nix {}).withPlugins {
+    package = (pkgs.callPackage ../../nixpkgs/overlays/pkgs/caddy/package.nix { }).withPlugins {
       caddyModules = [
         { repo = "github.com/caddy-dns/cloudflare"; version = "89f16b99c18ef49c8bb470a82f895bce01cbaece"; }
       ];
@@ -235,6 +235,18 @@ in
     };
     wait-online.anyInterface = true;
   };
+
+  services.cloudflared = {
+    enable = true;
+    tunnels."3a303175-5ce5-459c-b1fb-d2cf9cbcd5b2" = {
+      credentialsFile = "/persist/etc/cloudflared/3a303175-5ce5-459c-b1fb-d2cf9cbcd5b2.json";
+      default = "http_status:404";
+    };
+  };
+
+  # https://github.com/quic-go/quic-go/wiki/UDP-Buffer-Sizes
+  boot.kernel.sysctl."net.core.rmem_max" = 7500000;
+  boot.kernel.sysctl."net.core.wmem_max" = 7500000;
 
   services.tailscale.permitCertUid = "caddy";
   services.tailscaleAuth = {

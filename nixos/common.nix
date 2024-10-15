@@ -2,6 +2,11 @@
 let hostname = config.networking.hostName;
 in
 {
+
+  imports = [
+    ../modules/build-machines.nix
+  ];
+
   nix = {
     settings = {
       experimental-features = [ "nix-command" "flakes" ];
@@ -19,8 +24,6 @@ in
       dates = "weekly";
       options = "--delete-older-than 30d";
     };
-    #buildMachines = [
-    #];
     #distributedBuilds = true;
     sshServe = {
       enable = true;
@@ -28,6 +31,8 @@ in
       protocol = "ssh-ng";
     };
   };
+
+  nixBuildMachines.ward = hostname != "ward";
 
   system.autoUpgrade = {
     enable = true;
@@ -39,7 +44,7 @@ in
       "-L" # print build logs
     ];
     dates = "02:00";
-    randomizedDelaySec = "45min";
+    randomizedDelaySec = "90min";
   };
 
   i18n.defaultLocale = "en_US.UTF-8";

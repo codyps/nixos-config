@@ -235,6 +235,7 @@
               '';
             })
             ./nix-darwin/configuration.nix
+            ./modules/build-machines.nix
             home-manager.darwinModules.home-manager
             {
               nixpkgs = nixpkgsConfig;

@@ -5,7 +5,6 @@ in
 
   imports = [
     ../modules/build-machines.nix
-    ./ssh-auth.nix
   ];
 
   nix = {

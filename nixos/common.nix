@@ -32,7 +32,7 @@ in
     };
   };
 
-  p.nixBuildMachines.ward = hostname != "ward";
+  p.nix.buildMachines.ward = hostname != "ward";
 
   system.autoUpgrade = {
     enable = true;

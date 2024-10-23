@@ -127,8 +127,10 @@ in
     package = (pkgs.callPackage ../../nixpkgs/overlays/pkgs/caddy/package.nix { }).withPlugins {
       caddyModules = [
         { repo = "github.com/caddy-dns/cloudflare"; version = "89f16b99c18ef49c8bb470a82f895bce01cbaece"; }
+        { repo = "github.com/caddyserver/cache-handler"; version = "283ea9b5bf192ff9c98f0b848c7117367655893f"; } # v0.14.0
+        { repo = "github.com/darkweak/storages/nuts/caddy"; version = "0d6842b38ab6937af5a60adcf54d8955b5bbe6fc"; } # v0.0.10
       ];
-      vendorHash = "sha256-fTcMtg5GGEgclIwJCav0jjWpqT+nKw2OF1Ow0MEEitk=";
+      vendorHash = "sha256-hgiEcbsQKoYoAedjYEQ5ZMiH3F0de5neEPszGWqeTm0=";
     };
 
     virtualHosts."*.ward.einic.org" = {
@@ -185,6 +187,18 @@ in
       listenAddresses = [ "100.115.212.42" ];
       extraConfig = ''
         root /srv
+
+        redir /nix-cache /nix-cache/ 301
+        handle_path /nix-cache/* {
+          cache {
+            nuts {
+              path /ward/keep/nix-cache
+            }
+          }
+          reverse_proxy https://cache.nixos.org {
+            header_up Host {host}
+          }
+        }
 
         redir /harmonia /harmonia/ 301
         handle_path /harmonia/* {

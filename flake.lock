@@ -1,48 +1,5 @@
 {
   "nodes": {
-    "attic": {
-      "inputs": {
-        "crane": "crane",
-        "flake-compat": "flake-compat",
-        "flake-parts": "flake-parts",
-        "nixpkgs": "nixpkgs",
-        "nixpkgs-stable": "nixpkgs-stable"
-      },
-      "locked": {
-        "lastModified": 1729116596,
-        "narHash": "sha256-NnLMLIXGZtAscUF4dCShksuQ1nOGF6Y2dEeyj0rBbUg=",
-        "owner": "zhaofengli",
-        "repo": "attic",
-        "rev": "2b05b7d986cf6009b1c1ef7daa4961cd1a658782",
-        "type": "github"
-      },
-      "original": {
-        "owner": "zhaofengli",
-        "repo": "attic",
-        "type": "github"
-      }
-    },
-    "crane": {
-      "inputs": {
-        "nixpkgs": [
-          "attic",
-          "nixpkgs"
-        ]
-      },
-      "locked": {
-        "lastModified": 1722960479,
-        "narHash": "sha256-NhCkJJQhD5GUib8zN9JrmYGMwt4lCRp6ZVNzIiYCl0Y=",
-        "owner": "ipetkov",
-        "repo": "crane",
-        "rev": "4c6c77920b8d44cd6660c1621dea6b3fc4b4c4f4",
-        "type": "github"
-      },
-      "original": {
-        "owner": "ipetkov",
-        "repo": "crane",
-        "type": "github"
-      }
-    },
     "devour-flake": {
       "flake": false,
       "locked": {
@@ -88,8 +45,8 @@
       "inputs": {
         "devour-flake": "devour-flake",
         "devshell": "devshell",
-        "flake-compat": "flake-compat_2",
-        "flake-parts": "flake-parts_2",
+        "flake-compat": "flake-compat",
+        "flake-parts": "flake-parts",
         "flake-utils": [
           "flake-utils"
         ],
@@ -118,22 +75,6 @@
       }
     },
     "flake-compat": {
-      "flake": false,
-      "locked": {
-        "lastModified": 1696426674,
-        "narHash": "sha256-kvjfFW7WAETZlt09AgDn1MrtKzP7t90Vf7vypd3OL1U=",
-        "owner": "edolstra",
-        "repo": "flake-compat",
-        "rev": "0f9255e01c2351cc7d116c072cb317785dd33b33",
-        "type": "github"
-      },
-      "original": {
-        "owner": "edolstra",
-        "repo": "flake-compat",
-        "type": "github"
-      }
-    },
-    "flake-compat_2": {
       "locked": {
         "lastModified": 1717312683,
         "narHash": "sha256-FrlieJH50AuvagamEvWMIE6D2OAnERuDboFDYAED/dE=",
@@ -148,7 +89,7 @@
         "type": "github"
       }
     },
-    "flake-compat_3": {
+    "flake-compat_2": {
       "flake": false,
       "locked": {
         "lastModified": 1696426674,
@@ -165,27 +106,6 @@
       }
     },
     "flake-parts": {
-      "inputs": {
-        "nixpkgs-lib": [
-          "attic",
-          "nixpkgs"
-        ]
-      },
-      "locked": {
-        "lastModified": 1722555600,
-        "narHash": "sha256-XOQkdLafnb/p9ij77byFQjDf5m5QYl9b2REiVClC+x4=",
-        "owner": "hercules-ci",
-        "repo": "flake-parts",
-        "rev": "8471fe90ad337a8074e957b69ca4d0089218391d",
-        "type": "github"
-      },
-      "original": {
-        "owner": "hercules-ci",
-        "repo": "flake-parts",
-        "type": "github"
-      }
-    },
-    "flake-parts_2": {
       "inputs": {
         "nixpkgs-lib": [
           "ethereum-nix",
@@ -380,7 +300,7 @@
     },
     "nixos-wsl": {
       "inputs": {
-        "flake-compat": "flake-compat_3",
+        "flake-compat": "flake-compat_2",
         "flake-utils": [
           "flake-utils"
         ],
@@ -389,11 +309,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1729494942,
-        "narHash": "sha256-c/WV0R0WWuK2UAjTCGntaa+y1UVPsTUJZXqwwKxcmYs=",
+        "lastModified": 1729639198,
+        "narHash": "sha256-AshdfLU9yWhtYQdR5FnUtoQUlXvFee+vlQwPng4DSNY=",
         "owner": "nix-community",
         "repo": "NixOS-WSL",
-        "rev": "f26ca94fdcfc1a3adfee70e4ed5e2d8b1bab4317",
+        "rev": "eb326eabbfce607700d0af08cd957fd9d06e48fa",
         "type": "github"
       },
       "original": {
@@ -405,18 +325,17 @@
     },
     "nixpkgs": {
       "locked": {
-        "lastModified": 1726042813,
-        "narHash": "sha256-LnNKCCxnwgF+575y0pxUdlGZBO/ru1CtGHIqQVfvjlA=",
+        "lastModified": 1729413321,
+        "narHash": "sha256-I4tuhRpZFa6Fu6dcH9Dlo5LlH17peT79vx1y1SpeKt0=",
         "owner": "NixOS",
         "repo": "nixpkgs",
-        "rev": "159be5db480d1df880a0135ca0bfed84c2f88353",
+        "rev": "1997e4aa514312c1af7e2bda7fad1644e778ff26",
         "type": "github"
       },
       "original": {
-        "owner": "NixOS",
-        "ref": "nixpkgs-unstable",
-        "repo": "nixpkgs",
-        "type": "github"
+        "id": "nixpkgs",
+        "ref": "nixos-unstable",
+        "type": "indirect"
       }
     },
     "nixpkgs-2311": {
@@ -431,22 +350,6 @@
       "original": {
         "owner": "nixos",
         "ref": "23.11",
-        "repo": "nixpkgs",
-        "type": "github"
-      }
-    },
-    "nixpkgs-stable": {
-      "locked": {
-        "lastModified": 1724316499,
-        "narHash": "sha256-Qb9MhKBUTCfWg/wqqaxt89Xfi6qTD3XpTzQ9eXi3JmE=",
-        "owner": "NixOS",
-        "repo": "nixpkgs",
-        "rev": "797f7dc49e0bc7fab4b57c021cdf68f595e47841",
-        "type": "github"
-      },
-      "original": {
-        "owner": "NixOS",
-        "ref": "nixos-24.05",
         "repo": "nixpkgs",
         "type": "github"
       }
@@ -467,24 +370,8 @@
         "type": "github"
       }
     },
-    "nixpkgs_2": {
-      "locked": {
-        "lastModified": 1729256560,
-        "narHash": "sha256-/uilDXvCIEs3C9l73JTACm4quuHUsIHcns1c+cHUJwA=",
-        "owner": "NixOS",
-        "repo": "nixpkgs",
-        "rev": "4c2fcb090b1f3e5b47eaa7bd33913b574a11e0a0",
-        "type": "github"
-      },
-      "original": {
-        "id": "nixpkgs",
-        "ref": "nixos-unstable",
-        "type": "indirect"
-      }
-    },
     "root": {
       "inputs": {
-        "attic": "attic",
         "ethereum-nix": "ethereum-nix",
         "flake-utils": "flake-utils",
         "home-manager": "home-manager",
@@ -492,7 +379,7 @@
         "nix-darwin": "nix-darwin",
         "nixos-vscode-server": "nixos-vscode-server",
         "nixos-wsl": "nixos-wsl",
-        "nixpkgs": "nixpkgs_2",
+        "nixpkgs": "nixpkgs",
         "targo": "targo"
       }
     },

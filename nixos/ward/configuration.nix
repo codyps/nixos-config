@@ -128,10 +128,14 @@ in
       caddyModules = [
         { repo = "github.com/caddy-dns/cloudflare"; version = "89f16b99c18ef49c8bb470a82f895bce01cbaece"; }
         { repo = "github.com/caddyserver/cache-handler"; version = "283ea9b5bf192ff9c98f0b848c7117367655893f"; } # v0.14.0
-        { repo = "github.com/darkweak/storages/nuts/caddy"; version = "0d6842b38ab6937af5a60adcf54d8955b5bbe6fc"; } # v0.0.10
+        { repo = "github.com/darkweak/storages/badger/caddy"; version = "0d6842b38ab6937af5a60adcf54d8955b5bbe6fc"; } # v0.0.10
       ];
-      vendorHash = "sha256-hgiEcbsQKoYoAedjYEQ5ZMiH3F0de5neEPszGWqeTm0=";
+      vendorHash = "sha256-wXtJv29AVwwrGGJer/2QLL61+Ecio/TWkbMUsNWrjGY=";
     };
+
+    globalConfig = ''
+      cache
+    '';
 
     virtualHosts."*.ward.einic.org" = {
       extraConfig = ''
@@ -177,6 +181,11 @@ in
           }
         }
 
+        @archivebox host archivebox.ward.ts.einic.org
+        handle @archivebox {
+          reverse_proxy http://localhost:8000
+        }
+
         handle {
           abort
         }
@@ -191,22 +200,32 @@ in
         redir /nix-cache /nix-cache/ 301
         handle_path /nix-cache/* {
           cache {
-            nuts {
+            badger {
               path /ward/keep/nix-cache
             }
+
+            key {
+              disable_host
+              disable_scheme
+            }
+
+            ttl 30000h
+            default_cache_control no-store
           }
           reverse_proxy https://cache.nixos.org {
-            header_up Host {host}
+            header_up Host {upstream_hostport}
+
+            @ok status 200 302
+            handle_response @ok {
+              header Cache-Control "public, immutable"
+              copy_response
+            }
           }
         }
 
         redir /harmonia /harmonia/ 301
         handle_path /harmonia/* {
           reverse_proxy http://localhost:8916 {
-            #header_up Host {host}
-            #header_up X-Forwarded-For {remote}
-            #header_up Upgrade {upstream_http_upgrade}
-            #header_up Connection {upstream_http_connection}
           }
         }
 
@@ -232,6 +251,16 @@ in
           }
         }
       '';
+    };
+  };
+
+  virtualisation.oci-containers.containers = {
+    archivebox = {
+      image = "archivebox/archivebox:latest";
+      ports = ["127.0.0.1:8000:8000"];
+      volumes = [
+        "/ward/keep/archivebox:/data"
+      ];
     };
   };
 

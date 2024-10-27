@@ -28,6 +28,7 @@ in
       "/var/lib/upower"
       "/var/lib/tailscale"
       "/var/lib/systemd/coredump"
+      "/var/lib/audiobookshelf"
       "/etc/NetworkManager/system-connections"
       { directory = "/var/lib/colord"; user = "colord"; group = "colord"; mode = "u=rwx,g=rx,o="; }
     ];
@@ -89,6 +90,12 @@ in
     setSocketVariable = true;
   };
 
+  virtualisation.podman = {
+    enable = true;
+    autoPrune.enable = true;
+    defaultNetwork.settings.dns_enabled = true;
+  };
+
   services.hydra = {
     enable = true;
     hydraURL = "https://ward.little-moth.ts.net/hydra";
@@ -106,6 +113,11 @@ in
       "/persist/etc/nix-binary-cache/binary-cache.secret"
     ];
     settings.bind = "[::1]:8916";
+  };
+
+  services.audiobookshelf = {
+    enable = true;
+    port = 8917;
   };
 
   #services.atticd = {
@@ -137,6 +149,27 @@ in
       cache
     '';
 
+    virtualHosts."audiobookshelf.einic.org" = {
+      extraConfig = ''
+        tls {
+          dns cloudflare {env.CLOUDFLARE_API_TOKEN}
+        }
+
+        reverse_proxy http://localhost:8917
+      '';
+    };
+
+    virtualHosts."audiobooks.einic.org" = {
+      extraConfig = ''
+        tls {
+          dns cloudflare {env.CLOUDFLARE_API_TOKEN}
+        }
+
+        root /ward/keep/libation/data/Books
+        file_server browse
+      '';
+    };
+
     virtualHosts."*.ward.einic.org" = {
       extraConfig = ''
         tls {
@@ -144,14 +177,29 @@ in
         }
         root /srv
 
-        import /persist/etc/caddy-auth-config
-
         @zd621 host zd621.ward.einic.org
         handle @zd621 {
+          import /persist/etc/caddy-auth-config
           # D7J211001302.bed.einic.org
           reverse_proxy http://192.168.6.192 {
             header_up Authorization "Basic YWRtaW46MTIzNA=="
           }
+        }
+
+        #@archivebox host archivebox.ward.einic.org
+        #handle @archivebox {
+        #  reverse_proxy http://localhost:8000
+        #}
+
+        @audiobookshelf host audiobookshelf.ward.einic.org
+        handle @audiobookshelf {
+          reverse_proxy http://localhost:8917
+        }
+
+        @audiobooks host audiobooks.ward.einic.org
+        handle @audiobooks {
+          root /ward/keep/libation/data/Books
+          file_server browse
         }
 
         handle {
@@ -237,6 +285,12 @@ in
           }
         }
 
+        redir /audiobooks /audiobooks/ 301
+        handle_path /audiobooks/* {
+          root /ward/keep/libation/data/Books
+          file_server browse
+        }
+
         forward_auth unix//run/tailscale-nginx-auth/tailscale-nginx-auth.sock {
           uri /auth
           header_up Remote-Addr {remote_host}
@@ -261,6 +315,17 @@ in
       volumes = [
         "/ward/keep/archivebox:/data"
       ];
+    };
+
+    libation = {
+      image = "rmcrackan/libation:latest";
+      volumes = [
+        "/ward/keep/libation/data:/data"
+        "/ward/keep/libation/config:/config"
+      ];
+      environment = {
+        SLEEP_TIME = "24h";
+      };
     };
   };
 

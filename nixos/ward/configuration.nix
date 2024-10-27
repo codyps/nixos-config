@@ -141,33 +141,44 @@ in
         { repo = "github.com/caddy-dns/cloudflare"; version = "89f16b99c18ef49c8bb470a82f895bce01cbaece"; }
         { repo = "github.com/caddyserver/cache-handler"; version = "283ea9b5bf192ff9c98f0b848c7117367655893f"; } # v0.14.0
         { repo = "github.com/darkweak/storages/badger/caddy"; version = "0d6842b38ab6937af5a60adcf54d8955b5bbe6fc"; } # v0.0.10
+        { repo = "github.com/WeidiDeng/caddy-cloudflare-ip"; version = "f53b62aa13cb7ad79c8b47aacc3f2f03989b67e5"; } # head of main
       ];
-      vendorHash = "sha256-wXtJv29AVwwrGGJer/2QLL61+Ecio/TWkbMUsNWrjGY=";
+      vendorHash = "sha256-1uMji7GX7VpKr/VM0XG/mh4v1jW8sW2xaiBS1ZwAUMM=";
     };
 
     globalConfig = ''
       cache
+
+      servers {
+        trusted_proxies cloudflare {
+          interval 12h
+          timeout 15s
+        }
+      }
     '';
 
-    virtualHosts."audiobookshelf.einic.org" = {
+    virtualHosts."*.einic.org" = {
       extraConfig = ''
         tls {
           dns cloudflare {env.CLOUDFLARE_API_TOKEN}
         }
 
-        reverse_proxy http://localhost:8917
-      '';
-    };
-
-    virtualHosts."audiobooks.einic.org" = {
-      extraConfig = ''
-        tls {
-          dns cloudflare {env.CLOUDFLARE_API_TOKEN}
+        @audiobooks host audiobooks.einic.org
+        handle @audiobooks {
+          root /ward/keep/libation/data/Books
+          file_server browse
         }
 
-        root /ward/keep/libation/data/Books
-        file_server browse
+        @audiobookshelf host audiobookshelf.einic.org
+        handle @audiobookshelf {
+          reverse_proxy http://localhost:8917
+        }
+
+        handle {
+          abort
+        }
       '';
+
     };
 
     virtualHosts."*.ward.einic.org" = {

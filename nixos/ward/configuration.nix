@@ -149,6 +149,8 @@ in
     globalConfig = ''
       cache
 
+      acme_dns cloudflare {env.CLOUDFLARE_API_TOKEN}
+
       servers {
         trusted_proxies cloudflare {
           interval 12h
@@ -159,10 +161,6 @@ in
 
     virtualHosts."*.einic.org" = {
       extraConfig = ''
-        tls {
-          dns cloudflare {env.CLOUDFLARE_API_TOKEN}
-        }
-
         @audiobooks host audiobooks.einic.org
         handle @audiobooks {
           root /ward/keep/libation/data/Books
@@ -183,9 +181,6 @@ in
 
     virtualHosts."*.ward.einic.org" = {
       extraConfig = ''
-        tls {
-          dns cloudflare {env.CLOUDFLARE_API_TOKEN}
-        }
         root /srv
 
         @zd621 host zd621.ward.einic.org
@@ -222,9 +217,6 @@ in
     virtualHosts."*.ward.ts.einic.org" = {
       listenAddresses = [ "100.115.212.42" ];
       extraConfig = ''
-        tls {
-          dns cloudflare {env.CLOUDFLARE_API_TOKEN}
-        }
         root /srv
 
         @gramps host gramps.ward.ts.einic.org

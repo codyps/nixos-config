@@ -1,5 +1,10 @@
 { config, pkgs, lib, ... }:
 
+let
+  authorizedKeys = [
+    "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAILO6B2Cx3SVmD65J9sJsmxhjZq/AGprzpRMcrqbCuu6Y cody@u3.bed.einic.org"
+  ];
+in
 {
   imports =
     [
@@ -47,9 +52,7 @@
     enable = true;
     ssh = {
       enable = true;
-      authorizedKeys = [
-          "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAILO6B2Cx3SVmD65J9sJsmxhjZq/AGprzpRMcrqbCuu6Y cody@u3.bed.einic.org"
-      ];
+      inherit authorizedKeys;
       hostKeys = [
          "/persist/etc/secrets/initrd/ssh_host_ed25519_key"
       ];
@@ -160,22 +163,16 @@
     mutableUsers = false;
     users = {
       root = {
-	openssh.authorizedKeys.keys = [
-          "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAILO6B2Cx3SVmD65J9sJsmxhjZq/AGprzpRMcrqbCuu6Y cody@u3.bed.einic.org"
-        ];
-	hashedPasswordFile = "/persist/etc/password/root";
-	initialHashedPassword = "$y$j9T$.XitCJWQZXR6Jp7.qY4zb1$sjNfm460uI5Y9AXji0zcDsUUm.8HPSHo8ofkHrsT8AD";
+        openssh.authorizedKeys.keys = authorizedKeys;
+        hashedPasswordFile = "/persist/etc/password/root";
       };
 
       y = {
         isNormalUser = true;
         extraGroups = [ "wheel" ];
         uid = 1000;
-	openssh.authorizedKeys.keys = [
-          "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAILO6B2Cx3SVmD65J9sJsmxhjZq/AGprzpRMcrqbCuu6Y cody@u3.bed.einic.org"
-        ];
-	hashedPasswordFile = "/persist/etc/password/y";
-	initialHashedPassword = "$y$j9T$GX71.gVg8bfPGUvNPQRcL/$xfOX53jJft97hV7C49TO2WftZHpr6hSZoHvzt2UivB3";
+        openssh.authorizedKeys.keys = authorizedKeys;
+        hashedPasswordFile = "/persist/etc/password/y";
       };
 
       nix = {
@@ -189,21 +186,11 @@
     groups.users-remote = {};
   };
 
-  # Some programs need SUID wrappers, can be configured further or are
-  # started in user sessions.
-  # programs.mtr.enable = true;
-  # programs.gnupg.agent = {
-  #   enable = true;
-  #   enableSSHSupport = true;
-  # };
-
-  # List services that you want to enable:
-
-  # Open ports in the firewall.
-  # networking.firewall.allowedTCPPorts = [ ... ];
-  # networking.firewall.allowedUDPPorts = [ ... ];
-  # Or disable the firewall altogether.
-  # networking.firewall.enable = false;
+  programs.mtr.enable = true;
+  programs.gnupg.agent = {
+    enable = true;
+    enableSSHSupport = true;
+  };
 
   # This value determines the NixOS release from which the default
   # settings for stateful data, like file locations and database versions

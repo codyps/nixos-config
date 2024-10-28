@@ -21,14 +21,16 @@
       inputs.nixpkgs.follows = "nixpkgs";
       inputs.flake-utils.follows = "flake-utils";
     };
-    attic.url = "github:zhaofengli/attic";
   };
 
-  outputs = { self, nixpkgs, flake-utils, targo, nix-darwin, home-manager, nixos-wsl, nixos-vscode-server, impermanence, ethereum-nix, attic }:
+  outputs = { self, nixpkgs, flake-utils, targo, nix-darwin, home-manager, nixos-wsl, nixos-vscode-server, impermanence, ethereum-nix }:
     let
       overlays = [
         (final: prev: {
           targo = targo.packages.${prev.system}.default;
+
+          # something is using the old name, hack around it.
+          utillinux = prev.util-linux;
         })
         (final: prev: {
           redpanda-connect = prev.callPackage ./nixpkgs/overlays/pkgs/redpanda-connect {};
@@ -103,7 +105,6 @@
             specialArgs = { inherit home-manager self; };
             modules = [
               ethereum-nix.nixosModules.default
-              attic.nixosModules.atticd
               (import ./nixos/ward/configuration.nix)
               (import ./nixos/common.nix)
               impermanence.nixosModules.impermanence
@@ -236,8 +237,12 @@
               nix.extraOptions = ''
                 #upgrade-nix-store-path-url = "https://install.determinate.systems/nix-upgrade/stable/universal";
               '';
+
+              nix.buildMachines.ward.sshKey = "/etc/nix/keys/nix_ed25519";
+              p.nix.buildMachines.ward = true;
             })
             ./nix-darwin/configuration.nix
+            ./modules/build-machines.nix
             home-manager.darwinModules.home-manager
             {
               nixpkgs = nixpkgsConfig;

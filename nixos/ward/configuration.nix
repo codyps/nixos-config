@@ -28,6 +28,7 @@ in
       "/var/lib/upower"
       "/var/lib/tailscale"
       "/var/lib/systemd/coredump"
+      "/var/lib/audiobookshelf"
       "/etc/NetworkManager/system-connections"
       { directory = "/var/lib/colord"; user = "colord"; group = "colord"; mode = "u=rwx,g=rx,o="; }
     ];
@@ -89,6 +90,12 @@ in
     setSocketVariable = true;
   };
 
+  virtualisation.podman = {
+    enable = true;
+    autoPrune.enable = true;
+    defaultNetwork.settings.dns_enabled = true;
+  };
+
   services.hydra = {
     enable = true;
     hydraURL = "https://ward.little-moth.ts.net/hydra";
@@ -108,6 +115,11 @@ in
     settings.bind = "[::1]:8916";
   };
 
+  services.audiobookshelf = {
+    enable = true;
+    port = 8917;
+  };
+
   #services.atticd = {
   #  enable = true;
   #  credentialsFile = "/persist/etc/atticd.env";
@@ -124,24 +136,105 @@ in
   systemd.services.caddy.serviceConfig.EnvironmentFile = "/persist/etc/default/caddy";
   services.caddy = {
     enable = true;
-    package = (pkgs.callPackage ../../nixpkgs/overlays/pkgs/caddy/package.nix {}).withPlugins {
+    package = (pkgs.callPackage ../../nixpkgs/overlays/pkgs/caddy/package.nix { }).withPlugins {
       caddyModules = [
         { repo = "github.com/caddy-dns/cloudflare"; version = "89f16b99c18ef49c8bb470a82f895bce01cbaece"; }
+        { repo = "github.com/caddyserver/cache-handler"; version = "283ea9b5bf192ff9c98f0b848c7117367655893f"; } # v0.14.0
+        { repo = "github.com/darkweak/storages/badger/caddy"; version = "0d6842b38ab6937af5a60adcf54d8955b5bbe6fc"; } # v0.0.10
+        { repo = "github.com/WeidiDeng/caddy-cloudflare-ip"; version = "f53b62aa13cb7ad79c8b47aacc3f2f03989b67e5"; } # head of main
       ];
-      vendorHash = "sha256-fTcMtg5GGEgclIwJCav0jjWpqT+nKw2OF1Ow0MEEitk=";
+      vendorHash = "sha256-1uMji7GX7VpKr/VM0XG/mh4v1jW8sW2xaiBS1ZwAUMM=";
+    };
+
+    globalConfig = ''
+      cache
+
+      acme_dns cloudflare {env.CLOUDFLARE_API_TOKEN}
+
+      servers {
+        trusted_proxies cloudflare {
+          interval 12h
+          timeout 15s
+        }
+      }
+    '';
+
+    virtualHosts."*.einic.org" = {
+      extraConfig = ''
+        @audiobooks host audiobooks.einic.org
+        handle @audiobooks {
+          root /ward/keep/libation/data/Books
+          file_server browse
+        }
+
+        @audiobookshelf host audiobookshelf.einic.org
+        handle @audiobookshelf {
+          reverse_proxy http://localhost:8917
+        }
+
+        handle {
+          abort
+        }
+      '';
+
+    };
+
+    virtualHosts."*.ward.einic.org" = {
+      extraConfig = ''
+        root /srv
+
+        @zd621 host zd621.ward.einic.org
+        handle @zd621 {
+          import /persist/etc/caddy-auth-config
+          # D7J211001302.bed.einic.org
+          reverse_proxy http://192.168.6.192 {
+            header_up Authorization "Basic YWRtaW46MTIzNA=="
+          }
+        }
+
+        #@archivebox host archivebox.ward.einic.org
+        #handle @archivebox {
+        #  reverse_proxy http://localhost:8000
+        #}
+
+        @audiobookshelf host audiobookshelf.ward.einic.org
+        handle @audiobookshelf {
+          reverse_proxy http://localhost:8917
+        }
+
+        @audiobooks host audiobooks.ward.einic.org
+        handle @audiobooks {
+          root /ward/keep/libation/data/Books
+          file_server browse
+        }
+
+        handle {
+          abort
+        }
+      '';
     };
 
     virtualHosts."*.ward.ts.einic.org" = {
       listenAddresses = [ "100.115.212.42" ];
       extraConfig = ''
-        tls {
-          dns cloudflare {env.CLOUDFLARE_API_TOKEN}
-        }
         root /srv
 
         @gramps host gramps.ward.ts.einic.org
         handle @gramps {
           reverse_proxy http://localhost:5000
+        }
+
+        @zd621_ts host zd621.ward.ts.einic.org
+        handle @zd621_ts {
+          # D7J211001302.bed.einic.org
+          reverse_proxy http://192.168.6.192 {
+            header_up Authorization "Basic YWRtaW46MTIzNA=="
+          }
+        }
+
+        @archivebox host archivebox.ward.ts.einic.org
+        handle @archivebox {
+          reverse_proxy http://localhost:8000
         }
 
         handle {
@@ -155,13 +248,35 @@ in
       extraConfig = ''
         root /srv
 
+        redir /nix-cache /nix-cache/ 301
+        handle_path /nix-cache/* {
+          cache {
+            badger {
+              path /ward/keep/nix-cache
+            }
+
+            key {
+              disable_host
+              disable_scheme
+            }
+
+            ttl 30000h
+            default_cache_control no-store
+          }
+          reverse_proxy https://cache.nixos.org {
+            header_up Host {upstream_hostport}
+
+            @ok status 200 302
+            handle_response @ok {
+              header Cache-Control "public, immutable"
+              copy_response
+            }
+          }
+        }
+
         redir /harmonia /harmonia/ 301
         handle_path /harmonia/* {
           reverse_proxy http://localhost:8916 {
-            #header_up Host {host}
-            #header_up X-Forwarded-For {remote}
-            #header_up Upgrade {upstream_http_upgrade}
-            #header_up Connection {upstream_http_connection}
           }
         }
 
@@ -171,6 +286,12 @@ in
             header_up Host {upstream_hostport}
             header_up X-Request-Base /hydra
           }
+        }
+
+        redir /audiobooks /audiobooks/ 301
+        handle_path /audiobooks/* {
+          root /ward/keep/libation/data/Books
+          file_server browse
         }
 
         forward_auth unix//run/tailscale-nginx-auth/tailscale-nginx-auth.sock {
@@ -190,7 +311,53 @@ in
     };
   };
 
+  virtualisation.oci-containers.containers = {
+    archivebox = {
+      image = "archivebox/archivebox:latest";
+      ports = ["127.0.0.1:8000:8000"];
+      volumes = [
+        "/ward/keep/archivebox:/data"
+      ];
+    };
+
+    libation = {
+      image = "rmcrackan/libation:latest";
+      volumes = [
+        "/ward/keep/libation/data:/data"
+        "/ward/keep/libation/config:/config"
+      ];
+      environment = {
+        SLEEP_TIME = "24h";
+      };
+    };
+  };
+
   networking.firewall.trustedInterfaces = [ "tailscale0" ];
+  networking.firewall.allowedTCPPorts = [ 80 443 ];
+
+  networking.hostName = "ward";
+  networking.hostId = "5c794628";
+
+  systemd.network = {
+    enable = true;
+    networks."10-enp2s0.network" = {
+      networkConfig.DHCP = "ipv4";
+      matchConfig.Name = "enp2s0";
+    };
+    wait-online.anyInterface = true;
+  };
+
+  services.cloudflared = {
+    enable = true;
+    tunnels."3a303175-5ce5-459c-b1fb-d2cf9cbcd5b2" = {
+      credentialsFile = "/persist/etc/cloudflared/3a303175-5ce5-459c-b1fb-d2cf9cbcd5b2.json";
+      default = "http_status:404";
+    };
+  };
+
+  # https://github.com/quic-go/quic-go/wiki/UDP-Buffer-Sizes
+  boot.kernel.sysctl."net.core.rmem_max" = 7500000;
+  boot.kernel.sysctl."net.core.wmem_max" = 7500000;
 
   services.tailscale.permitCertUid = "caddy";
   services.tailscaleAuth = {
@@ -198,9 +365,6 @@ in
     user = "caddy";
     group = "caddy";
   };
-
-  networking.hostName = "ward";
-  networking.hostId = "5c794628";
 
   time.timeZone = "America/New_York";
 

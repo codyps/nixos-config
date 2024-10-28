@@ -2,15 +2,22 @@
 let hostname = config.networking.hostName;
 in
 {
+
+  imports = [
+    ../modules/build-machines.nix
+  ];
+
   nix = {
     settings = {
       experimental-features = [ "nix-command" "flakes" ];
       trusted-users = [ "nix-ssh" "@wheel" ];
 
-      substituters = if hostname != "ward" then [ "https://ward.little-moth.ts.net/harmonia" ] else [];
-      trusted-public-keys = if hostname != "ward" then [
-        "ward.einic.org-1:MVzXNXGliDxO/juzN9Vo+NHVrnRA6F/sHC4k1mb/iYI="
-      ] else [];
+      substituters = [ "https://ward.little-moth.ts.net/nix-cache" ] ++ (if hostname != "ward" then [ "https://ward.little-moth.ts.net/harmonia" ] else [ ]);
+
+      trusted-public-keys =
+        if hostname != "ward" then [
+          "ward.einic.org-1:MVzXNXGliDxO/juzN9Vo+NHVrnRA6F/sHC4k1mb/iYI="
+        ] else [ ];
     };
     optimise.automatic = true;
     gc = {
@@ -18,8 +25,6 @@ in
       dates = "weekly";
       options = "--delete-older-than 30d";
     };
-    #buildMachines = [
-    #];
     #distributedBuilds = true;
     sshServe = {
       enable = true;
@@ -27,6 +32,8 @@ in
       protocol = "ssh-ng";
     };
   };
+
+  p.nix.buildMachines.ward = hostname != "ward";
 
   system.autoUpgrade = {
     enable = true;
@@ -38,7 +45,7 @@ in
       "-L" # print build logs
     ];
     dates = "02:00";
-    randomizedDelaySec = "45min";
+    randomizedDelaySec = "90min";
   };
 
   i18n.defaultLocale = "en_US.UTF-8";

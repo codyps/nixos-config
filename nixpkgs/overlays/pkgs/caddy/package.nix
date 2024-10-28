@@ -1,13 +1,13 @@
-{
-  lib,
-  buildGoModule,
-  fetchFromGitHub,
-  gnused,
-  installShellFiles,
-  nixosTests,
-  caddy,
-  testers,
-  stdenv,
+{ lib
+, buildGoModule
+, fetchFromGitHub
+, gnused
+, installShellFiles
+, nixosTests
+, caddy
+, testers
+, stdenv
+,
 }:
 let
   attrsToModule = map (plugin: plugin.repo);
@@ -97,9 +97,9 @@ buildGoModule {
 
   passthru = {
     withPlugins =
-      {
-        caddyModules,
-        vendorHash,
+      { caddyModules
+      , vendorHash
+      ,
       }:
       buildGoModule {
         pname = "${caddy.pname}-with-plugins";

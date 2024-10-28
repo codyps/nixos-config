@@ -1,11 +1,15 @@
 { config, pkgs, lib, ... }:
 
+let
+  authorizedKeys = [
+    "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAILO6B2Cx3SVmD65J9sJsmxhjZq/AGprzpRMcrqbCuu6Y cody@u3.bed.einic.org"
+  ];
+in
 {
   imports =
     [
       ./hardware-configuration.nix
     ];
-
 
   nix = {
     package = pkgs.nixFlakes;
@@ -25,6 +29,11 @@
       ];
   };
 
+  # TODO: add tailscale to initrd & use tpm to encrypt/authenticate data
+  #boot.initrd = {
+  #  kernelModules = ["tpm_crb"];
+  #};
+
   boot.initrd.postDeviceCommands = lib.mkAfter ''
     zfs rollback -r calvin/local/root@blank
   '';
@@ -34,6 +43,18 @@
       device = "/dev/disk/by-uuid/cac206a2-6cf7-433d-99e5-51d0105d4a38";
       allowDiscards = true;
       preLVM = true;
+      bypassWorkqueues = true;
+    };
+  };
+
+  boot.initrd.network = {
+    enable = true;
+    ssh = {
+      enable = true;
+      inherit authorizedKeys;
+      hostKeys = [
+         "/persist/etc/secrets/initrd/ssh_host_ed25519_key"
+      ];
     };
   };
 
@@ -140,42 +161,35 @@
     defaultUserShell = pkgs.zsh;
     mutableUsers = false;
     users = {
-      root = { };
+      root = {
+        openssh.authorizedKeys.keys = authorizedKeys;
+        hashedPasswordFile = "/persist/etc/password/root";
+      };
 
       y = {
-        createHome = true;
-        extraGroups = [ "wheel" ];
-        group = "users";
-        uid = 1000;
-        home = "/home/y";
         isNormalUser = true;
+        extraGroups = [ "wheel" ];
+        uid = 1000;
+        openssh.authorizedKeys.keys = authorizedKeys;
+        hashedPasswordFile = "/persist/etc/password/y";
       };
+
       nix = {
-        createHome = true;
-        home = "/home/nix";
         group = "users-remote";
         uid = 1100;
         useDefaultShell = true;
         isNormalUser = true;
       };
     };
+
+    groups.users-remote = {};
   };
 
-  # Some programs need SUID wrappers, can be configured further or are
-  # started in user sessions.
-  # programs.mtr.enable = true;
-  # programs.gnupg.agent = {
-  #   enable = true;
-  #   enableSSHSupport = true;
-  # };
-
-  # List services that you want to enable:
-
-  # Open ports in the firewall.
-  # networking.firewall.allowedTCPPorts = [ ... ];
-  # networking.firewall.allowedUDPPorts = [ ... ];
-  # Or disable the firewall altogether.
-  # networking.firewall.enable = false;
+  programs.mtr.enable = true;
+  programs.gnupg.agent = {
+    enable = true;
+    enableSSHSupport = true;
+  };
 
   # This value determines the NixOS release from which the default
   # settings for stateful data, like file locations and database versions

@@ -20,5 +20,8 @@ buildGoModule rec {
     "cmd/redpanda-connect-community"
   ];
 
-  vendorHash = "sha256-Ic72mcklq+MOIK48TsaAh98Twy7YcuxkqZS16SQx2Yk=";
+  # otherwise vendorHash changes between macos & linux
+  proxyVendor = true;
+
+  vendorHash = "sha256-uae39+V2WVZSPb35Sg+XMMMYyVpAqFxoVlS0n2tufCI=";
 }

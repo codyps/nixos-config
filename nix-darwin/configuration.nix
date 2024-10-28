@@ -13,7 +13,7 @@ in
     curl
     fd
     git
-    ncdu
+    #ncdu
     neovim
     nix-direnv
     nodejs
@@ -39,23 +39,6 @@ in
     extra-nix-path = "nixpkgs=flake:nixpkgs";
     trusted-users = [ "root" "@admin" ];
   };
-
-  nix.buildMachines = [{
-    sshUser = "nix";
-    hostName = "arnold-local";
-    systems = [ "x86_64-linux" "aarch64-linux" ];
-    maxJobs = 4;
-    sshKey = "/etc/nix/keys/arnold_ed25519";
-    #publicHostKey = "c3NoLWVkMjU1MTkgQUFBQUMzTnphQzFsWkRJMU5URTVBQUFBSUZMTHRvZmM5aEFUb0daZmFmcmx2OC80dEU1VzBJQVJROG5IczhEcEJNU2sgcm9vdEBhcm5vbGQK";
-    supportedFeatures = [ "benchmark" "big-parallel" "kvm" ];
-    protocol = "ssh-ng";
-  }];
-
-  environment.etc."ssh/ssh_config.d/100-arnold-local.conf".text = ''
-    Host arnold-local
-      HostName 192.168.6.10
-      HostKeyAlias arnold
-  '';
 
   nix.settings.substituters = [ "https://nix-community.cachix.org" ];
   nix.settings.trusted-public-keys = [ "nix-community.cachix.org-1:mB9FSh9qf2dCimDSUo8Zy7bkq5CX+/rkCWyvRCYg3Fs=" "builder-name:V3galmyKya9h+w11jUnPeq7bZ7h+G8mxl2F6rR0avPQ=" ];

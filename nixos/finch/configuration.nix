@@ -2,70 +2,96 @@
 # your system.  Help is available in the configuration.nix(5) man page
 # and in the NixOS manual (accessible by running ‘nixos-help’).
 
-{ config, pkgs, lib, modulesPath, ... }:
+{ config, pkgs, lib, modulesPath, self, ... }:
 
+let
+  ssh-auth = (import ../ssh-auth.nix);
+  authorizedKeys = ssh-auth.authorizedKeys;
+in
 {
   imports =
     [
       ./hardware-configuration.nix
       (modulesPath + "/virtualisation/xen-domU.nix")
-      #<impermanence/nixos.nix>
     ];
 
+  services.logrotate.checkConfig = false;
 
-  nix = {
-    package = pkgs.nixFlakes;
-    settings = {
-      auto-optimise-store = true;
-      experimental-features = [ "nix-command" "flakes" ];
-    };
-    gc = {
-      automatic = true;
-      dates = "weekly";
-      options = "--delete-older-than 30d";
-    };
-    nixPath =
-      [
-        "nixpkgs=/nix/var/nix/profiles/per-user/root/channels/nixos"
-        "nixos-config=/persist/etc/nixos/configuration.nix"
-        "/nix/var/nix/profiles/per-user/root/channels"
-      ];
-  };
+  boot.zfs.extraPools = [ "tank" ];
 
   # Without this, boot ends up in grup rescue.
   boot.loader.grub.device = lib.mkForce "/dev/xvda";
   boot.zfs.devNodes = "/dev/disk/by-partuuid";
 
   # source: https://grahamc.com/blog/erase-your-darlings
-  boot.initrd.postDeviceCommands = lib.mkAfter ''
-    zfs rollback -r rpool/local/root@blank
-  '';
+  #boot.initrd.postDeviceCommands = lib.mkAfter ''
+  #  zfs rollback -r rpool/local/root@blank
+  #'';
+
+  # https://discourse.nixos.org/t/zfs-rollback-not-working-using-boot-initrd-systemd/37195/3
+  boot.initrd.systemd.enable = lib.mkDefault true;
+  boot.initrd.systemd.services.rollback = {
+    description = "Rollback root filesystem to a pristine state on boot";
+    wantedBy = [
+      # "zfs.target"
+      "initrd.target"
+    ];
+    after = [
+      "zfs-import-rpool.service"
+    ];
+    before = [
+      "sysroot.mount"
+    ];
+    path = with pkgs; [
+      zfs
+    ];
+    unitConfig.DefaultDependencies = "no";
+    serviceConfig.Type = "oneshot";
+    script = ''
+      zfs rollback -r rpool/local/root@blank && echo "  >> >> rollback complete << <<"
+    '';
+  };
+
+  #services.cockpit.enable = true;
+  #systemd.sockets."cockpit".socketConfig.ListenStream = lib.mkForce "127.0.0.1:${options.services.cockpit.port}";
+
+  boot.initrd.extraFiles."/etc/zfs/zfs-list.cache".source = /persist/var/cache/zfs/zfs-list.cache;
+  boot.initrd.extraFiles."/etc/zfs/zpool.cache".source = /persist/var/cache/zfs/zpool.cache;
 
   swapDevices = [{
     device = "/dev/rpool/local/swap";
   }];
 
+  fileSystems."/persist".neededForBoot = true;
+
   fileSystems."/var/lib" = {
     device = "/persist/var/lib";
     options = [ "bind" "x-systemd.requires-mounts-for=/persist" ];
     depends = [ "/persist" ];
+    neededForBoot = true;
   };
 
   fileSystems."/var/log" = {
     device = "/persist/var/log";
     options = [ "bind" "x-systemd.requires-mounts-for=/persist" ];
     depends = [ "/persist" ];
+    neededForBoot = true;
   };
 
-  fileSystems."/persist".neededForBoot = true;
-
-  /*
-    fileSystems."/etc/zfs/zfs-list.cache" = {
+  fileSystems."/etc/zfs/zfs-list.cache" = {
     device = "/persist/var/cache/zfs/zfs-list.cache";
-    options = ["bind" "x-systemd.requires-mounts-for=/persist"];
-    depends = ["/persist"];
-    };
-  */
+    options = [ "bind" "x-systemd.requires-mounts-for=/persist" ];
+    depends = [ "/persist" ];
+    neededForBoot = true;
+  };
+
+  fileSystems."/etc/zfs/zpool.cache" = {
+    device = "/persist/var/cache/zfs/zpool.cache";
+    options = [ "bind" "x-systemd.requires-mounts-for=/persist" ];
+    depends = [ "/persist" ];
+    neededForBoot = true;
+  };
+
   systemd.tmpfiles.rules = [
     "L /etc/zfs/zfs-list.cache - - - - /persist/var/cache/zfs/zfs-list.cache"
     "L /etc/zfs/zpool.cache - - - - /persist/var/cache/zfs/zpool.cache"
@@ -86,14 +112,16 @@
     interval = "monthly";
   };
 
-  services.harmonia = {
+  /*
+    services.harmonia = {
     enable = false;
     signKeyPath = "/persist/var/lib/secrets/harmonia.secret";
     # let's not bind to the wildcard address.
     settings = {
       bind = "[::1]:5000";
     };
-  };
+    };
+  */
 
   /*
     services.atticd = {
@@ -129,14 +157,16 @@
     };
   */
 
-  services.hydra = {
+  /*
+    services.hydra = {
     enable = false;
     hydraURL = "https://hydra.finch.einic.org/";
     notificationSender = "hydra@localhost";
-    buildMachinesFiles = [ ];
+    buildMachinesFiles = [];
     useSubstitutes = true;
     listenHost = "localhost";
-  };
+    };
+  */
 
   services.caddy = {
     enable = true;
@@ -146,15 +176,42 @@
     #virtualHosts."hydra.finch.einic.org".extraConfig = ''
     #  reverse_proxy :3000
     #'';
-    virtualHosts."syncthing.finch.einic.org".extraConfig = ''
-            basicauth {
-              import /persist/etc/caddy/syncthing.auth.*
-            }
-            reverse_proxy :8384 {
-      	      # https://docs.syncthing.net/users/faq.html#why-do-i-get-host-check-error-in-the-gui-api
-      	      header_up +Host "localhost"
-            }
-    '';
+    virtualHosts."finch.little-moth.ts.net" = {
+      listenAddresses = [ "100.112.195.103" ];
+      extraConfig = ''
+        root /srv
+
+        file_server /roms/* {
+          root /tank/syncthing/Roms
+          browse {
+             reveal_symlinks
+          }
+        }
+
+        handle_path /syncthing/* {
+          reverse_proxy http://localhost:8384 {
+              # https://docs.syncthing.net/users/reverseproxy.html
+              #header_up Host {upstream_hostport}
+              # https://docs.syncthing.net/users/faq.html#why-do-i-get-host-check-error-in-the-gui-api
+              header_up +Host "localhost"
+          }
+        }
+
+        forward_auth unix//run/tailscale-nginx-auth/tailscale-nginx-auth.sock {
+          uri /auth
+          header_up Remote-Addr {remote_host}
+          header_up Remote-Port {remote_port}
+          header_up Original-URI {uri}
+          copy_headers {
+            Tailscale-User>X-Webauth-User
+            Tailscale-Name>X-Webauth-Name
+            Tailscale-Login>X-Webauth-Login
+            Tailscale-Tailnet>X-Webauth-Tailnet
+            Tailscale-Profile-Picture>X-Webauth-Profile-Picture
+          }
+        }
+      '';
+    };
   };
 
   networking.hostId = "8425e349";
@@ -216,7 +273,6 @@
   */
 
   time.timeZone = "America/New_York";
-  i18n.defaultLocale = "en_US.UTF-8";
   # console = {
   #   font = "Lat2-Terminus16";
   #   keyMap = "us";
@@ -225,10 +281,15 @@
 
   users.mutableUsers = false;
   users.defaultUserShell = pkgs.zsh;
-  users.users.root = { };
+  users.users.root = {
+    openssh.authorizedKeys.keys = authorizedKeys;
+    hashedPasswordFile = "/persist/etc/passwd.d/root";
+  };
   users.users.cody = {
     isNormalUser = true;
     extraGroups = [ "wheel" ];
+    hashedPasswordFile = "/persist/etc/passwd.d/cody";
+    openssh.authorizedKeys.keys = authorizedKeys;
   };
 
   environment.systemPackages = with pkgs; [
@@ -236,18 +297,6 @@
     htop
     tmux
   ];
-
-  programs.zsh.enable = true;
-
-  # Some programs need SUID wrappers, can be configured further or are
-  # started in user sessions.
-  # programs.mtr.enable = true;
-  programs.gnupg.agent = {
-    enable = true;
-    enableSSHSupport = true;
-  };
-
-  services.tailscale.enable = true;
 
   services.openssh = {
     enable = true;
@@ -280,7 +329,12 @@
   networking.firewall.allowedUDPPorts = [ 443 22000 41641 ];
   networking.firewall.trustedInterfaces = [ "tailscale0" ];
 
-  system.copySystemConfiguration = true;
+  services.tailscale.permitCertUid = "caddy";
+  services.tailscaleAuth = {
+    enable = true;
+    user = "caddy";
+    group = "caddy";
+  };
 
   systemd.generators."zfs-mount-generator" = "${config.boot.zfs.package}/lib/systemd/system-generator/zfs-mount-generator";
   environment.etc."zfs/zed.d/history_event-zfs-list-cacher.sh".source = "${config.boot.zfs.package}/etc/zfs/zed.d/history_event-zfs-list-cacher.sh";
@@ -302,8 +356,6 @@
     KERNEL=="sd[a-z]*[0-9]*|mmcblk[0-9]*p[0-9]*|nvme[0-9]*n[0-9]*p[0-9]*|xvd[a-z]*[0-9]*", ENV{ID_FS_TYPE}=="zfs_member", ATTR{../queue/scheduler}="none"
   '';
 
-  system.extraSystemBuilderCmds = "ln -s ${../.} $out/full-config";
-
   # This value determines the NixOS release from which the default
   # settings for stateful data, like file locations and database versions
   # on your system were taken. It‘s perfectly fine and recommended to leave
@@ -311,5 +363,4 @@
   # Before changing this value read the documentation for this option
   # (e.g. man configuration.nix or on https://nixos.org/nixos/options.html).
   system.stateVersion = "22.11"; # Did you read the comment?
-
 }

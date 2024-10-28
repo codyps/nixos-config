@@ -15,15 +15,33 @@
     targo.url = "github:codyps/targo";
     targo.inputs.nixpkgs.follows = "nixpkgs";
     targo.inputs.flake-utils.follows = "flake-utils";
+    impermanence.url = "github:nix-community/impermanence";
+    ethereum-nix = {
+      url = "github:nix-community/ethereum.nix";
+      inputs.nixpkgs.follows = "nixpkgs";
+      inputs.flake-utils.follows = "flake-utils";
+    };
   };
 
-  outputs = { self, nixpkgs, flake-utils, targo, nix-darwin, home-manager, nixos-wsl, nixos-vscode-server }:
+  outputs = { self, nixpkgs, flake-utils, targo, nix-darwin, home-manager, nixos-wsl, nixos-vscode-server, impermanence, ethereum-nix }:
     let
       overlays = [
         (final: prev: {
           targo = targo.packages.${prev.system}.default;
+
+          # something is using the old name, hack around it.
+          utillinux = prev.util-linux;
         })
       ];
+
+      getName = pkg: pkg.pname or (builtins.parseDrvName pkg.name).name;
+      nixpkgsConfig = {
+        config.allowUnfreePredicate = pkg: builtins.elem (getName pkg) [
+          "vscode"
+          "copilot.vim"
+        ];
+        inherit overlays;
+      };
     in
     flake-utils.lib.eachDefaultSystem
       (system:
@@ -39,24 +57,71 @@
       ) //
     (
       let
-        getName = pkg: pkg.pname or (builtins.parseDrvName pkg.name).name;
-        nixpkgsConfig = {
-          config.allowUnfreePredicate = pkg: builtins.elem (getName pkg) [
-            "vscode"
-          ];
-          inherit overlays;
-        };
-
         nixosSystem = nixpkgs.lib.nixosSystem;
       in
       {
         nixosConfigurations = {
+          # u3 macbook vmware vm
+          mifflin = nixosSystem {
+            system = "x86_64-linux";
+            specialArgs = { inherit home-manager self; };
+            modules = [
+              (import ./nixos/mifflin/configuration.nix)
+              (import ./nixos/common.nix)
+              home-manager.nixosModules.home-manager
+              {
+                nixpkgs = nixpkgsConfig;
+                home-manager.useGlobalPkgs = true;
+                home-manager.useUserPackages = true;
+                home-manager.users.cody = import ./home-manager/home.nix;
+              }
+            ];
+          };
+
+          # storage vps
+          finch = nixosSystem {
+            system = "x86_64-linux";
+            specialArgs = { inherit self; };
+            modules = [
+              (import ./nixos/finch/configuration.nix)
+              (import ./nixos/common.nix)
+              impermanence.nixosModules.impermanence
+              home-manager.nixosModules.home-manager
+              {
+                nixpkgs = nixpkgsConfig;
+                home-manager.useGlobalPkgs = true;
+                home-manager.useUserPackages = true;
+                home-manager.users.cody = import ./home-manager/home-minimal.nix;
+              }
+            ];
+          };
+
+          # router
+          ward = nixosSystem {
+            system = "x86_64-linux";
+            specialArgs = { inherit home-manager self; };
+            modules = [
+              ethereum-nix.nixosModules.default
+              (import ./nixos/ward/configuration.nix)
+              (import ./nixos/common.nix)
+              impermanence.nixosModules.impermanence
+              home-manager.nixosModules.home-manager
+              {
+                nixpkgs = nixpkgsConfig;
+                home-manager.useGlobalPkgs = true;
+                home-manager.useUserPackages = true;
+                home-manager.users.cody = import ./home-manager/home.nix;
+              }
+            ];
+          };
+
           # framework wsl
           findley = nixosSystem {
             system = "x86_64-linux";
-            specialArgs = { inherit home-manager nixos-wsl nixos-vscode-server; };
+            specialArgs = { inherit home-manager nixos-wsl nixos-vscode-server self; };
             modules = [
               (import ./nixos/findley/configuration.nix)
+              (import ./nixos/common.nix)
               home-manager.nixosModules.home-manager
               {
                 nixpkgs = nixpkgsConfig;
@@ -96,8 +161,17 @@
           # work utm vm
           maclay = nixpkgs.lib.nixosSystem {
             system = "aarch64-linux";
+            specialArgs = { inherit home-manager self; };
             modules = [
+              (import ./nixos/common.nix)
               (import ./nixos/maclay/configuration.nix)
+              home-manager.nixosModules.home-manager
+              {
+                nixpkgs = nixpkgsConfig;
+                home-manager.useGlobalPkgs = true;
+                home-manager.useUserPackages = true;
+                home-manager.users.cody = import ./home-manager/home.nix;
+              }
             ];
           };
 
@@ -160,8 +234,12 @@
               nix.extraOptions = ''
                 #upgrade-nix-store-path-url = "https://install.determinate.systems/nix-upgrade/stable/universal";
               '';
+
+              nix.buildMachines.ward.sshKey = "/etc/nix/keys/nix_ed25519";
+              p.nix.buildMachines.ward = true;
             })
             ./nix-darwin/configuration.nix
+            ./modules/build-machines.nix
             home-manager.darwinModules.home-manager
             {
               nixpkgs = nixpkgsConfig;
@@ -227,12 +305,13 @@
           pkgs = (import nixpkgs {
             inherit system;
             inherit overlays;
+            inherit (nixpkgsConfig) config;
           });
         in
         {
 
           # chromeos
-          homeConfigurations."cody@penguin" = home-manager.lib.homeManagerConfiguration {
+          homeConfigurations."cody@peyton" = home-manager.lib.homeManagerConfiguration {
             inherit pkgs;
 
             modules = [
@@ -265,6 +344,18 @@
               ({ ... }: {
                 home.username = "x";
                 home.homeDirectory = "/home/x";
+              })
+              ./home-manager/home.nix
+            ];
+          };
+
+          homeConfigurations."cody@constance" = home-manager.lib.homeManagerConfiguration {
+            inherit pkgs;
+
+            modules = [
+              ({ ... }: {
+                home.username = "cody";
+                home.homeDirectory = "/home/cody";
               })
               ./home-manager/home.nix
             ];

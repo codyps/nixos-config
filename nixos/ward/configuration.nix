@@ -332,6 +332,8 @@ in
     };
   };
 
+  networking.useDHCP = false;
+  networking.networkmanager.enable = false;
   networking.firewall.trustedInterfaces = [ "tailscale0" ];
   networking.firewall.allowedTCPPorts = [ 80 443 ];
 

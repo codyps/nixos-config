@@ -69,14 +69,16 @@
             system = "x86_64-linux";
             specialArgs = { inherit home-manager self; };
             modules = [
-              (import ./nixos/mifflin/configuration.nix)
-              (import ./nixos/common.nix)
+              ./nixos/mifflin/configuration.nix
+              ./nixos/common.nix
               home-manager.nixosModules.home-manager
               {
                 nixpkgs = nixpkgsConfig;
                 home-manager.useGlobalPkgs = true;
                 home-manager.useUserPackages = true;
-                home-manager.users.cody = import ./home-manager/home.nix;
+                home-manager.users.cody.imports = [
+                  ./home-manager/home.nix
+                ];
               }
             ];
           };
@@ -86,15 +88,17 @@
             system = "x86_64-linux";
             specialArgs = { inherit self; };
             modules = [
-              (import ./nixos/finch/configuration.nix)
-              (import ./nixos/common.nix)
+              ./nixos/finch/configuration.nix
+              ./nixos/common.nix
               impermanence.nixosModules.impermanence
               home-manager.nixosModules.home-manager
               {
                 nixpkgs = nixpkgsConfig;
                 home-manager.useGlobalPkgs = true;
                 home-manager.useUserPackages = true;
-                home-manager.users.cody = import ./home-manager/home-minimal.nix;
+                home-manager.users.cody.imports = [
+                  ./home-manager/home-minimal.nix
+                ];
               }
             ];
           };
@@ -105,15 +109,17 @@
             specialArgs = { inherit home-manager self; };
             modules = [
               ethereum-nix.nixosModules.default
-              (import ./nixos/ward/configuration.nix)
-              (import ./nixos/common.nix)
+              ./nixos/ward/configuration.nix
+              ./nixos/common.nix
               impermanence.nixosModules.impermanence
               home-manager.nixosModules.home-manager
               {
                 nixpkgs = nixpkgsConfig;
                 home-manager.useGlobalPkgs = true;
                 home-manager.useUserPackages = true;
-                home-manager.users.cody = import ./home-manager/home.nix;
+                home-manager.users.cody.imports = [
+                  ./home-manager/home.nix
+                ];
               }
             ];
           };
@@ -123,14 +129,16 @@
             system = "x86_64-linux";
             specialArgs = { inherit home-manager nixos-wsl nixos-vscode-server self; };
             modules = [
-              (import ./nixos/findley/configuration.nix)
-              (import ./nixos/common.nix)
+              ./nixos/findley/configuration.nix
+              ./nixos/common.nix
               home-manager.nixosModules.home-manager
               {
                 nixpkgs = nixpkgsConfig;
                 home-manager.useGlobalPkgs = true;
                 home-manager.useUserPackages = true;
-                home-manager.users.nixos = import ./home-manager/home.nix;
+                home-manager.users.nixos.imports = [
+                  ./home-manager/home.nix
+                ];
               }
             ];
           };
@@ -140,7 +148,7 @@
             system = "x86_64-linux";
             specialArgs = { inherit home-manager; };
             modules = [
-              (import ./nixos/constance/configuration.nix)
+              ./nixos/constance/configuration.nix
             ];
           };
 
@@ -149,7 +157,7 @@
             system = "x86_64-linux";
             specialArgs = { inherit home-manager; };
             modules = [
-              (import ./nixos/forbes/configuration.nix)
+              ./nixos/forbes/configuration.nix
             ];
           };
 
@@ -157,7 +165,7 @@
           trunix = nixpkgs.lib.nixosSystem {
             system = "x86_64-linux";
             modules = [
-              (import ./nixos/trunix/configuration.nix)
+              ./nixos/trunix/configuration.nix
             ];
           };
 
@@ -166,14 +174,16 @@
             system = "aarch64-linux";
             specialArgs = { inherit home-manager self; };
             modules = [
-              (import ./nixos/common.nix)
-              (import ./nixos/maclay/configuration.nix)
+              ./nixos/common.nix
+              ./nixos/maclay/configuration.nix
               home-manager.nixosModules.home-manager
               {
                 nixpkgs = nixpkgsConfig;
                 home-manager.useGlobalPkgs = true;
                 home-manager.useUserPackages = true;
-                home-manager.users.cody = import ./home-manager/home.nix;
+                home-manager.users.cody.imports = [
+                  ./home-manager/home.nix
+                ];
               }
             ];
           };
@@ -183,7 +193,7 @@
             system = "x86_64-linux";
 
             modules = [
-              (import ./nixos/adams/configuration.nix)
+              ./nixos/adams/configuration.nix
             ];
           };
 
@@ -191,7 +201,7 @@
             system = "x86_64-linux";
 
             modules = [
-              (import ./nixos/calvin/configuration.nix)
+              ./nixos/calvin/configuration.nix
             ];
           };
         };
@@ -214,12 +224,10 @@
               nixpkgs = nixpkgsConfig;
               home-manager.useGlobalPkgs = true;
               home-manager.useUserPackages = true;
-              home-manager.users.x = {
-                imports = [
-                  ./nix-darwin/home.nix
-                  ./home-manager/home.nix
-                ];
-              };
+              home-manager.users.x.imports = [
+                ./nix-darwin/home.nix
+                ./home-manager/home.nix
+              ];
             }
           ];
         };

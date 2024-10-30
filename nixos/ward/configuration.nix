@@ -313,7 +313,7 @@ in
 
   virtualisation.oci-containers.containers = {
     archivebox = {
-      image = "archivebox/archivebox:latest";
+      image = "docker.io/archivebox/archivebox:latest";
       ports = ["127.0.0.1:8000:8000"];
       volumes = [
         "/ward/keep/archivebox:/data"
@@ -327,7 +327,7 @@ in
     };
 
     libation = {
-      image = "rmcrackan/libation:latest";
+      image = "docker.io/rmcrackan/libation:latest";
       volumes = [
         "/ward/keep/libation/data:/data"
         "/ward/keep/libation/config:/config"

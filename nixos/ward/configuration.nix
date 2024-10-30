@@ -318,6 +318,12 @@ in
       volumes = [
         "/ward/keep/archivebox:/data"
       ];
+      labels = {
+        "io.containers.autoupdate" = "registry";
+      };
+      extraOptions = [
+        "--pids-limit=-1"
+      ];
     };
 
     libation = {
@@ -327,7 +333,10 @@ in
         "/ward/keep/libation/config:/config"
       ];
       environment = {
-        SLEEP_TIME = "24h";
+        SLEEP_TIME = "2h";
+      };
+      labels = {
+        "io.containers.autoupdate" = "registry";
       };
     };
   };

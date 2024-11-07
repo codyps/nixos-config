@@ -426,6 +426,7 @@ in
     isNormalUser = true;
     extraGroups = [ "wheel" ];
     packages = with pkgs; [
+      firefox
     ];
     hashedPasswordFile = "/persist/etc/secret/cody.pass";
     openssh.authorizedKeys.keys = authorizedKeys;

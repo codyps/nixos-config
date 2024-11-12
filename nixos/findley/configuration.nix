@@ -36,6 +36,7 @@
       { src = "${busybox}/bin/addgroup"; }
       { src = "${su}/bin/groupadd"; }
       { src = "${su}/bin/usermod"; }
+      { src = "${wget}/bin/wget"; }
     ];
   };
 

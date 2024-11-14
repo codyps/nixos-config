@@ -31,7 +31,7 @@
     pkgs.rustup
     pkgs.sccache
     pkgs.socat
-    pkgs.targo
+    #pkgs.targo
     pkgs.tmux
     pkgs.tokei
     pkgs.universal-ctags

@@ -1,16 +1,16 @@
 self: super: {
   ethdo = super.buildGoModule rec {
     pname = "ethdo";
-    version = "1.30.0";
+    version = "1.36.1";
 
     src = super.fetchFromGitHub {
       owner = "wealdtech";
       repo = "ethdo";
       rev = "v${version}";
-      hash = "sha256-prV1sfvjUe1VPqh/M8C9d1flfTYU1nYTw6GIdJe4src=";
+      hash = "sha256-mv9BlPS5vcpVkMrNZ+E/fOd5xhhk7obDjch3HcyxvI4=";
     };
 
-    vendorHash = "sha256-iA1CEZOKwQq8khsIcQVJaJKhiIsQ5YPPQ+RInfQLP6c=";
+    vendorHash = "sha256-TIohGH/8t/gW+9TSH6RAkzIr7goiSYABq6JuJZG5UX0=";
 
     # without this, fails to locate C header used via CGO
     proxyVendor = true;

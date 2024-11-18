@@ -247,7 +247,6 @@
               '';
 
               nix.buildMachines.ward.sshKey = "/etc/nix/keys/nix_ed25519";
-              p.nix.buildMachines.ward = true;
             })
             ./nix-darwin/configuration.nix
             ./modules/build-machines.nix

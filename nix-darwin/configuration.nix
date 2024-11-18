@@ -34,7 +34,7 @@ in
   # nix.package = pkgs.nix;
 
   nix.settings = {
-    experimental-features = "nix-command flakes repl-flake";
+    experimental-features = "nix-command flakes";
     max-jobs = "auto";
     extra-nix-path = "nixpkgs=flake:nixpkgs";
     trusted-users = [ "root" "@admin" ];

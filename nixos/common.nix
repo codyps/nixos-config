@@ -33,7 +33,8 @@ in
     };
   };
 
-  p.nix.buildMachines.ward = hostname != "ward";
+  p.nix.buildMachines.ward.enable = hostname != "ward";
+  p.nix.buildMachines.ward.sshKey = "/persist/etc/nix/keys/ward";
 
   system.autoUpgrade = {
     enable = true;

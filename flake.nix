@@ -246,7 +246,9 @@
                 #upgrade-nix-store-path-url = "https://install.determinate.systems/nix-upgrade/stable/universal";
               '';
 
-              nix.buildMachines.ward.sshKey = "/etc/nix/keys/nix_ed25519";
+              # FIXME: included because we don't include `nixos/common.nix` here.
+              p.nix.buildMachines.ward.enable = true;
+              p.nix.buildMachines.ward.sshKey = "/etc/nix/keys/nix_ed25519";
             })
             ./nix-darwin/configuration.nix
             ./modules/build-machines.nix

@@ -314,7 +314,7 @@ in
   virtualisation.oci-containers.containers = {
     archivebox = {
       image = "docker.io/archivebox/archivebox:latest";
-      ports = ["127.0.0.1:8000:8000"];
+      ports = [ "127.0.0.1:8000:8000" ];
       volumes = [
         "/ward/keep/archivebox:/data"
       ];

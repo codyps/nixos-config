@@ -32,9 +32,7 @@
           # something is using the old name, hack around it.
           utillinux = prev.util-linux;
         })
-        (final: prev: {
-          redpanda-connect = prev.callPackage ./nixpkgs/overlays/pkgs/redpanda-connect {};
-        })
+        (import ./nixpkgs/overlays/overlay.nix)
       ];
 
       getName = pkg: pkg.pname or (builtins.parseDrvName pkg.name).name;

@@ -11,19 +11,20 @@
 
   config = {
     nix = {
-      buildMachines = if config.p.nix.buildMachines.ward.enable then [
-        {
-          hostName = "ward.little-moth.ts.net";
-          maxJobs = 8;
-          systems = [ "x86_64-linux" "aarch64-linux" ];
-          supportedFeatures = [ "kvm" "nixos-test" "big-parallel" ];
-          speedFactor = 10;
-          sshUser = "nix";
-          protocol = "ssh-ng";
-          publicHostKey = "c3NoLWVkMjU1MTkgQUFBQUMzTnphQzFsWkRJMU5URTVBQUFBSUsxN2h1UlFpV2pLc1FKTnljclNkdWRXWE1BaVp3eGJvVXhDUzg1VnVUOHYK";
-          sshKey = if config.p.nix.buildMachines.ward.sshKey != "" then config.p.nix.buildMachines.ward.sshKey else null;
-        }
-      ] else [];
+      buildMachines =
+        if config.p.nix.buildMachines.ward.enable then [
+          {
+            hostName = "ward.little-moth.ts.net";
+            maxJobs = 8;
+            systems = [ "x86_64-linux" "aarch64-linux" ];
+            supportedFeatures = [ "kvm" "nixos-test" "big-parallel" ];
+            speedFactor = 10;
+            sshUser = "nix";
+            protocol = "ssh-ng";
+            publicHostKey = "c3NoLWVkMjU1MTkgQUFBQUMzTnphQzFsWkRJMU5URTVBQUFBSUsxN2h1UlFpV2pLc1FKTnljclNkdWRXWE1BaVp3eGJvVXhDUzg1VnVUOHYK";
+            sshKey = if config.p.nix.buildMachines.ward.sshKey != "" then config.p.nix.buildMachines.ward.sshKey else null;
+          }
+        ] else [ ];
 
     } // (if options.nix ? sshServe then {
       # darwin doesn't have this, nixos only.
@@ -31,6 +32,6 @@
       sshServe.keys = [
         "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIA2gAJB7HLffugJejcMpcSUa64q176A6vpdPLI/fBLp/ root@u3"
       ] ++ (import ../nixos/ssh-auth.nix).authorizedKeys;
-    } else {});
+    } else { });
   };
 }

@@ -53,7 +53,7 @@ in
       enable = true;
       inherit authorizedKeys;
       hostKeys = [
-         "/persist/etc/secrets/initrd/ssh_host_ed25519_key"
+        "/persist/etc/secrets/initrd/ssh_host_ed25519_key"
       ];
     };
   };
@@ -182,7 +182,7 @@ in
       };
     };
 
-    groups.users-remote = {};
+    groups.users-remote = { };
   };
 
   programs.mtr.enable = true;

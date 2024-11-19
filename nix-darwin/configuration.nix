@@ -52,20 +52,20 @@ in
     enable = true;
     # FIXME: qemu-x86_64 SIGSEV, so removed extra system
     # > qemu-x86_64: QEMU internal SIGSEGV {code=MAPERR, addr=0x20}
-    systems =
-      if processor == "aarch64" then
-        [ "${processor}-linux" ]
-      else
-        [ "${processor}-linux" "${nonnative_linux}" ]
-    ;
+    #systems =
+    #  if processor == "aarch64" then
+    #    [ "${processor}-linux" ]
+    #  else
+    #    [ "${processor}-linux" "${nonnative_linux}" ]
+    #;
     speedFactor = 10;
     maxJobs = 4;
-    config = ({ ... }:
-      {
-        boot.binfmt.emulatedSystems = [ nonnative_linux ];
-        virtualisation.cores = if processor == "aarch64" then 16 else 8;
-      }
-    );
+    #config = ({ ... }:
+    #  {
+    #    boot.binfmt.emulatedSystems = [ nonnative_linux ];
+    #    virtualisation.cores = if processor == "aarch64" then 16 else 8;
+    #  }
+    #);
   };
 
   # Create /etc/zshrc that loads the nix-darwin environment.

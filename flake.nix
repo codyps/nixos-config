@@ -265,7 +265,7 @@
           ];
         };
 
-        darwinConfigurations."RIV-066789M" = nix-darwin.lib.darwinSystem {
+        darwinConfigurations."RVW-LYY7YT7329M" = nix-darwin.lib.darwinSystem {
           specialArgs = { inherit self; };
           modules = [
             ({ ... }: {

@@ -1,7 +1,7 @@
 { config, lib, pkgs, ... }:
 
 let
-  ssh-auth = (import ../ssh-auth.nix);
+  ssh-auth = (import ../../nixos/ssh-auth.nix);
   authorizedKeys = ssh-auth.authorizedKeys;
   holesky_jwt_path = "/persist/etc/ethereum/holesky-jwt";
   mainnet_jwt_path = "/persist/etc/ethereum/mainnet-jwt";

@@ -305,18 +305,9 @@ in
           reverse_proxy http://${toString config.services.grafana.settings.server.http_addr}:${toString config.services.grafana.settings.server.http_port}
         }
 
-        forward_auth unix//run/tailscale-nginx-auth/tailscale-nginx-auth.sock {
-          uri /auth
-          header_up Remote-Addr {remote_host}
-          header_up Remote-Port {remote_port}
-          header_up Original-URI {uri}
-          copy_headers {
-            Tailscale-User>X-Webauth-User
-            Tailscale-Name>X-Webauth-Name
-            Tailscale-Login>X-Webauth-Login
-            Tailscale-Tailnet>X-Webauth-Tailnet
-            Tailscale-Profile-Picture>X-Webauth-Profile-Picture
-          }
+        # return 404 for all other requests
+        handle {
+          abort
         }
       '';
     };
@@ -460,7 +451,6 @@ in
         http_port = 3001;
         domain = "ward.little-moth.ts.net";
         root_url = "https://ward.little-moth.ts.net/grafana/";
-        serve_from_sub_path = true;
       };
     };
   };

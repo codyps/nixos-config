@@ -415,10 +415,10 @@ in
       network = "mainnet";
       #datadir = "/persist/var/lib/private/lighthouse-mainnet/beacon";
       execution-jwt = mainnet_jwt_path;
-      # services.ethereum.geth.mainnet.args.http.port
-      execution-endpoint = "http://localhost:8551";
-      checkpoint-sync-url = "https://checkpoint-sync.mainnet.ethpandaops.io/";
-      genesis-state-url = "https://checkpoint-sync.mainnet.ethpandaops.io/";
+      # services.ethereum.geth.mainnet.args.authrpc.port
+      execution-endpoint = "http://localhost:8621";
+      checkpoint-sync-url = "https://sync.invis.tools/";
+      genesis-state-url = "https://sync.invis.tools/";
 
       discovery-port = 8624;
       quic-port = 8625;
@@ -433,7 +433,7 @@ in
       network = "mainnet";
       #datadir = "/persist/var/lib/private/lighthouse-mainnet/validator";
       # services.ethereum.lighthouse-beacon.mainnet.args.http-port
-      beacon-nodes = [ "http://localhost:8557" ];
+      beacon-nodes = [ "http://localhost:8626" ];
     };
   };
 

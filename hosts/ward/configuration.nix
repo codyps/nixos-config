@@ -359,6 +359,10 @@ in
       ws.port = 8552;
       metrics.port = 8553;
     };
+    extraArgs = [
+      "--metrics.influxdb"
+      "--metrics.influxdb.tags" "network=holesky,host=ward"
+    ];
   };
 
   services.ethereum.lighthouse-beacon.holesky = {
@@ -408,6 +412,10 @@ in
       ws.port = 8562;
       metrics.port = 8563;
     };
+    extraArgs = [
+      "--metrics.influxdb"
+      "--metrics.influxdb.tags" "network=holesky,host=ward"
+    ];
   };
 
   services.ethereum.lighthouse-beacon.mainnet = {
@@ -458,6 +466,11 @@ in
   services.influxdb = {
     enable = true;
     dataDir = "/persist/var/lib/influxdb";
+    extraConfig = {
+      http = {
+        bind-address = "[::1]:8086";
+      };
+    };
   };
 
   networking.useDHCP = false;

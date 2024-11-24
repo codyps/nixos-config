@@ -4,6 +4,7 @@ let
   ssh-auth = (import ../ssh-auth.nix);
   authorizedKeys = ssh-auth.authorizedKeys;
   holesky_jwt_path = "/persist/etc/ethereum/holesky-jwt";
+  mainnet_jwt_path = "/persist/etc/ethereum/mainnet-jwt";
 in
 {
   imports =
@@ -365,6 +366,7 @@ in
 
   services.ethereum.lighthouse-beacon.holesky = {
     enable = true;
+    openFirewall = true;
     args = {
       network = "holesky";
       #datadir = "/persist/var/lib/private/lighthouse-holesky/beacon";
@@ -383,10 +385,54 @@ in
 
   services.ethereum.lighthouse-validator.holesky = {
     enable = true;
+    openFirewall = true;
     args = {
       network = "holesky";
       #datadir = "/persist/var/lib/private/lighthouse-holesky/validator";
       # services.ethereum.lighthouse-beacon.holesky.args.http-port
+      beacon-nodes = [ "http://localhost:8557" ];
+    };
+  };
+
+  services.ethereum.geth.mainnet = {
+    package = pkgs.geth;
+    enable = true;
+    args = {
+      network = "mainnet";
+      authrpc.jwtsecret = mainnet_jwt_path;
+      #datadir = "/persist/var/lib/private/geth-mainnet";
+
+      port = 8620;
+      authrpc.port = 8621;
+      ws.port = 8622;
+      metrics.port = 8623;
+    };
+  };
+
+  services.ethereum.lighthouse-beacon.mainnet = {
+    enable = true;
+    args = {
+      network = "mainnet";
+      #datadir = "/persist/var/lib/private/lighthouse-mainnet/beacon";
+      execution-jwt = mainnet_jwt_path;
+      # services.ethereum.geth.mainnet.args.http.port
+      execution-endpoint = "http://localhost:8551";
+      checkpoint-sync-url = "https://checkpoint-sync.mainnet.ethpandaops.io/";
+      genesis-state-url = "https://checkpoint-sync.mainnet.ethpandaops.io/";
+
+      discovery-port = 8624;
+      quic-port = 8625;
+      http.port = 8626;
+      http.enable = true;
+    };
+  };
+
+  services.ethereum.lighthouse-validator.mainnet = {
+    enable = true;
+    args = {
+      network = "mainnet";
+      #datadir = "/persist/var/lib/private/lighthouse-mainnet/validator";
+      # services.ethereum.lighthouse-beacon.mainnet.args.http-port
       beacon-nodes = [ "http://localhost:8557" ];
     };
   };

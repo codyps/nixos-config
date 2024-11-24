@@ -302,7 +302,7 @@ in
 
         redir /grafana /grafana/ 301
         handle_path /grafana/* {
-          reverse_proxy http://${toString config.services.grafana.settings.server.http_addr}:${toString config.services.grafana.settings.server.http_port}"
+          reverse_proxy http://${toString config.services.grafana.settings.server.http_addr}:${toString config.services.grafana.settings.server.http_port}
         }
 
         forward_auth unix//run/tailscale-nginx-auth/tailscale-nginx-auth.sock {

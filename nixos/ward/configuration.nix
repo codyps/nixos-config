@@ -359,8 +359,8 @@ in
 
       port = 8550;
       authrpc.port = 8551;
-      ws.port = 8553;
-      metrics.port = 8554;
+      ws.port = 8552;
+      metrics.port = 8553;
     };
   };
 
@@ -371,14 +371,16 @@ in
       network = "holesky";
       #datadir = "/persist/var/lib/private/lighthouse-holesky/beacon";
       execution-jwt = holesky_jwt_path;
-      # services.ethereum.geth.holesky.args.http.port
+      # services.ethereum.geth.holesky.args.authrpc.port
       execution-endpoint = "http://localhost:8551";
       checkpoint-sync-url = "https://checkpoint-sync.holesky.ethpandaops.io/";
       genesis-state-url = "https://checkpoint-sync.holesky.ethpandaops.io/";
 
-      discovery-port = 8555;
-      quic-port = 8556;
-      http.port = 8557;
+      disable-upnp = false;
+      port = 8554;
+      discovery-port = 8554;
+      quic-port = 8555;
+      http.port = 8556;
       http.enable = true;
     };
   };
@@ -390,7 +392,7 @@ in
       network = "holesky";
       #datadir = "/persist/var/lib/private/lighthouse-holesky/validator";
       # services.ethereum.lighthouse-beacon.holesky.args.http-port
-      beacon-nodes = [ "http://localhost:8557" ];
+      beacon-nodes = [ "http://localhost:8556" ];
     };
   };
 
@@ -402,10 +404,10 @@ in
       authrpc.jwtsecret = mainnet_jwt_path;
       #datadir = "/persist/var/lib/private/geth-mainnet";
 
-      port = 8620;
-      authrpc.port = 8621;
-      ws.port = 8622;
-      metrics.port = 8623;
+      port = 8560;
+      authrpc.port = 8561;
+      ws.port = 8562;
+      metrics.port = 8563;
     };
   };
 
@@ -416,13 +418,15 @@ in
       #datadir = "/persist/var/lib/private/lighthouse-mainnet/beacon";
       execution-jwt = mainnet_jwt_path;
       # services.ethereum.geth.mainnet.args.authrpc.port
-      execution-endpoint = "http://localhost:8621";
+      execution-endpoint = "http://localhost:8561";
       checkpoint-sync-url = "https://sync.invis.tools/";
       genesis-state-url = "https://sync.invis.tools/";
 
-      discovery-port = 8624;
-      quic-port = 8625;
-      http.port = 8626;
+      disable-upnp = false;
+      port = 8564;
+      discovery-port = 8564;
+      quic-port = 8565;
+      http.port = 8566;
       http.enable = true;
     };
   };
@@ -433,7 +437,7 @@ in
       network = "mainnet";
       #datadir = "/persist/var/lib/private/lighthouse-mainnet/validator";
       # services.ethereum.lighthouse-beacon.mainnet.args.http-port
-      beacon-nodes = [ "http://localhost:8626" ];
+      beacon-nodes = [ "http://localhost:8566" ];
     };
   };
 

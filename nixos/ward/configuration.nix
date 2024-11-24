@@ -288,7 +288,7 @@ in
 
         redir /hydra /hydra/ 301
         handle_path /hydra/* {
-          reverse_proxy http://localhost:3000 {
+          reverse_proxy http://localhost:${toString config.services.hydra.port} {
             header_up Host {upstream_hostport}
             header_up X-Request-Base /hydra
           }
@@ -298,6 +298,11 @@ in
         handle_path /audiobooks/* {
           root /ward/keep/libation/data/Books
           file_server browse
+        }
+
+        redir /grafana /grafana/ 301
+        handle_path /grafana/* {
+          reverse_proxy http://${toString config.services.grafana.settings.server.http_addr}:${toString config.services.grafana.settings.server.http_port}"
         }
 
         forward_auth unix//run/tailscale-nginx-auth/tailscale-nginx-auth.sock {
@@ -439,6 +444,24 @@ in
       # services.ethereum.lighthouse-beacon.mainnet.args.http-port
       beacon-nodes = [ "http://localhost:8566" ];
     };
+  };
+
+  services.grafana = {
+    enable = true;
+    settings = {
+      server = {
+        http_addr = "127.0.0.1";
+        http_port = 3001;
+        domain = "ward.little-moth.ts.net";
+        root_url = "https://ward.little-moth.ts.net/grafana/";
+        serve_from_sub_path = true;
+      };
+    };
+  };
+
+  services.influxdb = {
+    enable = true;
+    dataDir = "/persist/var/lib/influxdb";
   };
 
   networking.useDHCP = false;

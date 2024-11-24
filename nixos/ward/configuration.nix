@@ -3,6 +3,7 @@
 let
   ssh-auth = (import ../ssh-auth.nix);
   authorizedKeys = ssh-auth.authorizedKeys;
+  holesky_jwt_path = "/persist/etc/ethereum/holesky-jwt";
 in
 {
   imports =
@@ -29,6 +30,10 @@ in
       "/var/lib/tailscale"
       "/var/lib/systemd/coredump"
       "/var/lib/audiobookshelf"
+      "/var/lib/private/geth-holesky"
+      "/var/lib/private/lighthouse-holesky"
+      "/var/lib/private/geth-mainnet"
+      "/var/lib/private/lighthouse-mainnet"
       "/etc/NetworkManager/system-connections"
       { directory = "/var/lib/colord"; user = "colord"; group = "colord"; mode = "u=rwx,g=rx,o="; }
     ];
@@ -213,7 +218,7 @@ in
         }
       '';
     };
-
+    
     virtualHosts."*.ward.ts.einic.org" = {
       listenAddresses = [ "100.115.212.42" ];
       extraConfig = ''
@@ -323,6 +328,8 @@ in
       };
       extraOptions = [
         "--pids-limit=-1"
+        "--cpus=4"
+        "--cpu-shares=512"
       ];
     };
 
@@ -338,6 +345,49 @@ in
       labels = {
         "io.containers.autoupdate" = "registry";
       };
+    };
+  };
+
+  services.ethereum.geth.holesky = {
+    package = pkgs.geth;
+    enable = true;
+    args = {
+      network = "holesky";
+      authrpc.jwtsecret = holesky_jwt_path;
+      #datadir = "/persist/var/lib/private/geth-holesky";
+
+      port = 8550;
+      authrpc.port = 8551;
+      ws.port = 8553;
+      metrics.port = 8554;
+    };
+  };
+
+  services.ethereum.lighthouse-beacon.holesky = {
+    enable = true;
+    args = {
+      network = "holesky";
+      #datadir = "/persist/var/lib/private/lighthouse-holesky/beacon";
+      execution-jwt = holesky_jwt_path;
+      # services.ethereum.geth.holesky.args.http.port
+      execution-endpoint = "http://localhost:8551";
+      checkpoint-sync-url = "https://checkpoint-sync.holesky.ethpandaops.io/";
+      genesis-state-url = "https://checkpoint-sync.holesky.ethpandaops.io/";
+
+      discovery-port = 8555;
+      quic-port = 8556;
+      http.port = 8557;
+      http.enable = true;
+    };
+  };
+
+  services.ethereum.lighthouse-validator.holesky = {
+    enable = true;
+    args = {
+      network = "holesky";
+      #datadir = "/persist/var/lib/private/lighthouse-holesky/validator";
+      # services.ethereum.lighthouse-beacon.holesky.args.http-port
+      beacon-nodes = [ "http://localhost:8557" ];
     };
   };
 

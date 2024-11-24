@@ -23,6 +23,11 @@
     };
   };
 
+  nixConfig = {
+    extra-substituters = ["https://nix-community.cachix.org"];
+    extra-trusted-public-keys = ["nix-community.cachix.org-1:mB9FSh9qf2dCimDSUo8Zy7bkq5CX+/rkCWyvRCYg3Fs="];
+  };
+
   outputs = { self, nixpkgs, flake-utils, targo, nix-darwin, home-manager, nixos-wsl, nixos-vscode-server, impermanence, ethereum-nix }:
     let
       overlays = [
@@ -33,6 +38,7 @@
           utillinux = prev.util-linux;
         })
         (import ./nixpkgs/overlays/overlay.nix)
+        ethereum-nix.overlays.default
       ];
 
       getName = pkg: pkg.pname or (builtins.parseDrvName pkg.name).name;

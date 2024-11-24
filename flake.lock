@@ -61,13 +61,12 @@
         "treefmt-nix": "treefmt-nix"
       },
       "locked": {
-        "lastModified": 1732409158,
-        "narHash": "sha256-rQeTpkMXBcBAfbhipW0bpVGWJnje3hS4rJiGpC3kwiI=",
-        "ref": "refs/heads/main",
-        "rev": "0e8132fa486ddb21de709a1c81d8efa4cafe6589",
-        "revCount": 416,
-        "type": "git",
-        "url": "file:///home/cody/d/ethereum.nix"
+        "lastModified": 1730715897,
+        "narHash": "sha256-G/TkPIxcoGkBg0IDJ4athUiKWIyBYWp0ZfwQnilv5Zk=",
+        "owner": "nix-community",
+        "repo": "ethereum.nix",
+        "rev": "69bd8dcde94f05bf2e98daeeb33fa1dc9e26b091",
+        "type": "github"
       },
       "original": {
         "owner": "nix-community",
@@ -263,11 +262,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1732324260,
-        "narHash": "sha256-0xzQvoId/P008QkTSAdFVv465P9rL9nYkIOWXL5pdsY=",
+        "lastModified": 1732420287,
+        "narHash": "sha256-CzvYF4x6jUh/+NEEIFrIY5t1W/N3IA2bNZJiMXu9GTo=",
         "owner": "LnL7",
         "repo": "nix-darwin",
-        "rev": "698a62c628c2ec423aa770d8ec0e1d0bcf4fca1a",
+        "rev": "3c52583b99666a349a6219dc1f0dd07d75c82d6a",
         "type": "github"
       },
       "original": {

@@ -378,10 +378,10 @@ in
 
       disable-upnp = false;
       port = 8554;
-      discovery-port = 8554;
       quic-port = 8555;
       http.port = 8556;
       http.enable = true;
+      metrics.port = 8557;
     };
   };
 
@@ -424,10 +424,10 @@ in
 
       disable-upnp = false;
       port = 8564;
-      discovery-port = 8564;
       quic-port = 8565;
       http.port = 8566;
       http.enable = true;
+      metrics.port = 8567;
     };
   };
 

@@ -61,11 +61,11 @@
         "treefmt-nix": "treefmt-nix"
       },
       "locked": {
-        "lastModified": 1732407360,
-        "narHash": "sha256-94uqbkEL6Z4piGFC7J4lurCD/3a1ZgeQxmwwKs6Hkx8=",
+        "lastModified": 1732409158,
+        "narHash": "sha256-rQeTpkMXBcBAfbhipW0bpVGWJnje3hS4rJiGpC3kwiI=",
         "ref": "refs/heads/main",
-        "rev": "1185b951c248b14a640bb19c15045d6d6cb55aad",
-        "revCount": 415,
+        "rev": "0e8132fa486ddb21de709a1c81d8efa4cafe6589",
+        "revCount": 416,
         "type": "git",
         "url": "file:///home/cody/d/ethereum.nix"
       },

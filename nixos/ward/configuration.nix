@@ -357,6 +357,7 @@ in
   services.ethereum.geth.holesky = {
     package = pkgs.geth;
     enable = true;
+    openFirewall = true;
     args = {
       network = "holesky";
       authrpc.jwtsecret = holesky_jwt_path;
@@ -398,12 +399,14 @@ in
       #datadir = "/persist/var/lib/private/lighthouse-holesky/validator";
       # services.ethereum.lighthouse-beacon.holesky.args.http-port
       beacon-nodes = [ "http://localhost:8556" ];
+      metrics.port = 8558;
     };
   };
 
   services.ethereum.geth.mainnet = {
     package = pkgs.geth;
     enable = true;
+    openFirewall = true;
     args = {
       network = "mainnet";
       authrpc.jwtsecret = mainnet_jwt_path;
@@ -418,6 +421,7 @@ in
 
   services.ethereum.lighthouse-beacon.mainnet = {
     enable = true;
+    openFirewall = true;
     args = {
       network = "mainnet";
       #datadir = "/persist/var/lib/private/lighthouse-mainnet/beacon";
@@ -438,11 +442,13 @@ in
 
   services.ethereum.lighthouse-validator.mainnet = {
     enable = true;
+    openFirewall = true;
     args = {
       network = "mainnet";
       #datadir = "/persist/var/lib/private/lighthouse-mainnet/validator";
       # services.ethereum.lighthouse-beacon.mainnet.args.http-port
       beacon-nodes = [ "http://localhost:8566" ];
+      metrics.port = 8568;
     };
   };
 

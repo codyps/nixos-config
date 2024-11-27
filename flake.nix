@@ -17,7 +17,7 @@
     targo.inputs.flake-utils.follows = "flake-utils";
     impermanence.url = "github:nix-community/impermanence";
     ethereum-nix = {
-      url = "github:nix-community/ethereum.nix";
+      url = "github:codyps/ethereum.nix";
       inputs.nixpkgs.follows = "nixpkgs";
       inputs.flake-utils.follows = "flake-utils";
     };
@@ -73,7 +73,7 @@
             system = "x86_64-linux";
             specialArgs = { inherit home-manager self; };
             modules = [
-              ./nixos/mifflin/configuration.nix
+              ./hosts/mifflin/configuration.nix
               ./nixos/common.nix
               home-manager.nixosModules.home-manager
               {

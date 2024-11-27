@@ -46,7 +46,5 @@
         helm-diff
       ];
     })
-
-    pkgs.redpanda-connect
   ];
 }

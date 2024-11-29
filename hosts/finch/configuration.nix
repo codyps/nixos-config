@@ -360,6 +360,7 @@ in
       volumes = [
         "/tank/libation/data:/data"
         "/tank/libation/config:/config"
+        "/tank/libation/tmp:/tmp"
         #"/var/lib/libation/data:/data"
         #"/var/lib/libation/config:/config"
       ];

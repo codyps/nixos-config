@@ -392,6 +392,11 @@ in
     defaultNetwork.settings.dns_enabled = true;
   };
 
+  services.audiobookshelf = {
+    enable = true;
+    port = 8917;
+  };
+
   services.zfs.zed.settings.PATH = lib.mkForce (lib.makeBinPath [
     pkgs.diffutils
     config.boot.zfs.package

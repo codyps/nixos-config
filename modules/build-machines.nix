@@ -9,8 +9,18 @@
     '';
   };
 
+  options.p.nix.settings.substituters.ward = lib.mkEnableOption "Use `ward` as a substituter.";
+
   config = {
     nix = {
+      settings = {
+        substituters =
+          if config.p.nix.settings.substituters.ward then
+            [ "https://ward.little-moth.ts.net/nix-cache" ] ++ (if hostname != "ward" then [ "https://ward.little-moth.ts.net/harmonia" ] else [ ])
+          else
+            [ ];
+      };
+
       buildMachines =
         if config.p.nix.buildMachines.ward.enable then [
           {
@@ -34,4 +44,6 @@
       ] ++ (import ../nixos/ssh-auth.nix).authorizedKeys;
     } else { });
   };
+
+
 }

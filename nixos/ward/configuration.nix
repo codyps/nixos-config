@@ -219,7 +219,7 @@ in
         }
       '';
     };
-    
+
     virtualHosts."*.ward.ts.einic.org" = {
       listenAddresses = [ "100.115.212.42" ];
       extraConfig = ''

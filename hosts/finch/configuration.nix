@@ -378,8 +378,8 @@ in
   #systemd.services.podman-libation.serviceConfig = {
   #  User = "libation";
   #  Home = "/tank/libation";
-    #DynamicUser = true;
-    #StateDirectory = "libation";
+  #DynamicUser = true;
+  #StateDirectory = "libation";
   #};
   #users.users.libation = {
   #  isSystemUser = true;

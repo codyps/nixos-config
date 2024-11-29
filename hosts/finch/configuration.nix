@@ -286,33 +286,6 @@ in
     };
   };
 
-
-  /*
-    # system specific details
-    networking = {
-    useDHCP = false;
-    dhcpcd.enable = false;
-    useNetworkd = true;
-
-    interfaces.enX0.ipv4.addresses = [ {
-      address = "207.90.192.55";
-      prefixLength = 24;
-    } ];
-
-    interfaces.enX1.ipv6.addresses = [ {
-      address = "2602:ffd5:0001:1e7:0000:0000:0000:0001";
-      prefixLength = 36;
-    } ];
-
-    defaultGateway = "207.90.192.1";
-    defaultGateway6 = {
-      address = "2602:ffd5:1:100::1";
-      #interface = "enX1";
-    };
-    nameservers = [ "8.8.8.8" ];
-    };
-  */
-
   time.timeZone = "America/New_York";
   # console = {
   #   font = "Lat2-Terminus16";
@@ -387,6 +360,8 @@ in
       volumes = [
         "/tank/libation/data:/data"
         "/tank/libation/config:/config"
+        #"/var/lib/libation/data:/data"
+        #"/var/lib/libation/config:/config"
       ];
       environment = {
         SLEEP_TIME = "1h";
@@ -395,6 +370,26 @@ in
         "io.containers.autoupdate" = "registry";
       };
     };
+  };
+
+  # oci-containers can't handle running as a user. See:
+  # https://github.com/NixOS/nixpkgs/issues/259770
+  #systemd.services.podman-libation.serviceConfig = {
+  #  User = "libation";
+  #  Home = "/tank/libation";
+    #DynamicUser = true;
+    #StateDirectory = "libation";
+  #};
+  #users.users.libation = {
+  #  isSystemUser = true;
+  #  group = "libation";
+  #};
+  #users.groups.libation = {};
+
+  virtualisation.podman = {
+    enable = true;
+    autoPrune.enable = true;
+    defaultNetwork.settings.dns_enabled = true;
   };
 
   services.zfs.zed.settings.PATH = lib.mkForce (lib.makeBinPath [

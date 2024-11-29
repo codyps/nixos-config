@@ -17,6 +17,8 @@ in
 
   services.logrotate.checkConfig = false;
 
+  system.autoUpgrade.enable = lib.mkForce true;
+
   boot.zfs.extraPools = [ "tank" ];
 
   # Without this, boot ends up in grup rescue.

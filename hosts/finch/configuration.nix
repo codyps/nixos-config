@@ -5,7 +5,7 @@
 { config, pkgs, lib, modulesPath, self, ... }:
 
 let
-  ssh-auth = (import ../ssh-auth.nix);
+  ssh-auth = (import ../../nixos/ssh-auth.nix);
   authorizedKeys = ssh-auth.authorizedKeys;
 in
 {
@@ -168,14 +168,53 @@ in
     };
   */
 
+
+  systemd.services.caddy.serviceConfig.EnvironmentFile = "/persist/etc/default/caddy";
   services.caddy = {
     enable = true;
-    #virtualHosts."nix-cache.finch.einic.org".extraConfig = ''
-    #  reverse_proxy :5000
-    #'';
-    #virtualHosts."hydra.finch.einic.org".extraConfig = ''
-    #  reverse_proxy :3000
-    #'';
+    package = (pkgs.callPackage ../../nixpkgs/overlays/pkgs/caddy/package.nix { }).withPlugins {
+      caddyModules = [
+        { repo = "github.com/caddy-dns/cloudflare"; version = "89f16b99c18ef49c8bb470a82f895bce01cbaece"; }
+        { repo = "github.com/caddyserver/cache-handler"; version = "283ea9b5bf192ff9c98f0b848c7117367655893f"; } # v0.14.0
+        { repo = "github.com/darkweak/storages/badger/caddy"; version = "0d6842b38ab6937af5a60adcf54d8955b5bbe6fc"; } # v0.0.10
+        { repo = "github.com/WeidiDeng/caddy-cloudflare-ip"; version = "f53b62aa13cb7ad79c8b47aacc3f2f03989b67e5"; } # head of main
+      ];
+      vendorHash = "sha256-Z80OP4fMele2kITxJkKKHGe/jbhCIAl43rp+FEYnvoE=";
+    };
+
+    globalConfig = ''
+      cache
+
+      acme_dns cloudflare {env.CLOUDFLARE_API_TOKEN}
+
+      servers {
+        trusted_proxies cloudflare {
+          interval 12h
+          timeout 15s
+        }
+      }
+    '';
+
+    virtualHosts."*.einic.org" = {
+      extraConfig = ''
+        @audiobooks host audiobooks.einic.org
+        handle @audiobooks {
+          root /tank/libation/data/Books
+          file_server browse
+        }
+
+        @audiobookshelf host audiobookshelf.einic.org
+        handle @audiobookshelf {
+          reverse_proxy http://localhost:8917
+        }
+
+        handle {
+          abort
+        }
+      '';
+
+    };
+
     virtualHosts."finch.little-moth.ts.net" = {
       listenAddresses = [ "100.112.195.103" ];
       extraConfig = ''
@@ -339,6 +378,22 @@ in
   systemd.generators."zfs-mount-generator" = "${config.boot.zfs.package}/lib/systemd/system-generator/zfs-mount-generator";
   environment.etc."zfs/zed.d/history_event-zfs-list-cacher.sh".source = "${config.boot.zfs.package}/etc/zfs/zed.d/history_event-zfs-list-cacher.sh";
   systemd.services.zfs-mount.enable = false;
+
+  virtualisation.oci-containers.containers = {
+    libation = {
+      image = "docker.io/rmcrackan/libation:latest";
+      volumes = [
+        "/tank/libation/data:/data"
+        "/tank/libation/config:/config"
+      ];
+      environment = {
+        SLEEP_TIME = "1h";
+      };
+      labels = {
+        "io.containers.autoupdate" = "registry";
+      };
+    };
+  };
 
   services.zfs.zed.settings.PATH = lib.mkForce (lib.makeBinPath [
     pkgs.diffutils

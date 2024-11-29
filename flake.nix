@@ -92,7 +92,7 @@
             system = "x86_64-linux";
             specialArgs = { inherit self; };
             modules = [
-              ./nixos/finch/configuration.nix
+              ./hosts/finch/configuration.nix
               ./nixos/common.nix
               impermanence.nixosModules.impermanence
               home-manager.nixosModules.home-manager

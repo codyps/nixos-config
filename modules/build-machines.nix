@@ -9,16 +9,18 @@
     '';
   };
 
-  options.p.nix.settings.substituters.ward = lib.mkEnableOption "Use `ward` as a substituter.";
+  options.p.nix.settings.substituters.ward.nix-cache = lib.mkEnableOption "Use `ward` as a substituter.";
+  options.p.nix.settings.substituters.ward.harmonia = lib.mkEnableOption "Use `ward` as a substituter.";
 
   config = {
     nix = {
       settings = {
         substituters =
-          if config.p.nix.settings.substituters.ward then
-            [ "https://ward.little-moth.ts.net/nix-cache" ] ++ (if hostname != "ward" then [ "https://ward.little-moth.ts.net/harmonia" ] else [ ])
-          else
-            [ ];
+          (if config.p.nix.settings.substituters.ward.nix-cache then
+            [ "https://ward.little-moth.ts.net/nix-cache" ]
+          else [ ])
+          ++ (if config.p.nix.settings.substituters.ward.harmonia then
+            [ "https://ward.little-moth.ts.net/harmonia" ] else [ ]);
       };
 
       buildMachines =

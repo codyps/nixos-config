@@ -201,7 +201,7 @@ in
       extraConfig = ''
         @audiobooks host audiobooks.einic.org
         handle @audiobooks {
-          root /tank/libation/data/Books
+          root /tank/libation/data/
           file_server browse
         }
 

@@ -15,16 +15,14 @@
   config = {
     nix = {
       settings = {
-        substituters =
-          (if config.p.nix.settings.substituters.ward.nix-cache then
-            [ "https://ward.little-moth.ts.net/nix-cache" ]
-          else [ ])
-          ++ (if config.p.nix.settings.substituters.ward.harmonia then
-            [ "https://ward.little-moth.ts.net/harmonia" ] else [ ]);
+        substituters = lib.mkMerge [
+          (lib.mkIf config.p.nix.settings.substituters.ward.nix-cache [ "https://ward.little-moth.ts.net/nix-cache" ])
+          (lib.mkIf config.p.nix.settings.substituters.ward.harmonia [ "https://ward.little-moth.ts.net/harmonia" ])
+        ];
       };
 
       buildMachines =
-        if config.p.nix.buildMachines.ward.enable then [
+        lib.mkIf config.p.nix.buildMachines.ward.enable
           {
             hostName = "ward.little-moth.ts.net";
             maxJobs = 8;
@@ -35,16 +33,14 @@
             protocol = "ssh-ng";
             publicHostKey = "c3NoLWVkMjU1MTkgQUFBQUMzTnphQzFsWkRJMU5URTVBQUFBSUsxN2h1UlFpV2pLc1FKTnljclNkdWRXWE1BaVp3eGJvVXhDUzg1VnVUOHYK";
             sshKey = if config.p.nix.buildMachines.ward.sshKey != "" then config.p.nix.buildMachines.ward.sshKey else null;
-          }
-        ] else [ ];
-
-    } // (if options.nix ? sshServe then {
+          };
+    } // (lib.mkIf (options.nix ? sshServe) {
       # darwin doesn't have this, nixos only.
       # TODO: find a nicer way to check.
       sshServe.keys = [
         "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIA2gAJB7HLffugJejcMpcSUa64q176A6vpdPLI/fBLp/ root@u3"
       ] ++ (import ../nixos/ssh-auth.nix).authorizedKeys;
-    } else { });
+    });
   };
 
 

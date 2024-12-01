@@ -11,6 +11,7 @@ in
 {
   imports =
     [
+      ../../modules/zfs.nix
       ./hardware-configuration.nix
       (modulesPath + "/virtualisation/xen-domU.nix")
     ];
@@ -25,40 +26,13 @@ in
   boot.loader.grub.device = lib.mkForce "/dev/xvda";
   boot.zfs.devNodes = "/dev/disk/by-partuuid";
 
-  # source: https://grahamc.com/blog/erase-your-darlings
-  #boot.initrd.postDeviceCommands = lib.mkAfter ''
-  #  zfs rollback -r rpool/local/root@blank
-  #'';
-
   # https://discourse.nixos.org/t/zfs-rollback-not-working-using-boot-initrd-systemd/37195/3
   boot.initrd.systemd.enable = lib.mkDefault true;
-  boot.initrd.systemd.services.rollback = {
-    description = "Rollback root filesystem to a pristine state on boot";
-    wantedBy = [
-      # "zfs.target"
-      "initrd.target"
-    ];
-    after = [
-      "zfs-import-rpool.service"
-    ];
-    before = [
-      "sysroot.mount"
-    ];
-    path = with pkgs; [
-      zfs
-    ];
-    unitConfig.DefaultDependencies = "no";
-    serviceConfig.Type = "oneshot";
-    script = ''
-      zfs rollback -r rpool/local/root@blank && echo "  >> >> rollback complete << <<"
-    '';
+
+  p.zfs.root-impermenance = {
+    enable = true;
+    rollback-target = "rpool/local/root@blank";
   };
-
-  #services.cockpit.enable = true;
-  #systemd.sockets."cockpit".socketConfig.ListenStream = lib.mkForce "127.0.0.1:${options.services.cockpit.port}";
-
-  boot.initrd.extraFiles."/etc/zfs/zfs-list.cache".source = /persist/var/cache/zfs/zfs-list.cache;
-  boot.initrd.extraFiles."/etc/zfs/zpool.cache".source = /persist/var/cache/zfs/zpool.cache;
 
   swapDevices = [{
     device = "/dev/rpool/local/swap";
@@ -66,53 +40,15 @@ in
 
   fileSystems."/persist".neededForBoot = true;
 
-  fileSystems."/var/lib" = {
-    device = "/persist/var/lib";
-    options = [ "bind" "x-systemd.requires-mounts-for=/persist" ];
-    depends = [ "/persist" ];
-    neededForBoot = true;
+  environment.persistence."/persist" = {
+    hideMounts = true;
+    directories = [
+      "/var/log"
+      "/var/lib"
+    ];
   };
-
-  fileSystems."/var/log" = {
-    device = "/persist/var/log";
-    options = [ "bind" "x-systemd.requires-mounts-for=/persist" ];
-    depends = [ "/persist" ];
-    neededForBoot = true;
-  };
-
-  fileSystems."/etc/zfs/zfs-list.cache" = {
-    device = "/persist/var/cache/zfs/zfs-list.cache";
-    options = [ "bind" "x-systemd.requires-mounts-for=/persist" ];
-    depends = [ "/persist" ];
-    neededForBoot = true;
-  };
-
-  fileSystems."/etc/zfs/zpool.cache" = {
-    device = "/persist/var/cache/zfs/zpool.cache";
-    options = [ "bind" "x-systemd.requires-mounts-for=/persist" ];
-    depends = [ "/persist" ];
-    neededForBoot = true;
-  };
-
-  systemd.tmpfiles.rules = [
-    "L /etc/zfs/zfs-list.cache - - - - /persist/var/cache/zfs/zfs-list.cache"
-    "L /etc/zfs/zpool.cache - - - - /persist/var/cache/zfs/zpool.cache"
-  ];
-
-  environment.etc."machine-id".source = "/persist/etc/machine-id";
-
-  #fileSystems."/var/lib/tailscale" = {
-  #  device = "/persist/var/lib/tailscale";
-  #  options = [ "bind" ];
-  #  noCheck = true;
-  #};
 
   environment.shells = with pkgs; [ zsh ];
-
-  services.zfs.autoScrub = {
-    enable = true;
-    interval = "monthly";
-  };
 
   /*
     services.harmonia = {
@@ -343,16 +279,15 @@ in
   networking.firewall.allowedUDPPorts = [ 443 22000 41641 ];
   networking.firewall.trustedInterfaces = [ "tailscale0" ];
 
+  # enable tailscale exit
+  boot.kernel.sysctl."net.ipv4.ip_forward" = 1;
+
   services.tailscale.permitCertUid = "caddy";
   services.tailscaleAuth = {
     enable = true;
     user = "caddy";
     group = "caddy";
   };
-
-  systemd.generators."zfs-mount-generator" = "${config.boot.zfs.package}/lib/systemd/system-generator/zfs-mount-generator";
-  environment.etc."zfs/zed.d/history_event-zfs-list-cacher.sh".source = "${config.boot.zfs.package}/etc/zfs/zed.d/history_event-zfs-list-cacher.sh";
-  systemd.services.zfs-mount.enable = false;
 
   virtualisation.oci-containers.containers = {
     libation = {
@@ -397,22 +332,6 @@ in
     enable = true;
     port = 8917;
   };
-
-  services.zfs.zed.settings.PATH = lib.mkForce (lib.makeBinPath [
-    pkgs.diffutils
-    config.boot.zfs.package
-    pkgs.coreutils
-    pkgs.curl
-    pkgs.gawk
-    pkgs.gnugrep
-    pkgs.gnused
-    pkgs.nettools
-    pkgs.util-linux
-  ]);
-
-  services.udev.extraRules = ''
-    KERNEL=="sd[a-z]*[0-9]*|mmcblk[0-9]*p[0-9]*|nvme[0-9]*n[0-9]*p[0-9]*|xvd[a-z]*[0-9]*", ENV{ID_FS_TYPE}=="zfs_member", ATTR{../queue/scheduler}="none"
-  '';
 
   # This value determines the NixOS release from which the default
   # settings for stateful data, like file locations and database versions

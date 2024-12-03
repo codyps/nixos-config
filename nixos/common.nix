@@ -14,10 +14,9 @@ in
 
       substituters = [ "https://ward.little-moth.ts.net/nix-cache" ] ++ (if hostname != "ward" then [ "https://ward.little-moth.ts.net/harmonia" ] else [ ]);
 
-      trusted-public-keys =
-        if hostname != "ward" then [
-          "ward.einic.org-1:MVzXNXGliDxO/juzN9Vo+NHVrnRA6F/sHC4k1mb/iYI="
-        ] else [ ];
+      trusted-public-keys = [
+        "ward.einic.org-1:MVzXNXGliDxO/juzN9Vo+NHVrnRA6F/sHC4k1mb/iYI="
+      ];
     };
     optimise.automatic = true;
     gc = {

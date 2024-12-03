@@ -5,17 +5,20 @@
 { config, pkgs, lib, modulesPath, self, ... }:
 
 let
-  ssh-auth = (import ../ssh-auth.nix);
+  ssh-auth = (import ../../nixos/ssh-auth.nix);
   authorizedKeys = ssh-auth.authorizedKeys;
 in
 {
   imports =
     [
+      ../../modules/zfs.nix
       ./hardware-configuration.nix
       (modulesPath + "/virtualisation/xen-domU.nix")
     ];
 
   services.logrotate.checkConfig = false;
+
+  system.autoUpgrade.enable = lib.mkForce true;
 
   boot.zfs.extraPools = [ "tank" ];
 
@@ -23,40 +26,13 @@ in
   boot.loader.grub.device = lib.mkForce "/dev/xvda";
   boot.zfs.devNodes = "/dev/disk/by-partuuid";
 
-  # source: https://grahamc.com/blog/erase-your-darlings
-  #boot.initrd.postDeviceCommands = lib.mkAfter ''
-  #  zfs rollback -r rpool/local/root@blank
-  #'';
-
   # https://discourse.nixos.org/t/zfs-rollback-not-working-using-boot-initrd-systemd/37195/3
   boot.initrd.systemd.enable = lib.mkDefault true;
-  boot.initrd.systemd.services.rollback = {
-    description = "Rollback root filesystem to a pristine state on boot";
-    wantedBy = [
-      # "zfs.target"
-      "initrd.target"
-    ];
-    after = [
-      "zfs-import-rpool.service"
-    ];
-    before = [
-      "sysroot.mount"
-    ];
-    path = with pkgs; [
-      zfs
-    ];
-    unitConfig.DefaultDependencies = "no";
-    serviceConfig.Type = "oneshot";
-    script = ''
-      zfs rollback -r rpool/local/root@blank && echo "  >> >> rollback complete << <<"
-    '';
+
+  p.zfs.root-impermenance = {
+    enable = true;
+    rollback-target = "rpool/local/root@blank";
   };
-
-  #services.cockpit.enable = true;
-  #systemd.sockets."cockpit".socketConfig.ListenStream = lib.mkForce "127.0.0.1:${options.services.cockpit.port}";
-
-  boot.initrd.extraFiles."/etc/zfs/zfs-list.cache".source = /persist/var/cache/zfs/zfs-list.cache;
-  boot.initrd.extraFiles."/etc/zfs/zpool.cache".source = /persist/var/cache/zfs/zpool.cache;
 
   swapDevices = [{
     device = "/dev/rpool/local/swap";
@@ -64,53 +40,15 @@ in
 
   fileSystems."/persist".neededForBoot = true;
 
-  fileSystems."/var/lib" = {
-    device = "/persist/var/lib";
-    options = [ "bind" "x-systemd.requires-mounts-for=/persist" ];
-    depends = [ "/persist" ];
-    neededForBoot = true;
+  environment.persistence."/persist" = {
+    hideMounts = true;
+    directories = [
+      "/var/log"
+      "/var/lib"
+    ];
   };
-
-  fileSystems."/var/log" = {
-    device = "/persist/var/log";
-    options = [ "bind" "x-systemd.requires-mounts-for=/persist" ];
-    depends = [ "/persist" ];
-    neededForBoot = true;
-  };
-
-  fileSystems."/etc/zfs/zfs-list.cache" = {
-    device = "/persist/var/cache/zfs/zfs-list.cache";
-    options = [ "bind" "x-systemd.requires-mounts-for=/persist" ];
-    depends = [ "/persist" ];
-    neededForBoot = true;
-  };
-
-  fileSystems."/etc/zfs/zpool.cache" = {
-    device = "/persist/var/cache/zfs/zpool.cache";
-    options = [ "bind" "x-systemd.requires-mounts-for=/persist" ];
-    depends = [ "/persist" ];
-    neededForBoot = true;
-  };
-
-  systemd.tmpfiles.rules = [
-    "L /etc/zfs/zfs-list.cache - - - - /persist/var/cache/zfs/zfs-list.cache"
-    "L /etc/zfs/zpool.cache - - - - /persist/var/cache/zfs/zpool.cache"
-  ];
-
-  environment.etc."machine-id".source = "/persist/etc/machine-id";
-
-  #fileSystems."/var/lib/tailscale" = {
-  #  device = "/persist/var/lib/tailscale";
-  #  options = [ "bind" ];
-  #  noCheck = true;
-  #};
 
   environment.shells = with pkgs; [ zsh ];
-
-  services.zfs.autoScrub = {
-    enable = true;
-    interval = "monthly";
-  };
 
   /*
     services.harmonia = {
@@ -168,14 +106,53 @@ in
     };
   */
 
+
+  systemd.services.caddy.serviceConfig.EnvironmentFile = "/persist/etc/default/caddy";
   services.caddy = {
     enable = true;
-    #virtualHosts."nix-cache.finch.einic.org".extraConfig = ''
-    #  reverse_proxy :5000
-    #'';
-    #virtualHosts."hydra.finch.einic.org".extraConfig = ''
-    #  reverse_proxy :3000
-    #'';
+    package = (pkgs.callPackage ../../nixpkgs/overlays/pkgs/caddy/package.nix { }).withPlugins {
+      caddyModules = [
+        { repo = "github.com/caddy-dns/cloudflare"; version = "89f16b99c18ef49c8bb470a82f895bce01cbaece"; }
+        { repo = "github.com/caddyserver/cache-handler"; version = "283ea9b5bf192ff9c98f0b848c7117367655893f"; } # v0.14.0
+        { repo = "github.com/darkweak/storages/badger/caddy"; version = "0d6842b38ab6937af5a60adcf54d8955b5bbe6fc"; } # v0.0.10
+        { repo = "github.com/WeidiDeng/caddy-cloudflare-ip"; version = "f53b62aa13cb7ad79c8b47aacc3f2f03989b67e5"; } # head of main
+      ];
+      vendorHash = "sha256-Z80OP4fMele2kITxJkKKHGe/jbhCIAl43rp+FEYnvoE=";
+    };
+
+    globalConfig = ''
+      cache
+
+      acme_dns cloudflare {env.CLOUDFLARE_API_TOKEN}
+
+      servers {
+        trusted_proxies cloudflare {
+          interval 12h
+          timeout 15s
+        }
+      }
+    '';
+
+    virtualHosts."*.einic.org" = {
+      extraConfig = ''
+        @audiobooks host audiobooks.einic.org
+        handle @audiobooks {
+          root /tank/libation/data/
+          file_server browse
+        }
+
+        @audiobookshelf host audiobookshelf.einic.org
+        handle @audiobookshelf {
+          reverse_proxy http://localhost:8917
+        }
+
+        handle {
+          abort
+        }
+      '';
+
+    };
+
     virtualHosts."finch.little-moth.ts.net" = {
       listenAddresses = [ "100.112.195.103" ];
       extraConfig = ''
@@ -245,33 +222,6 @@ in
     };
   };
 
-
-  /*
-    # system specific details
-    networking = {
-    useDHCP = false;
-    dhcpcd.enable = false;
-    useNetworkd = true;
-
-    interfaces.enX0.ipv4.addresses = [ {
-      address = "207.90.192.55";
-      prefixLength = 24;
-    } ];
-
-    interfaces.enX1.ipv6.addresses = [ {
-      address = "2602:ffd5:0001:1e7:0000:0000:0000:0001";
-      prefixLength = 36;
-    } ];
-
-    defaultGateway = "207.90.192.1";
-    defaultGateway6 = {
-      address = "2602:ffd5:1:100::1";
-      #interface = "enX1";
-    };
-    nameservers = [ "8.8.8.8" ];
-    };
-  */
-
   time.timeZone = "America/New_York";
   # console = {
   #   font = "Lat2-Terminus16";
@@ -329,6 +279,9 @@ in
   networking.firewall.allowedUDPPorts = [ 443 22000 41641 ];
   networking.firewall.trustedInterfaces = [ "tailscale0" ];
 
+  # enable tailscale exit
+  boot.kernel.sysctl."net.ipv4.ip_forward" = 1;
+
   services.tailscale.permitCertUid = "caddy";
   services.tailscaleAuth = {
     enable = true;
@@ -336,25 +289,49 @@ in
     group = "caddy";
   };
 
-  systemd.generators."zfs-mount-generator" = "${config.boot.zfs.package}/lib/systemd/system-generator/zfs-mount-generator";
-  environment.etc."zfs/zed.d/history_event-zfs-list-cacher.sh".source = "${config.boot.zfs.package}/etc/zfs/zed.d/history_event-zfs-list-cacher.sh";
-  systemd.services.zfs-mount.enable = false;
+  virtualisation.oci-containers.containers = {
+    libation = {
+      image = "docker.io/rmcrackan/libation:latest";
+      volumes = [
+        "/tank/libation/data:/data"
+        "/tank/libation/config:/config"
+        "/tank/libation/tmp:/tmp"
+        #"/var/lib/libation/data:/data"
+        #"/var/lib/libation/config:/config"
+      ];
+      environment = {
+        SLEEP_TIME = "1h";
+      };
+      labels = {
+        "io.containers.autoupdate" = "registry";
+      };
+    };
+  };
 
-  services.zfs.zed.settings.PATH = lib.mkForce (lib.makeBinPath [
-    pkgs.diffutils
-    config.boot.zfs.package
-    pkgs.coreutils
-    pkgs.curl
-    pkgs.gawk
-    pkgs.gnugrep
-    pkgs.gnused
-    pkgs.nettools
-    pkgs.util-linux
-  ]);
+  # oci-containers can't handle running as a user. See:
+  # https://github.com/NixOS/nixpkgs/issues/259770
+  #systemd.services.podman-libation.serviceConfig = {
+  #  User = "libation";
+  #  Home = "/tank/libation";
+  #DynamicUser = true;
+  #StateDirectory = "libation";
+  #};
+  #users.users.libation = {
+  #  isSystemUser = true;
+  #  group = "libation";
+  #};
+  #users.groups.libation = {};
 
-  services.udev.extraRules = ''
-    KERNEL=="sd[a-z]*[0-9]*|mmcblk[0-9]*p[0-9]*|nvme[0-9]*n[0-9]*p[0-9]*|xvd[a-z]*[0-9]*", ENV{ID_FS_TYPE}=="zfs_member", ATTR{../queue/scheduler}="none"
-  '';
+  virtualisation.podman = {
+    enable = true;
+    autoPrune.enable = true;
+    defaultNetwork.settings.dns_enabled = true;
+  };
+
+  services.audiobookshelf = {
+    enable = true;
+    port = 8917;
+  };
 
   # This value determines the NixOS release from which the default
   # settings for stateful data, like file locations and database versions

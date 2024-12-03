@@ -16,19 +16,20 @@
     targo.inputs.nixpkgs.follows = "nixpkgs";
     targo.inputs.flake-utils.follows = "flake-utils";
     impermanence.url = "github:nix-community/impermanence";
+    sops-nix.url = "github:Mic92/sops-nix";
     ethereum-nix = {
-      url = "github:nix-community/ethereum.nix";
+      url = "github:codyps/ethereum.nix";
       inputs.nixpkgs.follows = "nixpkgs";
       inputs.flake-utils.follows = "flake-utils";
     };
   };
 
   nixConfig = {
-    extra-substituters = ["https://nix-community.cachix.org"];
-    extra-trusted-public-keys = ["nix-community.cachix.org-1:mB9FSh9qf2dCimDSUo8Zy7bkq5CX+/rkCWyvRCYg3Fs="];
+    extra-substituters = [ "https://nix-community.cachix.org" ];
+    extra-trusted-public-keys = [ "nix-community.cachix.org-1:mB9FSh9qf2dCimDSUo8Zy7bkq5CX+/rkCWyvRCYg3Fs=" ];
   };
 
-  outputs = { self, nixpkgs, flake-utils, targo, nix-darwin, home-manager, nixos-wsl, nixos-vscode-server, impermanence, ethereum-nix }:
+  outputs = { self, nixpkgs, flake-utils, targo, nix-darwin, home-manager, nixos-wsl, nixos-vscode-server, impermanence, ethereum-nix, sops-nix }:
     let
       overlays = [
         (final: prev: {
@@ -73,7 +74,7 @@
             system = "x86_64-linux";
             specialArgs = { inherit home-manager self; };
             modules = [
-              ./nixos/mifflin/configuration.nix
+              ./hosts/mifflin/configuration.nix
               ./nixos/common.nix
               home-manager.nixosModules.home-manager
               {
@@ -92,7 +93,8 @@
             system = "x86_64-linux";
             specialArgs = { inherit self; };
             modules = [
-              ./nixos/finch/configuration.nix
+              sops-nix.nixosModules.sops
+              ./hosts/finch/configuration.nix
               ./nixos/common.nix
               impermanence.nixosModules.impermanence
               home-manager.nixosModules.home-manager

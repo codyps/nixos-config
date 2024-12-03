@@ -221,6 +221,7 @@ in
   systemd.user.services.atuind = {
     Service = {
       # TODO: consider removing unix socket, it existing causes issues
+      ExecStartPre = "${pkgs.coreutils}/bin/rm -f %h/.local/share/atuin/atuin.sock";
       ExecStart = "${pkgs.atuin}/bin/atuin daemon";
       Environment = "ATUIN_LOG=info";
     };

@@ -10,6 +10,7 @@ in
   imports =
     [
       ./hardware-configuration.nix
+      ../../modules/zfs.nix
     ];
 
   boot.kernelParams = [ "ip=dhcp" ];
@@ -20,6 +21,11 @@ in
 
   # hashedPasswordFile reads from this
   fileSystems."/persist".neededForBoot = true;
+
+  p.zfs.root-impermenance = {
+    enable = true;
+    rollback-target = "ward/temp/root@blank";
+  };
 
   environment.persistence."/persist" = {
     hideMounts = true;
@@ -45,28 +51,6 @@ in
 
   boot.initrd = {
     systemd.enable = true;
-
-    systemd.services.rollback = {
-      description = "Rollback ZFS datasets to a pristine state";
-      wantedBy = [
-        "initrd.target"
-      ];
-      after = [
-        # TODO: use systemd generated targets instead
-        "zfs-import-ward.service"
-      ];
-      before = [
-        "sysroot.mount"
-      ];
-      path = with pkgs; [
-        zfs
-      ];
-      unitConfig.DefaultDependencies = "no";
-      serviceConfig.Type = "oneshot";
-      script = ''
-        zfs rollback -r ward/temp/root@blank && echo "rollback complete"
-      '';
-    };
 
     network = {
       enable = true;

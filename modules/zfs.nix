@@ -57,29 +57,29 @@ in
     })
 
     (lib.mkIf cfg.root-impermenance.enable
-    {
-      boot.initrd.systemd.enable = lib.mkDefault true;
-      boot.initrd.systemd.services.rollback = {
-        description = "Rollback root filesystem to a pristine state on boot";
-        wantedBy = [
-          # "zfs.target"
-          "initrd.target"
-        ];
-        after = let pool = builtins.elemAt (lib.splitString "/" cfg.root-impermenance.rollback-target) 0; in [
-          "zfs-import-${pool}.service"
-        ];
-        before = [
-          "sysroot.mount"
-        ];
-        path = [
-          zfs
-        ];
-        unitConfig.DefaultDependencies = "no";
-        serviceConfig.Type = "oneshot";
-        script = ''
-          zfs rollback -r ${cfg.root-impermenance.rollback-target} && echo "  >> >> rollback complete << <<"
-        '';
-      };
-    })
+      {
+        boot.initrd.systemd.enable = lib.mkDefault true;
+        boot.initrd.systemd.services.rollback = {
+          description = "Rollback root filesystem to a pristine state on boot";
+          wantedBy = [
+            # "zfs.target"
+            "initrd.target"
+          ];
+          after = let pool = builtins.elemAt (lib.splitString "/" cfg.root-impermenance.rollback-target) 0; in [
+            "zfs-import-${pool}.service"
+          ];
+          before = [
+            "sysroot.mount"
+          ];
+          path = [
+            zfs
+          ];
+          unitConfig.DefaultDependencies = "no";
+          serviceConfig.Type = "oneshot";
+          script = ''
+            zfs rollback -r ${cfg.root-impermenance.rollback-target} && echo "  >> >> rollback complete << <<"
+          '';
+        };
+      })
   ];
 }

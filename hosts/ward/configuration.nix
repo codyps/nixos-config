@@ -342,7 +342,8 @@ in
     };
     extraArgs = [
       "--metrics.influxdb"
-      "--metrics.influxdb.tags" "network=holesky,host=ward"
+      "--metrics.influxdb.tags"
+      "network=holesky,host=ward"
     ];
   };
 
@@ -395,7 +396,8 @@ in
     };
     extraArgs = [
       "--metrics.influxdb"
-      "--metrics.influxdb.tags" "network=holesky,host=ward"
+      "--metrics.influxdb.tags"
+      "network=holesky,host=ward"
     ];
   };
 

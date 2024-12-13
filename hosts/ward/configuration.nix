@@ -301,6 +301,7 @@ in
         "--pids-limit=-1"
         "--cpus=4"
         "--cpu-shares=512"
+        "--memory-reservation=32G"
       ];
     };
 

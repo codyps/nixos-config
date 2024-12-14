@@ -154,7 +154,7 @@ in
     };
 
     virtualHosts."finch.little-moth.ts.net" = {
-      listenAddresses = [ "100.112.195.103" ];
+      listenAddresses = [ "unix//run/caddy/caddy-tailscale.sock" ];
       extraConfig = ''
         root /srv
 
@@ -188,6 +188,19 @@ in
           }
         }
       '';
+    };
+  };
+
+  systemd.socket."caddy-tailscale" = {
+    socketConfig = {
+      BindToDevice = "tailscale0";
+      ListenStream = "100.112.195.103:443";
+    };
+  };
+
+  systemd.service."caddy-tailscale" = {
+    serviceConfig = {
+      ExecStart = "${pkgs.systemd}/bin/systemd-socket-proxyd /run/caddy/caddy-tailscale.sock";
     };
   };
 

@@ -107,7 +107,11 @@ in
   */
 
 
-  systemd.services.caddy.serviceConfig.EnvironmentFile = "/persist/etc/default/caddy";
+  systemd.services.caddy.serviceConfig = {
+    EnvironmentFile = "/persist/etc/default/caddy";
+    Requires = [ "tank-libation.mount" ];
+    After = [ "tank-libation.mount" ];
+  };
   services.caddy = {
     enable = true;
     package = (pkgs.callPackage ../../nixpkgs/overlays/pkgs/caddy/package.nix { }).withPlugins {
@@ -312,12 +316,21 @@ in
         #"/var/lib/libation/data:/data"
         #"/var/lib/libation/config:/config"
       ];
-      environment = {
-        SLEEP_TIME = "1h";
-      };
       labels = {
         "io.containers.autoupdate" = "registry";
       };
+    };
+  };
+
+  systemd.services.podman-libation.serviceConfig = {
+    After = [ "tank-libation.mount" ];
+    Requires = [ "tank-libation.mount" ];
+  };
+
+  systemd.timers.podman-libation = {
+    wantedBy = [ "timers.target" ];
+    timerConfig = {
+      OnUnitActiveSec = "1h";
     };
   };
 

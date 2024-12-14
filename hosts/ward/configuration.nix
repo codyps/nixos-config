@@ -1,15 +1,13 @@
 { config, lib, pkgs, ... }:
-
 let
-  ssh-auth = (import ../ssh-auth.nix);
+  ssh-auth = (import ../../nixos/ssh-auth.nix);
   authorizedKeys = ssh-auth.authorizedKeys;
-  holesky_jwt_path = "/persist/etc/ethereum/holesky-jwt";
-  mainnet_jwt_path = "/persist/etc/ethereum/mainnet-jwt";
 in
 {
   imports =
     [
       ./hardware-configuration.nix
+      ../../modules/zfs.nix
     ];
 
   boot.kernelParams = [ "ip=dhcp" ];
@@ -21,6 +19,11 @@ in
   # hashedPasswordFile reads from this
   fileSystems."/persist".neededForBoot = true;
 
+  p.zfs.root-impermenance = {
+    enable = true;
+    rollback-target = "ward/temp/root@blank";
+  };
+
   environment.persistence."/persist" = {
     hideMounts = true;
     directories = [
@@ -31,42 +34,13 @@ in
       "/var/lib/tailscale"
       "/var/lib/systemd/coredump"
       "/var/lib/audiobookshelf"
-      "/var/lib/private/geth-holesky"
-      "/var/lib/private/lighthouse-holesky"
-      "/var/lib/private/geth-mainnet"
-      "/var/lib/private/lighthouse-mainnet"
       "/etc/NetworkManager/system-connections"
       { directory = "/var/lib/colord"; user = "colord"; group = "colord"; mode = "u=rwx,g=rx,o="; }
-    ];
-    files = [
-      "/etc/machine-id"
     ];
   };
 
   boot.initrd = {
     systemd.enable = true;
-
-    systemd.services.rollback = {
-      description = "Rollback ZFS datasets to a pristine state";
-      wantedBy = [
-        "initrd.target"
-      ];
-      after = [
-        # TODO: use systemd generated targets instead
-        "zfs-import-ward.service"
-      ];
-      before = [
-        "sysroot.mount"
-      ];
-      path = with pkgs; [
-        zfs
-      ];
-      unitConfig.DefaultDependencies = "no";
-      serviceConfig.Type = "oneshot";
-      script = ''
-        zfs rollback -r ward/temp/root@blank && echo "rollback complete"
-      '';
-    };
 
     network = {
       enable = true;
@@ -302,21 +276,12 @@ in
 
         redir /grafana /grafana/ 301
         handle_path /grafana/* {
-          reverse_proxy http://${toString config.services.grafana.settings.server.http_addr}:${toString config.services.grafana.settings.server.http_port}"
+          reverse_proxy http://${toString config.services.grafana.settings.server.http_addr}:${toString config.services.grafana.settings.server.http_port}
         }
 
-        forward_auth unix//run/tailscale-nginx-auth/tailscale-nginx-auth.sock {
-          uri /auth
-          header_up Remote-Addr {remote_host}
-          header_up Remote-Port {remote_port}
-          header_up Original-URI {uri}
-          copy_headers {
-            Tailscale-User>X-Webauth-User
-            Tailscale-Name>X-Webauth-Name
-            Tailscale-Login>X-Webauth-Login
-            Tailscale-Tailnet>X-Webauth-Tailnet
-            Tailscale-Profile-Picture>X-Webauth-Profile-Picture
-          }
+        # return 404 for all other requests
+        handle {
+          abort
         }
       '';
     };
@@ -354,104 +319,6 @@ in
     };
   };
 
-  services.ethereum.geth.holesky = {
-    package = pkgs.geth;
-    enable = true;
-    openFirewall = true;
-    args = {
-      network = "holesky";
-      authrpc.jwtsecret = holesky_jwt_path;
-      #datadir = "/persist/var/lib/private/geth-holesky";
-
-      port = 8550;
-      authrpc.port = 8551;
-      ws.port = 8552;
-      metrics.port = 8553;
-    };
-  };
-
-  services.ethereum.lighthouse-beacon.holesky = {
-    enable = true;
-    openFirewall = true;
-    args = {
-      network = "holesky";
-      #datadir = "/persist/var/lib/private/lighthouse-holesky/beacon";
-      execution-jwt = holesky_jwt_path;
-      # services.ethereum.geth.holesky.args.authrpc.port
-      execution-endpoint = "http://localhost:8551";
-      checkpoint-sync-url = "https://checkpoint-sync.holesky.ethpandaops.io/";
-      genesis-state-url = "https://checkpoint-sync.holesky.ethpandaops.io/";
-
-      disable-upnp = false;
-      port = 8554;
-      quic-port = 8555;
-      http.port = 8556;
-      http.enable = true;
-      metrics.port = 8557;
-    };
-  };
-
-  services.ethereum.lighthouse-validator.holesky = {
-    enable = true;
-    openFirewall = true;
-    args = {
-      network = "holesky";
-      #datadir = "/persist/var/lib/private/lighthouse-holesky/validator";
-      # services.ethereum.lighthouse-beacon.holesky.args.http-port
-      beacon-nodes = [ "http://localhost:8556" ];
-      metrics.port = 8558;
-    };
-  };
-
-  services.ethereum.geth.mainnet = {
-    package = pkgs.geth;
-    enable = true;
-    openFirewall = true;
-    args = {
-      network = "mainnet";
-      authrpc.jwtsecret = mainnet_jwt_path;
-      #datadir = "/persist/var/lib/private/geth-mainnet";
-
-      port = 8560;
-      authrpc.port = 8561;
-      ws.port = 8562;
-      metrics.port = 8563;
-    };
-  };
-
-  services.ethereum.lighthouse-beacon.mainnet = {
-    enable = true;
-    openFirewall = true;
-    args = {
-      network = "mainnet";
-      #datadir = "/persist/var/lib/private/lighthouse-mainnet/beacon";
-      execution-jwt = mainnet_jwt_path;
-      # services.ethereum.geth.mainnet.args.authrpc.port
-      execution-endpoint = "http://localhost:8561";
-      checkpoint-sync-url = "https://sync.invis.tools/";
-      genesis-state-url = "https://sync.invis.tools/";
-
-      disable-upnp = false;
-      port = 8564;
-      quic-port = 8565;
-      http.port = 8566;
-      http.enable = true;
-      metrics.port = 8567;
-    };
-  };
-
-  services.ethereum.lighthouse-validator.mainnet = {
-    enable = true;
-    openFirewall = true;
-    args = {
-      network = "mainnet";
-      #datadir = "/persist/var/lib/private/lighthouse-mainnet/validator";
-      # services.ethereum.lighthouse-beacon.mainnet.args.http-port
-      beacon-nodes = [ "http://localhost:8566" ];
-      metrics.port = 8568;
-    };
-  };
-
   services.grafana = {
     enable = true;
     settings = {
@@ -460,7 +327,6 @@ in
         http_port = 3001;
         domain = "ward.little-moth.ts.net";
         root_url = "https://ward.little-moth.ts.net/grafana/";
-        serve_from_sub_path = true;
       };
     };
   };
@@ -468,6 +334,11 @@ in
   services.influxdb = {
     enable = true;
     dataDir = "/persist/var/lib/influxdb";
+    extraConfig = {
+      http = {
+        bind-address = "[::1]:8086";
+      };
+    };
   };
 
   networking.useDHCP = false;

@@ -115,7 +115,7 @@
             specialArgs = { inherit home-manager self; };
             modules = [
               ethereum-nix.nixosModules.default
-              ./nixos/ward/configuration.nix
+              ./hosts/ward/configuration.nix
               ./nixos/common.nix
               impermanence.nixosModules.impermanence
               home-manager.nixosModules.home-manager

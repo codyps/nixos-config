@@ -107,10 +107,13 @@ in
   */
 
 
-  systemd.services.caddy.serviceConfig = {
-    EnvironmentFile = "/persist/etc/default/caddy";
-    Requires = [ "tank-libation.mount" ];
-    After = [ "tank-libation.mount" ];
+  systemd.services.caddy = {
+    serviceConfig = {
+      EnvironmentFile = "/persist/etc/default/caddy";
+    };
+
+    requires = [ "tank-libation.mount" ];
+    after = [ "tank-libation.mount" ];
   };
   services.caddy = {
     enable = true;
@@ -195,14 +198,16 @@ in
     };
   };
 
-  systemd.socket."caddy-tailscale" = {
+  systemd.sockets."caddy-tailscale" = {
     socketConfig = {
       BindToDevice = "tailscale0";
+      FreeBind = true;
       ListenStream = "100.112.195.103:443";
     };
+    wantedBy = [ "sockets.target" ];
   };
 
-  systemd.service."caddy-tailscale" = {
+  systemd.services."caddy-tailscale" = {
     serviceConfig = {
       ExecStart = "${pkgs.systemd}/bin/systemd-socket-proxyd /run/caddy/caddy-tailscale.sock";
     };
@@ -322,9 +327,9 @@ in
     };
   };
 
-  systemd.services.podman-libation.serviceConfig = {
-    After = [ "tank-libation.mount" ];
-    Requires = [ "tank-libation.mount" ];
+  systemd.services.podman-libation = {
+    after = [ "tank-libation.mount" ];
+    requires = [ "tank-libation.mount" ];
   };
 
   systemd.timers.podman-libation = {

@@ -154,6 +154,11 @@ in
           reverse_proxy http://localhost:8917
         }
 
+        @storyteller host storyteller.einic.org
+        handle @storyteller {
+          reverse_proxy http://localhost:8918
+        }
+
         handle {
           abort
         }
@@ -342,14 +347,36 @@ in
         "io.containers.autoupdate" = "registry";
       };
     };
+
+    storyteller = {
+      image = "registry.gitlab.com/smoores/storyteller:latest";
+      volumes = [
+        "/tank/storyteller/data:/data"
+        "/tank/storyteller/secret:/run/secret"
+      ];
+      environment = {
+        STORYTELLER_SECRET_KEY_FILE = "/run/secret/key";
+      };
+      ports = [
+        "127.0.0.1:8918:8001"
+      ];
+      labels = {
+        "io.containers.autoupdate" = "registry";
+      };
+    };
   };
 
-  systemd.services.podman-libation = {
+  systemd.services.podman-libation = let
+    mounts = [
+      "tank-libation.mount"
+      "tank-books-kindle.mount"
+      "tank-books-personal.mount"
+    ]; in {
     serviceConfig = {
       type = "oneshot";
     };
-    after = [ "tank-libation.mount" ];
-    requires = [ "tank-libation.mount" ];
+    after = mounts;
+    requires = mounts;
   };
 
   systemd.timers.podman-libation = {

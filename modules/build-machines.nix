@@ -42,6 +42,4 @@
       ] ++ (import ../nixos/ssh-auth.nix).authorizedKeys;
     });
   };
-
-
 }

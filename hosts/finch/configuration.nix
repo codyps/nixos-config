@@ -110,6 +110,7 @@ in
   systemd.services.caddy = {
     serviceConfig = {
       EnvironmentFile = "/persist/etc/default/caddy";
+      RuntimeDirectory = "caddy";
     };
 
     requires = [ "tank-libation.mount" ];
@@ -209,8 +210,14 @@ in
 
   systemd.services."caddy-tailscale" = {
     serviceConfig = {
-      ExecStart = "${pkgs.systemd}/bin/systemd-socket-proxyd /run/caddy/caddy-tailscale.sock";
+      PrivateIPC = true;
+      PrivateDevices = true;
+      PrivateTmp = true;
+
+      ReadWritePaths = ["/run/caddy/caddy-tailscale.sock"];
     };
+
+    script = "${pkgs.systemd}/bin/systemd-socket-proxyd /run/caddy/caddy-tailscale.sock";
   };
 
   networking.hostId = "8425e349";
@@ -241,6 +248,14 @@ in
         "2602:ffd5:0001:1e7:0000:0000:0000:0001/36"
       ];
       gateway = [ "2602:ffd5:1:100::1" ];
+    };
+
+    networks."50-tailscale" = {
+      name = "tailscale*";
+      linkConfig = {
+        Unmanaged = true;
+        ActivationPolicy = "manual";
+      };
     };
   };
 
@@ -303,6 +318,7 @@ in
 
   # enable tailscale exit
   boot.kernel.sysctl."net.ipv4.ip_forward" = 1;
+  boot.kernel.sysctl."net.ipv6.conf.all.forwarding" = 1;
 
   services.tailscale.permitCertUid = "caddy";
   services.tailscaleAuth = {
@@ -328,6 +344,9 @@ in
   };
 
   systemd.services.podman-libation = {
+    serviceConfig = {
+      type = "oneshot";
+    };
     after = [ "tank-libation.mount" ];
     requires = [ "tank-libation.mount" ];
   };

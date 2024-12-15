@@ -219,7 +219,7 @@ in
       PrivateDevices = true;
       PrivateTmp = true;
 
-      ReadWritePaths = ["/run/caddy/caddy-tailscale.sock"];
+      ReadWritePaths = [ "/run/caddy/caddy-tailscale.sock" ];
     };
 
     script = "${pkgs.systemd}/bin/systemd-socket-proxyd /run/caddy/caddy-tailscale.sock";
@@ -336,6 +336,7 @@ in
   virtualisation.oci-containers.containers = {
     libation = {
       image = "docker.io/rmcrackan/libation:latest";
+      autoStart = false;
       volumes = [
         "/tank/libation/data:/data"
         "/tank/libation/config:/config"
@@ -366,23 +367,29 @@ in
     };
   };
 
-  systemd.services.podman-libation = let
-    mounts = [
-      "tank-libation.mount"
-      "tank-books-kindle.mount"
-      "tank-books-personal.mount"
-    ]; in {
-    serviceConfig = {
-      type = "oneshot";
+  systemd.services.podman-libation =
+    let
+      mounts = [
+        "tank-libation.mount"
+        "tank-books-kindle.mount"
+        "tank-books-personal.mount"
+      ];
+    in
+    {
+      serviceConfig = {
+        type = "oneshot";
+      };
+      after = mounts;
+      requires = mounts;
     };
-    after = mounts;
-    requires = mounts;
-  };
 
   systemd.timers.podman-libation = {
     wantedBy = [ "timers.target" ];
     timerConfig = {
-      OnUnitActiveSec = "1h";
+      Persistent = true;
+      OnCalendar = "hourly";
+      AccuracySec = "30m";
+      RandomizedDelaySec = "20m";
     };
   };
 

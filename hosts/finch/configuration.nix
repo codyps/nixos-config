@@ -226,6 +226,7 @@ in
 
   systemd.network = {
     enable = true;
+    wait-online.anyInterface = true;
     networks."10-enX0" = {
       matchConfig.Name = "enX0";
       dns = [

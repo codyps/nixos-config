@@ -143,6 +143,13 @@ in
 
     virtualHosts."*.einic.org" = {
       extraConfig = ''
+        bind fd/4 {
+          protocols h1 h2
+        }
+        bind fdgram/6 {
+          protocols h3
+        }
+
         @audiobooks host audiobooks.einic.org
         handle @audiobooks {
           root /tank/libation/data/
@@ -166,9 +173,15 @@ in
 
     };
 
-    virtualHosts."finch.little-moth.ts.net" = {
-      listenAddresses = [ "unix//run/caddy/caddy-tailscale.sock" ];
+    virtualHosts."https://finch.little-moth.ts.net" = {
       extraConfig = ''
+        bind fd/5 {
+          protocols h1 h2
+	}
+        bind fdgram/7 {
+          protocols h3
+        }
+
         file_server /roms/* {
           root /tank/syncthing/Roms
           browse {
@@ -192,26 +205,44 @@ in
     };
   };
 
-  systemd.sockets."caddy-tailscale" = {
+  # NOTE: when caddy is given an IP address to bind, it doesn't specify the
+  # `FREEBIND` socket option, so we're required to have that IP address
+  # assigned to a local interface before caddy starts. There isn't a good way
+  # to do that, and requiring it would break caddy if tailscale failed for some
+  # reason (undesirable).
+
+  # NOTE: when a systemd.socket binds `<specific-ip>:443` as a listenStream
+  # before caddy tries to bind the wildcard `:443`, caddy fails to obtain a
+  # bind and exists. This broke our "use systemd.socket and a systemd.service
+  # to forward stuff to a unix socket caddy reads from".
+
+  # NOTE: when using systemd.sockets, we don't bind to the interface because
+  # using multiple systemd.socket units doesn't specify the ordering for the
+  # file descriptors, and caddy's way of interfacing with this is us explicitly
+  # listing fd numbers in the caddyfile. If caddy supported examining the
+  # descriptions, we could use multiple systemd.sockets, allowing more flexible
+  # configuration.
+  systemd.sockets."caddy" = {
+    listenStreams = [
+      # fd/4
+      "[::]:443"
+      # fd/5
+      "100.112.195.103:443"
+    ];
+    listenDatagrams = [
+      # fdgram/6
+      "[::]:443"
+      # fdgram/7
+      "100.112.195.103:443"
+    ];
     socketConfig = {
-      BindToDevice = "tailscale0";
+      BindIPv6Only = "both";
       FreeBind = true;
-      ListenStream = "100.112.195.103:443";
     };
     wantedBy = [ "sockets.target" ];
   };
 
-  systemd.services."caddy-tailscale" = {
-    serviceConfig = {
-      PrivateIPC = true;
-      PrivateDevices = true;
-      PrivateTmp = true;
-
-      ReadWritePaths = [ "/run/caddy/caddy-tailscale.sock" ];
-    };
-
-    script = "${pkgs.systemd}/bin/systemd-socket-proxyd /run/caddy/caddy-tailscale.sock";
-  };
+  systemd.services."caddy".requires = [ "caddy.socket" ];
 
   networking.hostId = "8425e349";
   networking.hostName = "finch";

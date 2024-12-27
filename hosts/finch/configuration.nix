@@ -241,6 +241,7 @@ in
       FreeBind = true;
       ReusePort = true;
     };
+    requiredBy = [ "caddy.service" ];
     wantedBy = [ "sockets.target" ];
     requiredBy = [ "caddy.socket" ];
   };

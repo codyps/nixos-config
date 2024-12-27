@@ -169,8 +169,6 @@ in
     virtualHosts."finch.little-moth.ts.net" = {
       listenAddresses = [ "unix//run/caddy/caddy-tailscale.sock" ];
       extraConfig = ''
-        root /srv
-
         file_server /roms/* {
           root /tank/syncthing/Roms
           browse {
@@ -187,18 +185,8 @@ in
           }
         }
 
-        forward_auth unix//run/tailscale-nginx-auth/tailscale-nginx-auth.sock {
-          uri /auth
-          header_up Remote-Addr {remote_host}
-          header_up Remote-Port {remote_port}
-          header_up Original-URI {uri}
-          copy_headers {
-            Tailscale-User>X-Webauth-User
-            Tailscale-Name>X-Webauth-Name
-            Tailscale-Login>X-Webauth-Login
-            Tailscale-Tailnet>X-Webauth-Tailnet
-            Tailscale-Profile-Picture>X-Webauth-Profile-Picture
-          }
+        handle {
+          abort
         }
       '';
     };
@@ -327,11 +315,6 @@ in
   boot.kernel.sysctl."net.ipv6.conf.all.forwarding" = 1;
 
   services.tailscale.permitCertUid = "caddy";
-  services.tailscaleAuth = {
-    enable = true;
-    user = "caddy";
-    group = "caddy";
-  };
 
   virtualisation.oci-containers.containers = {
     libation = {

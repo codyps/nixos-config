@@ -22,6 +22,7 @@
 
   # Enable networking
   networking.networkmanager.enable = true;
+  systemd.services.NetworkManager-wait-online.enable = false;
 
   # Set your time zone.
   time.timeZone = "America/New_York";
@@ -60,13 +61,7 @@
 
   services.tailscale.enable = true;
 
-  # Enable CUPS to print documents.
-  services.printing.enable = true;
-
-  hardware.enableAllFirmware = true;
-
   # Enable sound with pipewire.
-  hardware.pulseaudio.enable = false;
   security.rtkit.enable = true;
   services.pipewire = {
     enable = true;

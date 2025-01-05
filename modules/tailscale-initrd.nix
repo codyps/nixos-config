@@ -14,10 +14,14 @@ in {
       ];
     };
 
-    systemd.contents."/etc/tmpfiles.d/50-tailscale.conf".text = ''
-      L /var/run - - - - /run
-    '';
-    systemd.contents."/etc/hostname".source = config.environment.etc.hostname.source;
+
+    systemd.tmpfiles.settings = {
+      "50-tailscale" = {
+        "/var/run".L = {
+          argument = "/run";
+        };
+      };
+    };
 
     systemd.network.networks."50-tailscale" = {
       matchConfig = {
@@ -31,14 +35,14 @@ in {
 
     systemd.extraBin.ping = "${pkgs.iputils}/bin/ping";
 
-    systemd.additionalUpstreamUnits = ["systemd-resolved.service"];
-    systemd.users.systemd-resolve = {};
-    systemd.groups.systemd-resolve = {};
-    systemd.contents."/etc/systemd/resolved.conf".source = config.environment.etc."systemd/resolved.conf".source;
-    systemd.storePaths = ["${config.boot.initrd.systemd.package}/lib/systemd/systemd-resolved"];
-    systemd.services.systemd-resolved = {
-      wantedBy = ["initrd.target"];
-      serviceConfig.ExecStartPre = "-+/bin/ln -s /run/systemd/resolve/resolv.conf /etc/resolv.conf";
-    };
+    #systemd.additionalUpstreamUnits = ["systemd-resolved.service"];
+    #systemd.users.systemd-resolve = {};
+    #systemd.groups.systemd-resolve = {};
+    #systemd.contents."/etc/systemd/resolved.conf".source = config.environment.etc."systemd/resolved.conf".source;
+    #systemd.storePaths = ["${config.boot.initrd.systemd.package}/lib/systemd/systemd-resolved"];
+    #systemd.services.systemd-resolved = {
+    #  wantedBy = ["initrd.target"];
+    #  serviceConfig.ExecStartPre = "-+/bin/ln -s /run/systemd/resolve/resolv.conf /etc/resolv.conf";
+    #};
   };
 }

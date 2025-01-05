@@ -22,8 +22,6 @@ in
   # boot partition too. Consider hooking bootctl.
   # TODO: modify efibootmgr to use the other boot partition too.
 
-  # FIXME: does this actually work? complaints appear.
-  boot.kernelParams = [ "ip=dhcp" ];
   boot.loader.systemd-boot.enable = true;
   boot.loader.efi.canTouchEfiVariables = true;
 

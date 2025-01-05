@@ -44,7 +44,7 @@ in
     #systemd.storePaths = ["${config.boot.initrd.systemd.package}/lib/systemd/systemd-resolved"];
     systemd.services.systemd-resolved = {
       # Default is "sysinit.target", which is too late (blocks tailscaled)
-      wantedBy = lib.mkForce ["initrd.target"];
+      wantedBy = lib.mkForce [ "initrd.target" ];
       serviceConfig.ExecStartPre = "-+/bin/ln -s /run/systemd/resolve/resolv.conf /etc/resolv.conf";
     };
   };

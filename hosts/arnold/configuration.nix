@@ -148,6 +148,7 @@ in
   networking.networkmanager.enable = false;
   networking.firewall.trustedInterfaces = [ "tailscale0" ];
   networking.firewall.allowedTCPPorts = [ 80 443 ];
+  networking.firewall.allowPing = true;
 
   networking.hostName = "arnold";
   networking.hostId = "5c794628";
@@ -313,6 +314,63 @@ in
       z14.2   UUID=3fc04e0d-251b-4cec-8172-12c603c58284 /persist/etc/secret/luks1 discard,no-read-workqueue,no-write-workqueue,same-cpu-crypt
       z14.3   UUID=e5b69a87-e02c-4b14-be58-6109488e172a /persist/etc/secret/luks1 discard,no-read-workqueue,no-write-workqueue,same-cpu-crypt
     '';
+  };
+
+  services.samba-wsdd = {
+    enable = true;
+    openFirewall = true;
+  };
+
+  services.samba = {
+    enable = true;
+    securityType = "user";
+    openFirewall = true;
+    settings = {
+      global = {
+        "workgroup" = "WORKGROUP";
+        "server string" = "arnold";
+        "netbios name" = "arnold";
+        "security" = "user";
+        #"use sendfile" = "yes";
+        #"max protocol" = "smb2";
+        # note: localhost is the ipv6 localhost ::1
+        "hosts allow" = "10. 100. 192.168.0. 127.0.0.1 localhost";
+        "hosts deny" = "0.0.0.0/0";
+        "guest account" = "nobody";
+        "map to guest" = "bad user";
+
+        "server min protocol" = "SMB3_11";
+        "server signing" = "mandatory";
+        "server smb encrypt" = "required";
+        "restrict anonymous" = "2";
+
+        "fruit:metadata" = "stream";
+        "fruit:resource" = "stream";
+        # requires catia
+        "fruit:encoding" = "native";
+
+        "fruit:veto_appledouble" = "no";
+        "fruit:posix_rename" = "yes";
+        "fruit:zero_file_id" = "yes";
+
+        "domain master" = "yes";
+      };
+      "tank" = {
+        "path" = "/tank";
+        "writable" = "yes";
+        "valid users" = "cody";
+      };
+      "timemachine" = {
+        "path" = "/tank/backup/timemachine4";
+        "valid users" = "cody";
+        "public" = "no";
+        "writeable" = "yes";
+        "force user" = "username";
+        "fruit:aapl" = "yes";
+        "fruit:time machine" = "yes";
+        "vfs objects" = "catia fruit streams_xattr";
+      };
+    };
   };
 
   system.stateVersion = "24.11";

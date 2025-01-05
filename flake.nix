@@ -76,6 +76,7 @@
             modules = [
               ./hosts/mifflin/configuration.nix
               ./nixos/common.nix
+              sops-nix.nixosModules.sops
               home-manager.nixosModules.home-manager
               {
                 nixpkgs = nixpkgsConfig;

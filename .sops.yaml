@@ -1,0 +1,7 @@
+keys:
+  - &admin_cody 881CEAC38C98647F6F660956794D748B8B8BF912
+creation_rules:
+  - path_regex: secrets/[^/]+\.(yaml|json|env|ini)$
+    key_groups:
+    - pgp:
+      - *admin_cody

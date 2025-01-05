@@ -109,14 +109,15 @@ in
     # NOTE: this is so tailscale-initrd works
     systemd.contents = {
       # TODO: consider using systemd.mount to configure this instead
+      # NOTE: `noauto` is to avoid creating dependencies.
       "/etc/fstab".text = ''
-        mainrust/initrd /initrd zfs nofail 0 2
-        /initrd/var/lib/tailscale /var/lib/tailscale auto x-systemd.requires-mounts-for=/initrd,bind,X-fstrim.notrim,x-gvfs-hide,nofail 0 2
+        mainrust/initrd /initrd zfs noauto 0 2
+        /initrd/var/lib/tailscale /var/lib/tailscale auto x-systemd.requires-mounts-for=/initrd,bind,X-fstrim.notrim,x-gvfs-hide,noauto 0 2
       '';
     };
 
-    systemd.services."tailscale".requires = [ "var-lib-tailscale.mount" ];
-    systemd.services."tailscale".after = [ "var-lib-tailscale.mount" ];
+    systemd.services.tailscaled.requires = [ "var-lib-tailscale.mount" ];
+    systemd.services.tailscaled.after = [ "var-lib-tailscale.mount" ];
 
     # TODO: encrypt tailscale & ssh host keys using TPM.
 

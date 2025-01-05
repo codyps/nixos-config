@@ -90,13 +90,46 @@ in
   networking.hostName = "arnold";
   networking.hostId = "5c794628";
 
-  systemd.network = {
-    enable = true;
-    networks."10-en.network" = {
-      networkConfig.DHCP = "ipv4";
-      matchConfig.Name = "en*";
+  systemd.network =
+    let
+      bind1-devs = [
+        "enp12s0"
+        "enp0s31f6"
+      ];
+    in
+    {
+      enable = true;
+      netdevs."10-bond1.netdev" = {
+        netdevConfig = {
+          Name = "bond1";
+          Kind = "bond";
+        };
+        bondConfig = {
+          Mode = "802.3ad";
+          MIIMonitorSec = "1s";
+          LACPTransmitRate = "fast";
+          UpDelaySec = "2s";
+          DownDelaySec = "8s";
+          TransmitHashPolicy = "layer3+4";
+        };
+      };
+      networks."10-en.network" = {
+        matchConfig = {
+          Name = bind1-devs;
+        };
+
+        networkConfig = {
+          Bond = "bond1";
+        };
+      };
+      networks."20-bond1.network" = {
+        networkConfig = {
+          DHCP = "ipv4";
+          BindCarrier = bind1-devs;
+        };
+        matchConfig.Name = "bond1";
+      };
     };
-  };
 
   time.timeZone = "America/New_York";
 

@@ -175,32 +175,32 @@ in
 
     virtualHosts."https://finch.little-moth.ts.net" = {
       extraConfig = ''
-        bind fd/5 {
-          protocols h1 h2
-	}
-        bind fdgram/7 {
-          protocols h3
-        }
+                bind fd/5 {
+                  protocols h1 h2
+        	}
+                bind fdgram/7 {
+                  protocols h3
+                }
 
-        file_server /roms/* {
-          root /tank/syncthing/Roms
-          browse {
-             reveal_symlinks
-          }
-        }
+                file_server /roms/* {
+                  root /tank/syncthing/Roms
+                  browse {
+                     reveal_symlinks
+                  }
+                }
 
-        handle_path /syncthing/* {
-          reverse_proxy http://localhost:8384 {
-              # https://docs.syncthing.net/users/reverseproxy.html
-              #header_up Host {upstream_hostport}
-              # https://docs.syncthing.net/users/faq.html#why-do-i-get-host-check-error-in-the-gui-api
-              header_up +Host "localhost"
-          }
-        }
+                handle_path /syncthing/* {
+                  reverse_proxy http://localhost:8384 {
+                      # https://docs.syncthing.net/users/reverseproxy.html
+                      #header_up Host {upstream_hostport}
+                      # https://docs.syncthing.net/users/faq.html#why-do-i-get-host-check-error-in-the-gui-api
+                      header_up +Host "localhost"
+                  }
+                }
 
-        handle {
-          abort
-        }
+                handle {
+                  abort
+                }
       '';
     };
   };

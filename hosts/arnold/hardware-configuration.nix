@@ -5,7 +5,8 @@
 
 {
   imports =
-    [ (modulesPath + "/installer/scan/not-detected.nix")
+    [
+      (modulesPath + "/installer/scan/not-detected.nix")
     ];
 
   boot.initrd.availableKernelModules = [ "xhci_pci" "ahci" "aacraid" "nvme" "firewire_ohci" "usbhid" "usb_storage" "sd_mod" "sr_mod" ];
@@ -14,23 +15,27 @@
   boot.extraModulePackages = [ ];
 
   fileSystems."/" =
-    { device = "mainrust/enc/root-tmp";
+    {
+      device = "mainrust/enc/root-tmp";
       fsType = "zfs";
     };
 
   fileSystems."/persist" =
-    { device = "mainrust/enc/persist";
+    {
+      device = "mainrust/enc/persist";
       fsType = "zfs";
     };
 
   fileSystems."/boot.d/0" =
-    { device = "/dev/disk/by-uuid/6EC1-2C8B";
+    {
+      device = "/dev/disk/by-uuid/6EC1-2C8B";
       fsType = "vfat";
       options = [ "fmask=0022" "dmask=0022" ];
     };
 
   fileSystems."/boot.d/1" =
-    { device = "/dev/disk/by-uuid/6F1B-13E7";
+    {
+      device = "/dev/disk/by-uuid/6F1B-13E7";
       fsType = "vfat";
       options = [ "fmask=0022" "dmask=0022" ];
     };

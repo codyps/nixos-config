@@ -111,9 +111,12 @@ in
       # TODO: consider using systemd.mount to configure this instead
       "/etc/fstab".text = ''
         mainrust/initrd /initrd zfs nofail 0 2
-        /initrd/var/lib/tailscale /var/lib/tailscale auto x-systemd.requires-mounts-for=/initrd,bind,X-fstrim.notrim,x-gvfs-hide 0 2
+        /initrd/var/lib/tailscale /var/lib/tailscale auto x-systemd.requires-mounts-for=/initrd,bind,X-fstrim.notrim,x-gvfs-hide,nofail 0 2
       '';
     };
+
+    systemd.services."tailscale".requires = [ "var-lib-tailscale.mount" ];
+    systemd.services."tailscale".after = [ "var-lib-tailscale.mount" ];
 
     # TODO: encrypt tailscale & ssh host keys using TPM.
 

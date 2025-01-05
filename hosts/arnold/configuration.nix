@@ -114,6 +114,15 @@ in
           TransmitHashPolicy = "layer3+4";
         };
       };
+      links."10-bond1.link" = {
+        matchConfig = {
+          Name = "bond1";
+        };
+
+        linkConfig = {
+          MACAddressPolicy = "none";
+        };
+      };
       networks."10-en.network" = {
         matchConfig = {
           Name = bind1-devs;

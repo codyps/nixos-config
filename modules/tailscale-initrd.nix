@@ -42,9 +42,10 @@ in
     #systemd.groups.systemd-resolve = {};
     #systemd.contents."/etc/systemd/resolved.conf".source = config.environment.etc."systemd/resolved.conf".source;
     #systemd.storePaths = ["${config.boot.initrd.systemd.package}/lib/systemd/systemd-resolved"];
-    #systemd.services.systemd-resolved = {
-    #  wantedBy = ["initrd.target"];
-    #  serviceConfig.ExecStartPre = "-+/bin/ln -s /run/systemd/resolve/resolv.conf /etc/resolv.conf";
-    #};
+    systemd.services.systemd-resolved = {
+      # Default is "sysinit.target", which is too late (blocks tailscaled)
+      wantedBy = lib.mkForce ["initrd.target"];
+      serviceConfig.ExecStartPre = "-+/bin/ln -s /run/systemd/resolve/resolv.conf /etc/resolv.conf";
+    };
   };
 }

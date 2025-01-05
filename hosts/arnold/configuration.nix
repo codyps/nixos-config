@@ -71,15 +71,17 @@ in
     # TODO: match required modules
     kernelModules = [ "usb_storage" "igc" "tpm_crb" "zfs" "uas" "nvme" "bonding" ];
 
-    systemd.services."zfs-import-mainrust".requiredBy = [ "initrd.mount" ];
+    systemd.services."zfs-import-mainrust".wantedBy = [ "initrd.mount" ];
     systemd.services."zfs-import-mainrust".before = [ "initrd.mount" ];
 
+    # FIXME: this currently blocks `tailscale-initrd` from starting, so we just
+    # load tailscale _after_ we load this key right now. Not very useful.
     systemd.services."zfs-load-key-mainrust-enc" = {
       description = "Load ZFS encryption key for mainrust/enc";
-      requiredBy = [ "sysroot.mount" "create-needed-for-boot-dirs.service" ];
-      before = [ "sysroot.mount" "shutdown.target" "create-needed-for-boot-dirs.service" ];
+      wantedBy = [ "sysroot.mount" "create-needed-for-boot-dirs.service" "rollback.service" ];
+      before = [ "sysroot.mount" "shutdown.target" "create-needed-for-boot-dirs.service" "rollback.service" ];
       after = [ "zfs-import-mainrust.service" "systemd-ask-password-console.service" ];
-      requires = [ "zfs-import-mainrust.service" ];
+      wants = [ "zfs-import-mainrust.service" ];
       conflicts = [ "shutdown.target" ];
       script = ''
         success=false
@@ -108,8 +110,8 @@ in
     systemd.contents = {
       # TODO: consider using systemd.mount to configure this instead
       "/etc/fstab".text = ''
-        mainrust/initrd /initrd zfs defaults 0 0
-        /initrd/var/lib/tailscale /var/lib/tailscale auto x-systemd.requires-mounts-for=/initrd,bind,X-fstrim.notrim,x-gvfs-hide 0 0
+        mainrust/initrd /initrd zfs nofail 0 2
+        /initrd/var/lib/tailscale /var/lib/tailscale auto x-systemd.requires-mounts-for=/initrd,bind,X-fstrim.notrim,x-gvfs-hide 0 2
       '';
     };
 

@@ -109,6 +109,27 @@
             ];
           };
 
+          # local storage
+          arnold = nixosSystem {
+            system = "x86_64-linux";
+            specialArgs = { inherit home-manager self; };
+            modules = [
+              ethereum-nix.nixosModules.default
+              ./hosts/arnold/configuration.nix
+              ./nixos/common.nix
+              impermanence.nixosModules.impermanence
+              home-manager.nixosModules.home-manager
+              {
+                nixpkgs = nixpkgsConfig;
+                home-manager.useGlobalPkgs = true;
+                home-manager.useUserPackages = true;
+                home-manager.users.cody.imports = [
+                  ./home-manager/home.nix
+                ];
+              }
+            ];
+          };
+
           # router
           ward = nixosSystem {
             system = "x86_64-linux";

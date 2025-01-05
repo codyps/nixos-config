@@ -1,10 +1,12 @@
-{ config, lib, pkgs, ... }: let
+{ config, lib, pkgs, ... }:
+let
   cfg = config.services.tailscale;
-in {
+in
+{
   boot.initrd = {
     systemd.packages = [ cfg.package ];
-    systemd.initrdBin = [pkgs.iptables pkgs.iproute2 cfg.package];
-    availableKernelModules = ["tun" "nft_chain_nat"];
+    systemd.initrdBin = [ pkgs.iptables pkgs.iproute2 cfg.package ];
+    availableKernelModules = [ "tun" "nft_chain_nat" ];
 
     systemd.services.tailscaled = {
       wantedBy = [ "initrd.target" ];

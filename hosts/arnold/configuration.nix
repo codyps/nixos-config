@@ -69,24 +69,27 @@ in
     availableKernelModules = [ "zfs" ];
 
     # TODO: match required modules
-    kernelModules = [ "usb_storage" "igc" "tpm_crb" "zfs" "uas" "nvme" ];
+    kernelModules = [ "usb_storage" "igc" "tpm_crb" "zfs" "uas" "nvme" "bonding" ];
 
     systemd.services."zfs-import-mainrust".requiredBy = [ "initrd.mount" ];
     systemd.services."zfs-import-mainrust".before = [ "initrd.mount" ];
 
     systemd.services."zfs-load-key-mainrust-enc" = {
       description = "Load ZFS encryption key for mainrust/enc";
-      requiredBy = [ "sysroot.mount" ];
-      before = [ "sysroot.mount" "shutdown.target" ];
-      after = [ "zfs-import-mainrust.service"  "systemd-ask-password-console.service" ];
+      requiredBy = [ "sysroot.mount" "create-needed-for-boot-dirs.service" ];
+      before = [ "sysroot.mount" "shutdown.target" "create-needed-for-boot-dirs.service" ];
+      after = [ "zfs-import-mainrust.service" "systemd-ask-password-console.service" ];
       requires = [ "zfs-import-mainrust.service" ];
       conflicts = [ "shutdown.target" ];
       script = ''
         success=false
-        while ! $success; do
+        tries=4
+        while ! $success && [[ $tries -gt 0 ]] ; do
           systemd-ask-password --timeout 0 "Enter ZFS encryption key for mainrust/enc:" | zfs load-key "mainrust/enc" \
-           && success=true
+           && success=true || tries=$((tries-1))
         done
+
+        $success
       '';
 
       serviceConfig = {
@@ -99,10 +102,7 @@ in
       };
     };
 
-    # FIXME: currently trying to determine how to get the pool imported before we try to mount the filesystems in the initrd
     supportedFilesystems.zfs = true;
-
-    # TODO: configure zfs load-key for rootfs
 
     # NOTE: this is so tailscale-initrd works
     systemd.contents = {

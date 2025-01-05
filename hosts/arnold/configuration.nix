@@ -103,6 +103,7 @@ in
         netdevConfig = {
           Name = "bond1";
           Kind = "bond";
+          MACAddress = "none";
         };
         bondConfig = {
           Mode = "802.3ad";

@@ -49,6 +49,9 @@ in
     ];
   };
 
+  # FIXME: if we disable this, then everything breaks becasue we don't every load keys. We'll have to insert our own key loading
+  boot.zfs.requestEncryptionCredentials = false;
+
   boot.initrd = {
     systemd.enable = true;
     systemd.network = config.systemd.network;
@@ -63,8 +66,36 @@ in
       };
     };
 
+    availableKernelModules = [ "zfs" ];
+
     # TODO: match required modules
     kernelModules = [ "usb_storage" "igc" "tpm_crb" "zfs" "uas" "nvme" ];
+
+    systemd.services."zfs-import-mainrust".requiredBy = [ "initrd.mount" ];
+    systemd.services."zfs-import-mainrust".before = [ "initrd.mount" ];
+
+    systemd.services."zfs-load-key-mainrust-enc" = {
+      description = "Load ZFS encryption key for mainrust/enc";
+      requiredBy = [ "sysroot.mount" ];
+      before = [ "sysroot.mount" ];
+      after = [ "zfs-import-mainrust.service" ];
+      requires = [ "zfs-import-mainrust.service" ];
+      script = ''
+        success=false
+        while ! $success; do
+          systemd-ask-password --timeout 0 --echo "Enter ZFS encryption key for mainrust/enc" | zfs load-key "mainrust/enc" \
+           && success=true
+        done
+      '';
+
+      serviceConfig = {
+        Type = "oneshot";
+        RemainAfterExit = true;
+      };
+    };
+
+    # FIXME: currently trying to determine how to get the pool imported before we try to mount the filesystems in the initrd
+    supportedFilesystems.zfs = true;
 
     # TODO: configure zfs load-key for rootfs
 
@@ -119,7 +150,7 @@ in
     in
     {
       enable = true;
-      netdevs."10-bond1.netdev" = {
+      netdevs."10-bond1" = {
         netdevConfig = {
           Name = "bond1";
           Kind = "bond";
@@ -134,16 +165,16 @@ in
           TransmitHashPolicy = "layer3+4";
         };
       };
-      links."10-bond1.link" = {
+      links."10-bond1" = {
         matchConfig = {
-          Name = "bond1";
+          OriginalName = "bond1";
         };
 
         linkConfig = {
           MACAddressPolicy = "none";
         };
       };
-      networks."10-en.network" = {
+      networks."10-en" = {
         matchConfig = {
           Name = bind1-devs;
         };
@@ -152,7 +183,7 @@ in
           Bond = "bond1";
         };
       };
-      networks."20-bond1.network" = {
+      networks."20-bond1" = {
         networkConfig = {
           DHCP = "ipv4";
           BindCarrier = bind1-devs;

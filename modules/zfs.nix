@@ -27,8 +27,8 @@ in
         ];
       };
 
-      boot.initrd.extraFiles."/etc/zfs/zfs-list.cache".source = /persist/etc/zfs/zfs-list.cache;
-      boot.initrd.extraFiles."/etc/zfs/zpool.cache".source = /persist/etc/zfs/zpool.cache;
+      #boot.initrd.extraFiles."/etc/zfs/zfs-list.cache".source = /persist/etc/zfs/zfs-list.cache;
+      #boot.initrd.extraFiles."/etc/zfs/zpool.cache".source = /persist/etc/zfs/zpool.cache;
 
       services.zfs.zed.settings.PATH = lib.mkForce (lib.makeBinPath [
         pkgs.diffutils

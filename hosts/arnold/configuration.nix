@@ -16,17 +16,18 @@ in
   boot.loader.systemd-boot.extraInstallCommands = ''
     ${pkgs.rsync}/bin/rsync -ahiv --delete /boot.d/0/ /boot.d/1/
   '';
+  # TODO: avoid overwriting the random-seed if we wrote it to the alternate boot partition
   # TODO: tweak systemd-boot-random-seed.service and others to use the other
   # boot partition too. Consider hooking bootctl.
   # TODO: modify efibootmgr to use the other boot partition too.
 
+  # FIXME: does this actually work? complaints appear.
   boot.kernelParams = [ "ip=dhcp" ];
   boot.loader.systemd-boot.enable = true;
   boot.loader.efi.canTouchEfiVariables = true;
 
   systemd.watchdog.runtimeTime = "30s";
 
-  # hashedPasswordFile reads from this
   fileSystems."/persist".neededForBoot = true;
 
   p.zfs.root-impermenance = {
@@ -86,7 +87,7 @@ in
   networking.firewall.trustedInterfaces = [ "tailscale0" ];
   networking.firewall.allowedTCPPorts = [ 80 443 ];
 
-  networking.hostName = "ward";
+  networking.hostName = "arnold";
   networking.hostId = "5c794628";
 
   systemd.network = {
@@ -95,12 +96,7 @@ in
       networkConfig.DHCP = "ipv4";
       matchConfig.Name = "en*";
     };
-    wait-online.anyInterface = true;
   };
-
-  # https://github.com/quic-go/quic-go/wiki/UDP-Buffer-Sizes
-  boot.kernel.sysctl."net.core.rmem_max" = 7500000;
-  boot.kernel.sysctl."net.core.wmem_max" = 7500000;
 
   time.timeZone = "America/New_York";
 

@@ -61,5 +61,12 @@ in
 
   services.tailscale.enable = true;
 
+  # https://github.com/quic-go/quic-go/wiki/UDP-Buffer-Sizes
+  boot.kernel.sysctl."net.core.rmem_max" = 7500000;
+  boot.kernel.sysctl."net.core.wmem_max" = 7500000;
+
+  # wait-online is busted all the time without this, especially when using tailscale
+  systemd.network.wait-online.anyInterface = true;
+
   system.extraSystemBuilderCmds = "ln -s ${./.} $out/full-config";
 }

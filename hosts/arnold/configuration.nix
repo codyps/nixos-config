@@ -31,7 +31,7 @@ in
 
   p.zfs.root-impermenance = {
     enable = true;
-    rollback-target = "mainrust/env/root-tmp@blank";
+    rollback-target = "mainrust/enc/root-tmp@blank";
   };
 
   environment.persistence."/persist" = {

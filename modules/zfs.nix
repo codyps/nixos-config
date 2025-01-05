@@ -27,6 +27,9 @@ in
         ];
       };
 
+      # mount generators run _early_, ensure we have the zfs cache files for that.
+      fileSystems."/etc/zfs/zfs-list.cache".neededForBoot = true;
+
       #boot.initrd.extraFiles."/etc/zfs/zfs-list.cache".source = /persist/etc/zfs/zfs-list.cache;
       #boot.initrd.extraFiles."/etc/zfs/zpool.cache".source = /persist/etc/zfs/zpool.cache;
 

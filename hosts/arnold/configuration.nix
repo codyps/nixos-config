@@ -77,13 +77,14 @@ in
     systemd.services."zfs-load-key-mainrust-enc" = {
       description = "Load ZFS encryption key for mainrust/enc";
       requiredBy = [ "sysroot.mount" ];
-      before = [ "sysroot.mount" ];
-      after = [ "zfs-import-mainrust.service" ];
+      before = [ "sysroot.mount" "shutdown.target" ];
+      after = [ "zfs-import-mainrust.service"  "systemd-ask-password-console.service" ];
       requires = [ "zfs-import-mainrust.service" ];
+      conflicts = [ "shutdown.target" ];
       script = ''
         success=false
         while ! $success; do
-          systemd-ask-password --timeout 0 --echo "Enter ZFS encryption key for mainrust/enc" | zfs load-key "mainrust/enc" \
+          systemd-ask-password --timeout 0 "Enter ZFS encryption key for mainrust/enc:" | zfs load-key "mainrust/enc" \
            && success=true
         done
       '';
@@ -91,6 +92,10 @@ in
       serviceConfig = {
         Type = "oneshot";
         RemainAfterExit = true;
+      };
+
+      unitConfig = {
+        DefaultDependencies = false;
       };
     };
 

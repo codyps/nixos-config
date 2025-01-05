@@ -8,6 +8,7 @@ in
     [
       ./hardware-configuration.nix
       ../../modules/zfs.nix
+      ../../modules/tailscale-initrd.nix
     ];
 
   boot.loader.efi.efiSysMountPoint = "/boot.d/0";
@@ -52,6 +53,7 @@ in
 
   boot.initrd = {
     systemd.enable = true;
+    systemd.network = config.systemd.network;
 
     network = {
       enable = true;
@@ -67,6 +69,30 @@ in
     kernelModules = [ "usb_storage" "igc" "tpm_crb" "zfs" "uas" "nvme" ];
 
     # TODO: configure zfs load-key for rootfs
+
+    # NOTE: this is so tailscale-initrd works
+    systemd.contents = {
+      # TODO: consider using systemd.mount to configure this instead
+      "/etc/fstab".text = ''
+        mainrust/initrd /initrd zfs defaults 0 0
+        /initrd/var/lib/tailscale /var/lib/tailscale auto x-systemd.requires-mounts-for=/initrd,bind,X-fstrim.notrim,x-gvfs-hide 0 0
+      '';
+      "/etc/tmpfiles.d/50-ssh-host-keys.conf".text = ''
+        C /etc/ssh/ssh_host_ed25519_key 0600 - - - /tpm2bag/etc/ssh/ssh_host_ed25519_key
+        C /etc/ssh/ssh_host_rsa_key 0600 - - - /tpm2bag/etc/ssh/ssh_host_rsa_key
+      '';
+    };
+
+    # TODO: encrypt tailscale & ssh host keys using TPM.
+
+    # TODO: move ssh host keys for initrd into same fs as tailscale auth info
+    #systemd.contents = {
+    #  "/etc/tmpfiles.d/50-ssh-host-keys.conf".text = ''
+    #    C /etc/ssh/ssh_host_ed25519_key 0600 - - - /initrd/etc/ssh/ssh_host_ed25519_key
+    #    C /etc/ssh/ssh_host_rsa_key 0600 - - - /initrd/etc/ssh/ssh_host_rsa_key
+    #  '';
+    #};
+    #systemd.services.systemd-tmpfiles-setup.before = ["sshd.service"];
   };
 
   programs.nix-ld.enable = true;
@@ -172,7 +198,7 @@ in
   users.mutableUsers = false;
   users.users.cody = {
     isNormalUser = true;
-    extraGroups = [ "wheel" ];
+    extraGroups = [ "wheel" "tss" ];
     packages = with pkgs; [
       firefox
     ];
@@ -215,6 +241,12 @@ in
   };
 
   services.tailscale.enable = true;
+
+  security.tpm2 = {
+    enable = true;
+    pkcs11.enable = true;
+    tctiEnvironment.enable = true;
+  };
 
   system.stateVersion = "24.11";
 }

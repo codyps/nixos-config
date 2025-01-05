@@ -77,10 +77,6 @@ in
         mainrust/initrd /initrd zfs defaults 0 0
         /initrd/var/lib/tailscale /var/lib/tailscale auto x-systemd.requires-mounts-for=/initrd,bind,X-fstrim.notrim,x-gvfs-hide 0 0
       '';
-      "/etc/tmpfiles.d/50-ssh-host-keys.conf".text = ''
-        C /etc/ssh/ssh_host_ed25519_key 0600 - - - /tpm2bag/etc/ssh/ssh_host_ed25519_key
-        C /etc/ssh/ssh_host_rsa_key 0600 - - - /tpm2bag/etc/ssh/ssh_host_rsa_key
-      '';
     };
 
     # TODO: encrypt tailscale & ssh host keys using TPM.

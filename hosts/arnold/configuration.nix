@@ -62,7 +62,7 @@ in
       ssh = {
         enable = true;
         authorizedKeys = config.users.users.root.openssh.authorizedKeys.keys;
-        # ssh-keygen -t ed25519 -N "" -f /etc/secrets/initrd/ssh_host_ed25519_key
+        # ssh-keygen -t ed25519 -N "" -f /etc/secret/initrd/ssh_host_ed25519_key
         hostKeys = [ "/persist/etc/secret/initrd/ssh_host_ed25519_key" ];
       };
     };
@@ -194,6 +194,8 @@ in
 
         networkConfig = {
           Bond = "bond1";
+          LLDP = true;
+          EmitLLDP = true;
         };
       };
       networks."20-bond1" = {
@@ -324,7 +326,6 @@ in
 
   services.samba = {
     enable = true;
-    securityType = "user";
     openFirewall = true;
     settings = {
       global = {
@@ -335,7 +336,7 @@ in
         #"use sendfile" = "yes";
         #"max protocol" = "smb2";
         # note: localhost is the ipv6 localhost ::1
-        "hosts allow" = "10. 100. 192.168.0. 127.0.0.1 localhost";
+        "hosts allow" = "10. 100. 192.168. 127.0.0.1 localhost";
         "hosts deny" = "0.0.0.0/0";
         "guest account" = "nobody";
         "map to guest" = "bad user";
@@ -366,11 +367,193 @@ in
         "valid users" = "cody";
         "public" = "no";
         "writeable" = "yes";
-        "force user" = "username";
         "fruit:aapl" = "yes";
         "fruit:time machine" = "yes";
         "vfs objects" = "catia fruit streams_xattr";
       };
+    };
+  };
+
+  systemd.services.caddy = {
+    serviceConfig = {
+      EnvironmentFile = "/persist/etc/default/caddy";
+      RuntimeDirectory = "caddy";
+    };
+  };
+
+  services.caddy = {
+    enable = true;
+    package = pkgs.caddy.withPlugins {
+      plugins = [
+        "github.com/caddy-dns/cloudflare@v0.0.0-20240703190432-89f16b99c18e"
+        "github.com/caddyserver/cache-handler@v0.14.0"
+        "github.com/darkweak/storages/badger/caddy@v0.0.10"
+        "github.com/WeidiDeng/caddy-cloudflare-ip@v0.0.0-20231130002422-f53b62aa13cb"
+      ];
+      hash = "sha256-8kGbVao2yNTu7LHrnDrmHvqetWpXa70NIJ/LgM7l7lU=";
+    };
+
+    globalConfig = ''
+      cache
+
+      acme_dns cloudflare {env.CLOUDFLARE_API_TOKEN}
+
+      servers {
+        trusted_proxies cloudflare {
+          interval 12h
+          timeout 15s
+        }
+      }
+    '';
+
+    virtualHosts."*.arnold.einic.org, arnold.einic.org" = {
+      extraConfig = ''
+        @free-games-claimer host free-games-claimer.arnold.einic.org
+        route @free-games-claimer {
+          import /persist/etc/secret/caddy-auth
+          reverse_proxy :6080 {
+                  header_up +Host "localhost"
+          }
+        }
+
+        @rslsync host rslsync.arnold.einic.org
+        route @rslsync {
+          import /persist/etc/secret/caddy-auth
+          reverse_proxy :8389
+        }
+
+        @minio-console host minio-console.arnold.einic.org
+        route @minio-console {
+          import /persist/etc/secret/caddy-auth
+          reverse_proxy :9198
+        }
+
+        @minio host minio.arnold.einic.org
+        route @minio {
+          import /persist/etc/secret/caddy-auth
+          reverse_proxy :9199
+        }
+
+        @syncthing host syncthing.arnold.einic.org
+        route @syncthing {
+          import /persist/etc/secret/caddy-auth
+
+          reverse_proxy :8384 {
+                  # https://docs.syncthing.net/users/faq.html#why-do-i-get-host-check-error-in-the-gui-api
+                  header_up +Host "localhost"
+          }
+        }
+
+        @sonarr host sonarr.arnold.einic.org
+        route @sonarr {
+                reverse_proxy :8989
+        }
+
+        @komga host komga.arnold.einic.org
+        route @komga {
+                reverse_proxy [::1]:25600
+        }
+
+        @jellyfin host jellyfin.arnold.einic.org
+        route @jellyfin {
+                reverse_proxy :8096 {
+                        # https://github.com/jellyfin/jellyfin/issues/5575
+                        header_up +Host "localhost"
+                }
+        }
+
+        @radarr host radarr.arnold.einic.org
+        route @radarr {
+                reverse_proxy :7878
+        }
+
+        @arnold host arnold.einic.org
+        route @arnold {
+                @secure {
+                        not path /~*
+                        #path /tank/*
+                        #path /games/*
+                        not path /audiobooks
+                        not path /audiobooks/*
+                        not path /switch
+                        not path /switch/*
+                }
+
+                @switch {
+                        path /switch
+                        path /switch/*
+                }
+
+                import /persist/etc/secret/caddy-auth-2
+
+                redir /jackett /jackett/
+                reverse_proxy /jackett/* http://127.0.0.1:9117
+
+                redir /tank /tank/
+                handle_path /tank/* {
+                        file_server browse {
+                                root /tank
+                        }
+                }
+
+                redir /switch /switch/
+                handle_path /switch/* {
+                        file_server browse {
+                                root /tank/DATA/games/console/nintendo-switch
+                        }
+                }
+
+                redir /audiobooks /audiobooks/
+                handle_path /audiobooks/* {
+                        file_server browse {
+                                root /tank/DATA/audiobooks
+                        }
+                }
+
+                redir /games /games/
+                handle_path /games/* {
+                        file_server browse {
+                                root /tank/DATA/games
+                        }
+                }
+
+                @user_html {
+                        path_regexp user '^/~([^/]+)'
+                }
+
+                route @user_html {
+                        uri strip_prefix {re.user.0}
+                        file_server browse {
+                                root /home/{re.user.1}/public_html/
+                        }
+                }
+
+                root * /srv/http
+                templates
+                file_server
+        }
+
+        root * /srv/http
+
+        encode zstd gzip
+
+        log {
+                output file /var/log/caddy/access.log
+        }
+      '';
+    };
+  };
+
+  services.avahi = {
+    enable = true;
+    nssmdns4 = true;
+    publish = {
+      enable = true;
+      addresses = true;
+      domain = true;
+      hinfo = true;
+      userServices = true;
+      workstation = true;
     };
   };
 

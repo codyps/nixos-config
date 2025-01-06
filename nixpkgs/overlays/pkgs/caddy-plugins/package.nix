@@ -4,7 +4,7 @@
 , gnused
 , installShellFiles
 , nixosTests
-, caddy
+, caddy-plugins
 , testers
 , stdenv
 ,
@@ -13,7 +13,7 @@ let
   attrsToModule = map (plugin: plugin.repo);
   attrsToVersionedModule = map ({ repo, version, ... }: lib.escapeShellArg "${repo}@${version}");
 
-  pname = "caddy";
+  pname = "caddy-plugins";
   version = "2.8.4";
 
   dist = fetchFromGitHub {
@@ -102,7 +102,7 @@ buildGoModule {
       ,
       }:
       buildGoModule {
-        pname = "${caddy.pname}-with-plugins";
+        pname = "${caddy-plugins.pname}-with-plugins";
 
         inherit
           version
@@ -141,10 +141,10 @@ buildGoModule {
         inherit vendorHash;
       };
     tests = {
-      inherit (nixosTests) caddy;
+      inherit (nixosTests) caddy-plugins;
       version = testers.testVersion {
-        command = "${caddy}/bin/caddy version";
-        package = caddy;
+        command = "${caddy-plugins}/bin/caddy version";
+        package = caddy-plugins;
       };
     };
   };

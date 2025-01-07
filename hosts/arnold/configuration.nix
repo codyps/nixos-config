@@ -326,6 +326,13 @@ in
 
   services.samba = {
     enable = true;
+    # We need MDNS for timemachine, and plain samba doens't include it.
+    # note: theoretically, `pkgs.samba4Full` provides this, but it's not cached
+    # so don't bother. Need to set up hydra or similar to auto build & cache
+    # this.
+    package = pkgs.samba4.override {
+      enableMDNS = true;
+    };
     openFirewall = true;
     settings = {
       global = {
@@ -333,11 +340,28 @@ in
         "server string" = "arnold";
         "netbios name" = "arnold";
         "security" = "user";
+
+	"disable spoolss" = "Yes";
+	"dns proxy" = "No";
+	"load printers" = "No";
+	"logging" = "file";
+	"max log size" = "5120";
+	"printcap name" = "/dev/null";
+	"registry shares" = "Yes";
+	"restrict anonymous" = "2";
+	"server multi channel support" = "No";
+	"winbind request timeout" = "2";
+	"fruit:zero_file_id" = "False";
+	"fruit:nfs_aces" = "False";
+	"create mask" = "0664";
+	"directory mask" = "0775";
+
+        /*
         #"use sendfile" = "yes";
         #"max protocol" = "smb2";
         # note: localhost is the ipv6 localhost ::1
-        "hosts allow" = "10. 100. 192.168. 127.0.0.1 localhost";
-        "hosts deny" = "0.0.0.0/0";
+        #"hosts allow" = "10. 100. 192.168. 127.0.0.1 localhost";
+        #"hosts deny" = "0.0.0.0/0";
         "guest account" = "nobody";
         "map to guest" = "bad user";
 
@@ -345,31 +369,90 @@ in
         "server signing" = "mandatory";
         "server smb encrypt" = "required";
         "restrict anonymous" = "2";
+        */
 
-        "fruit:metadata" = "stream";
-        "fruit:resource" = "stream";
-        # requires catia
-        "fruit:encoding" = "native";
+        #"vfs objects" = "catia fruit streams_xattr";
 
-        "fruit:veto_appledouble" = "no";
-        "fruit:posix_rename" = "yes";
-        "fruit:zero_file_id" = "yes";
+        #"fruit:metadata" = "stream";
+        #"fruit:resource" = "stream";
+        ## requires catia
+        #"fruit:encoding" = "native";
 
-        "domain master" = "yes";
+        ##"fruit:aapl" = "yes";
+        ##"fruit:veto_appledouble" = "no";
+        ##"fruit:posix_rename" = "yes";
+        #"fruit:zero_file_id" = "False";
+
+        #"domain master" = "yes";
+        #"guest ok" = "no";
+        #"create mask" = "0664";
+        #"directory mask" = "0775";
+
+
+        /*
+	"bind interfaces only" = "Yes";
+	"disable spoolss" = "Yes";
+	"dns proxy" = "No";
+	"load printers" = "No";
+	"logging" = "file";
+	"max log size" = "5120";
+	"passdb backend" = "tdbsam:/var/run/samba-cache/private/passdb.tdb";
+	"printcap name" = "/dev/null";
+	"registry shares" = "Yes";
+	"restrict anonymous" = "2";
+	"server multi channel support" = "No";
+	"server string" = "TrueNAS Server";
+	"winbind request timeout" = "2";
+	"idmap config * : range" = "90000001 - 100000000";
+	"fss:prune stale" = "True";
+	"rpc_daemon:fssd" = "fork";
+	"fruit:zero_file_id" = "False";
+	"fruit:nfs_aces" = "False";
+	"idmap config * : backend" = "tdb";
+	"create mask" = "0664";
+	"directory mask" = "0775";
+        */
       };
       "tank" = {
+	"ea support" = "No";
         "path" = "/tank";
         "writable" = "yes";
         "valid users" = "cody";
+        "browseable" = "yes";
       };
       "timemachine" = {
         "path" = "/tank/backup/timemachine4";
         "valid users" = "cody";
-        "public" = "no";
+        /*
+        "guest ok" = "no";
         "writeable" = "yes";
-        "fruit:aapl" = "yes";
         "fruit:time machine" = "yes";
-        "vfs objects" = "catia fruit streams_xattr";
+        "browseable" = "yes";
+        "fruit:aapl" = "yes";
+	"durable handles" = "yes";
+	"kernel oplocks" = "no";
+	"kernel share modes" = "no";
+	"posix locking" = "no";
+        */
+
+	"ea support" = "No";
+	"posix locking" = "No";
+	"read only" = "No";
+	"smbd max xattr size" = "2097152";
+	"vfs objects" = "catia fruit streams_xattr";
+        #"zfs_core:zfs_auto_create" = "true";
+        #"tn:vuid" = "e8f2fd79-7e7e-4ecb-adb3-d8517db947cb";
+	"fruit:time machine max size" = "0";
+	"fruit:time machine" = "True";
+	"fruit:resource" = "stream";
+	"fruit:metadata" = "stream";
+        "nfs4:chown" = "True";
+        #"tn:home" = "False";
+        #"tn:path_suffix" = "%U";
+        #"tn:purpose" = "ENHANCED_TIMEMACHINE";
+
+
+
       };
     };
   };
@@ -390,7 +473,7 @@ in
         "github.com/darkweak/storages/badger/caddy@v0.0.10"
         "github.com/WeidiDeng/caddy-cloudflare-ip@v0.0.0-20231130002422-f53b62aa13cb"
       ];
-      hash = "sha256-8kGbVao2yNTu7LHrnDrmHvqetWpXa70NIJ/LgM7l7lU=";
+      hash = "sha256-m6SVqy9ks4mvdcgqs+YD6MeE98WjGga25zbrOjPBMKs=";
     };
 
     globalConfig = ''
@@ -546,6 +629,7 @@ in
 
   services.avahi = {
     enable = true;
+    openFirewall = true;
     nssmdns4 = true;
     publish = {
       enable = true;
@@ -554,6 +638,19 @@ in
       hinfo = true;
       userServices = true;
       workstation = true;
+    };
+    extraServiceFiles = {
+      smb = ''
+        <?xml version="1.0" standalone='no'?><!--*-nxml-*-->
+        <!DOCTYPE service-group SYSTEM "avahi-service.dtd">
+        <service-group>
+          <name replace-wildcards="yes">%h</name>
+          <service>
+            <type>_smb._tcp</type>
+            <port>445</port>
+          </service>
+        </service-group>
+      '';
     };
   };
 

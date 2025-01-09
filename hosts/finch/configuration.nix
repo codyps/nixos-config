@@ -34,10 +34,6 @@ in
     rollback-target = "rpool/local/root@blank";
   };
 
-  swapDevices = [{
-    device = "/dev/rpool/local/swap";
-  }];
-
   fileSystems."/persist".neededForBoot = true;
 
   environment.persistence."/persist" = {
@@ -234,7 +230,7 @@ in
       # fdgram/6
       "[::]:443"
       # fdgram/7
-      "100.112.195.103:443"
+      #"100.112.195.103:443"
     ];
     socketConfig = {
       BindIPv6Only = "both";
@@ -393,7 +389,8 @@ in
     in
     {
       serviceConfig = {
-        type = "oneshot";
+        Type = lib.mkForce "oneshot";
+        Restart = lib.mkForce "on-failure";
       };
       after = mounts;
       requires = mounts;

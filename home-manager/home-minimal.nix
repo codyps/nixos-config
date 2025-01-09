@@ -230,6 +230,10 @@ in
     };
     Unit = {
       After = [ "network.target" ];
+      X-Restart-Triggers = [
+        "${pkgs.atuin}"
+        "${home.file.".config/atuin/config.toml".source}"
+      ];
     };
   };
 

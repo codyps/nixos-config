@@ -2,6 +2,7 @@
 let
   ssh-auth = (import ../../nixos/ssh-auth.nix);
   authorizedKeys = ssh-auth.authorizedKeys;
+  komgaPort = 10100;
 in
 {
   imports =
@@ -9,6 +10,7 @@ in
       ./hardware-configuration.nix
       ../../modules/zfs.nix
       ../../modules/tailscale-initrd.nix
+      ../../modules/bind-localhost-only.nix
     ];
 
   boot.loader.efi.efiSysMountPoint = "/boot.d/0";
@@ -45,6 +47,7 @@ in
       "/var/lib/systemd/coredump"
       "/var/lib/audiobookshelf"
       "/var/lib/samba"
+      "/var/lib/komga"
       "/etc/NetworkManager/system-connections"
       { directory = "/var/lib/colord"; user = "colord"; group = "colord"; mode = "u=rwx,g=rx,o="; }
     ];
@@ -490,6 +493,8 @@ in
     '';
 
     virtualHosts."*.arnold.einic.org, arnold.einic.org" = {
+      # NOTE: nixos can't handle virtualHosts with multiple hosts, so we have to set logFormat manually
+      logFormat = "output file /var/log/caddy/arnold.einic.org.log";
       extraConfig = ''
         @free-games-claimer host free-games-claimer.arnold.einic.org
         route @free-games-claimer {
@@ -534,7 +539,7 @@ in
 
         @komga host komga.arnold.einic.org
         route @komga {
-                reverse_proxy [::1]:25600
+                reverse_proxy 127.0.0.1:${toString komgaPort}
         }
 
         @jellyfin host jellyfin.arnold.einic.org
@@ -619,10 +624,6 @@ in
         root * /srv/http
 
         encode zstd gzip
-
-        log {
-                output file /var/log/caddy/access.log
-        }
       '';
     };
   };
@@ -651,6 +652,22 @@ in
           </service>
         </service-group>
       '';
+    };
+  };
+
+  # FIXME: nixos places the komga config in `/var/lib/komga/application.yml`,
+  # which we persist in a bind mount. This makes initial startup break because
+  # the `application.yml` gets put in place before the bind mount is executed.
+  # And generally mixing nixos created config and application db stuff is a bad
+  # idea. Look at changing the path used for the configuration file.
+  # FIXME: changing the settings doesn't trigger a restart of komga, meaning
+  # port/address changes don't take effect until a manual restart.
+  services.komga = {
+    enable = true;
+    settings = {
+      server = {
+        port = komgaPort;
+      };
     };
   };
 

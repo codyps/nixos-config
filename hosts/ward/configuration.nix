@@ -116,14 +116,14 @@ in
   systemd.services.caddy.serviceConfig.EnvironmentFile = "/persist/etc/default/caddy";
   services.caddy = {
     enable = true;
-    package = (pkgs.callPackage ../../nixpkgs/overlays/pkgs/caddy/package.nix { }).withPlugins {
-      caddyModules = [
-        { repo = "github.com/caddy-dns/cloudflare"; version = "89f16b99c18ef49c8bb470a82f895bce01cbaece"; }
-        { repo = "github.com/caddyserver/cache-handler"; version = "283ea9b5bf192ff9c98f0b848c7117367655893f"; } # v0.14.0
-        { repo = "github.com/darkweak/storages/badger/caddy"; version = "0d6842b38ab6937af5a60adcf54d8955b5bbe6fc"; } # v0.0.10
-        { repo = "github.com/WeidiDeng/caddy-cloudflare-ip"; version = "f53b62aa13cb7ad79c8b47aacc3f2f03989b67e5"; } # head of main
+    package = pkgs.caddy.withPlugins {
+      plugins = [
+        "github.com/caddy-dns/cloudflare@v0.0.0-20240703190432-89f16b99c18e"
+        "github.com/caddyserver/cache-handler@v0.14.0"
+        "github.com/darkweak/storages/badger/caddy@v0.0.10"
+        "github.com/WeidiDeng/caddy-cloudflare-ip@v0.0.0-20231130002422-f53b62aa13cb"
       ];
-      vendorHash = "sha256-1uMji7GX7VpKr/VM0XG/mh4v1jW8sW2xaiBS1ZwAUMM=";
+      hash = "sha256-m6SVqy9ks4mvdcgqs+YD6MeE98WjGga25zbrOjPBMKs=";
     };
 
     globalConfig = ''

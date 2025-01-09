@@ -232,7 +232,7 @@ in
       After = [ "network.target" ];
       X-Restart-Triggers = [
         "${pkgs.atuin}"
-        "${home.file.".config/atuin/config.toml".source}"
+        "${config.home.file.".config/atuin/config.toml".source}"
       ];
     };
   };

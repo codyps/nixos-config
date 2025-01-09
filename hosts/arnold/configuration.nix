@@ -344,20 +344,20 @@ in
         "netbios name" = "arnold";
         "security" = "user";
 
-	"disable spoolss" = "Yes";
-	"dns proxy" = "No";
-	"load printers" = "No";
-	"logging" = "file";
-	"max log size" = "5120";
-	"printcap name" = "/dev/null";
-	"registry shares" = "Yes";
-	"restrict anonymous" = "2";
-	"server multi channel support" = "No";
-	"winbind request timeout" = "2";
-	"fruit:zero_file_id" = "False";
-	"fruit:nfs_aces" = "False";
-	"create mask" = "0664";
-	"directory mask" = "0775";
+        "disable spoolss" = "Yes";
+        "dns proxy" = "No";
+        "load printers" = "No";
+        "logging" = "file";
+        "max log size" = "5120";
+        "printcap name" = "/dev/null";
+        "registry shares" = "Yes";
+        "restrict anonymous" = "2";
+        "server multi channel support" = "No";
+        "winbind request timeout" = "2";
+        "fruit:zero_file_id" = "False";
+        "fruit:nfs_aces" = "False";
+        "create mask" = "0664";
+        "directory mask" = "0775";
 
         /*
         #"use sendfile" = "yes";
@@ -393,31 +393,31 @@ in
 
 
         /*
-	"bind interfaces only" = "Yes";
-	"disable spoolss" = "Yes";
-	"dns proxy" = "No";
-	"load printers" = "No";
-	"logging" = "file";
-	"max log size" = "5120";
-	"passdb backend" = "tdbsam:/var/run/samba-cache/private/passdb.tdb";
-	"printcap name" = "/dev/null";
-	"registry shares" = "Yes";
-	"restrict anonymous" = "2";
-	"server multi channel support" = "No";
-	"server string" = "TrueNAS Server";
-	"winbind request timeout" = "2";
-	"idmap config * : range" = "90000001 - 100000000";
-	"fss:prune stale" = "True";
-	"rpc_daemon:fssd" = "fork";
-	"fruit:zero_file_id" = "False";
-	"fruit:nfs_aces" = "False";
-	"idmap config * : backend" = "tdb";
-	"create mask" = "0664";
-	"directory mask" = "0775";
+           	"bind interfaces only" = "Yes";
+           	"disable spoolss" = "Yes";
+           	"dns proxy" = "No";
+           	"load printers" = "No";
+           	"logging" = "file";
+           	"max log size" = "5120";
+           	"passdb backend" = "tdbsam:/var/run/samba-cache/private/passdb.tdb";
+           	"printcap name" = "/dev/null";
+           	"registry shares" = "Yes";
+           	"restrict anonymous" = "2";
+           	"server multi channel support" = "No";
+           	"server string" = "TrueNAS Server";
+           	"winbind request timeout" = "2";
+           	"idmap config * : range" = "90000001 - 100000000";
+           	"fss:prune stale" = "True";
+           	"rpc_daemon:fssd" = "fork";
+           	"fruit:zero_file_id" = "False";
+           	"fruit:nfs_aces" = "False";
+           	"idmap config * : backend" = "tdb";
+           	"create mask" = "0664";
+           	"directory mask" = "0775";
         */
       };
       "tank" = {
-	"ea support" = "No";
+        "ea support" = "No";
         "path" = "/tank";
         "writable" = "yes";
         "valid users" = "cody";
@@ -432,23 +432,23 @@ in
         "fruit:time machine" = "yes";
         "browseable" = "yes";
         "fruit:aapl" = "yes";
-	"durable handles" = "yes";
-	"kernel oplocks" = "no";
-	"kernel share modes" = "no";
-	"posix locking" = "no";
+           	"durable handles" = "yes";
+           	"kernel oplocks" = "no";
+           	"kernel share modes" = "no";
+           	"posix locking" = "no";
         */
 
-	"ea support" = "No";
-	"posix locking" = "No";
-	"read only" = "No";
-	"smbd max xattr size" = "2097152";
-	"vfs objects" = "catia fruit streams_xattr";
+        "ea support" = "No";
+        "posix locking" = "No";
+        "read only" = "No";
+        "smbd max xattr size" = "2097152";
+        "vfs objects" = "catia fruit streams_xattr";
         #"zfs_core:zfs_auto_create" = "true";
         #"tn:vuid" = "e8f2fd79-7e7e-4ecb-adb3-d8517db947cb";
-	"fruit:time machine max size" = "0";
-	"fruit:time machine" = "True";
-	"fruit:resource" = "stream";
-	"fruit:metadata" = "stream";
+        "fruit:time machine max size" = "0";
+        "fruit:time machine" = "True";
+        "fruit:resource" = "stream";
+        "fruit:metadata" = "stream";
         "nfs4:chown" = "True";
         #"tn:home" = "False";
         #"tn:path_suffix" = "%U";

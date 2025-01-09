@@ -5,5 +5,6 @@
     lima
     ctlptl
     tilt
+    mpv
   ];
 }

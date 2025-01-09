@@ -274,11 +274,11 @@
               '';
 
               # FIXME: included because we don't include `nixos/common.nix` here.
-              p.nix.buildMachines.ward.enable = true;
-              p.nix.buildMachines.ward.sshKey = "/etc/nix/keys/nix_ed25519";
+              #p.nix.buildMachines.ward.enable = true;
+              #p.nix.buildMachines.ward.sshKey = "/etc/nix/keys/nix_ed25519";
             })
             ./nix-darwin/configuration.nix
-            ./modules/build-machines.nix
+            #./modules/build-machines.nix
             home-manager.darwinModules.home-manager
             {
               nixpkgs = nixpkgsConfig;

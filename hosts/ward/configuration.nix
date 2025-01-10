@@ -8,6 +8,7 @@ in
     [
       ./hardware-configuration.nix
       ../../modules/zfs.nix
+      ../../modules/bind-localhost-only.nix
     ];
 
   boot.kernelParams = [ "ip=dhcp" ];
@@ -84,7 +85,6 @@ in
     buildMachinesFiles = [ ];
     # you will probably also want, otherwise *everything* will be built from scratch
     useSubstitutes = true;
-    listenHost = "localhost";
   };
 
   services.harmonia = {

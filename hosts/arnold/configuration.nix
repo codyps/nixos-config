@@ -15,6 +15,8 @@ in
 
   boot.loader.efi.efiSysMountPoint = "/boot.d/0";
 
+  boot.zfs.extraPools = [ "tank" ];
+
   # hack because nixos doesn't have multi-boot partition support for systemd-boot
   boot.loader.systemd-boot.extraInstallCommands = ''
     ${pkgs.rsync}/bin/rsync -ahiv --delete /boot.d/0/ /boot.d/1/
@@ -500,7 +502,7 @@ in
         route @free-games-claimer {
           import /persist/etc/secret/caddy-auth
           reverse_proxy :6080 {
-                  header_up +Host "localhost"
+            header_up +Host "localhost"
           }
         }
 
@@ -527,32 +529,32 @@ in
           import /persist/etc/secret/caddy-auth
 
           reverse_proxy :8384 {
-                  # https://docs.syncthing.net/users/faq.html#why-do-i-get-host-check-error-in-the-gui-api
-                  header_up +Host "localhost"
+            # https://docs.syncthing.net/users/faq.html#why-do-i-get-host-check-error-in-the-gui-api
+            header_up +Host "localhost"
           }
         }
 
         @sonarr host sonarr.arnold.einic.org
         route @sonarr {
-                reverse_proxy :8989
+          reverse_proxy :8989
         }
 
         @komga host komga.arnold.einic.org
         route @komga {
-                reverse_proxy 127.0.0.1:${toString komgaPort}
+          reverse_proxy 127.0.0.1:${toString komgaPort}
         }
 
         @jellyfin host jellyfin.arnold.einic.org
         route @jellyfin {
-                reverse_proxy :8096 {
-                        # https://github.com/jellyfin/jellyfin/issues/5575
-                        header_up +Host "localhost"
-                }
+          reverse_proxy :8096 {
+            # https://github.com/jellyfin/jellyfin/issues/5575
+            header_up +Host "localhost"
+          }
         }
 
         @radarr host radarr.arnold.einic.org
         route @radarr {
-                reverse_proxy :7878
+          reverse_proxy :7878
         }
 
         @arnold host arnold.einic.org
@@ -579,41 +581,41 @@ in
 
                 redir /tank /tank/
                 handle_path /tank/* {
-                        file_server browse {
-                                root /tank
-                        }
+                    file_server browse {
+                        root /tank
+                    }
                 }
 
                 redir /switch /switch/
                 handle_path /switch/* {
-                        file_server browse {
-                                root /tank/DATA/games/console/nintendo-switch
-                        }
+                    file_server browse {
+                        root /tank/DATA/games/console/nintendo-switch
+                    }
                 }
 
                 redir /audiobooks /audiobooks/
                 handle_path /audiobooks/* {
-                        file_server browse {
-                                root /tank/DATA/audiobooks
-                        }
+                    file_server browse {
+                        root /tank/DATA/audiobooks
+                    }
                 }
 
                 redir /games /games/
                 handle_path /games/* {
-                        file_server browse {
-                                root /tank/DATA/games
-                        }
+                    file_server browse {
+                        root /tank/DATA/games
+                    }
                 }
 
                 @user_html {
-                        path_regexp user '^/~([^/]+)'
+                     path_regexp user '^/~([^/]+)'
                 }
 
                 route @user_html {
-                        uri strip_prefix {re.user.0}
-                        file_server browse {
-                                root /home/{re.user.1}/public_html/
-                        }
+                    uri strip_prefix {re.user.0}
+                    file_server browse {
+                        root /home/{re.user.1}/public_html/
+                    }
                 }
 
                 root * /srv/http
@@ -670,6 +672,25 @@ in
       };
     };
   };
+
+  services.jellyfin.enable = true;
+
+  # FIXME: pick exactly what we require for jellyfin
+  # https:/graphics.wiki/wiki/Jellyfin
+  hardware.opengl = {
+    enable = true;
+    extraPackages = with pkgs; [
+      intel-media-driver
+      intel-vaapi-driver
+      vaapiVdpau
+      libvdpau-va-gl
+      intel-compute-runtime # OpenCL filter support (hardware tonemapping and subtitle burn-in)
+      vpl-gpu-rt # QSV on 11th gen or newer
+      intel-media-sdk # QSV up to 11th gen
+    ];
+  };
+
+  services.logrotate.enable = true;
 
   system.stateVersion = "24.11";
 }

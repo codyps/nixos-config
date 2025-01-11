@@ -684,7 +684,7 @@ in
 
   # FIXME: pick exactly what we require for jellyfin
   # https:/graphics.wiki/wiki/Jellyfin
-  hardware.opengl = {
+  hardware.graphics = {
     enable = true;
     extraPackages = with pkgs; [
       intel-media-driver

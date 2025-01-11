@@ -418,6 +418,13 @@ in
               	"directory mask" = "0775";
         */
       };
+      "windows-fh" = {
+        "ea support" = "No";
+        "path" = "/tank/backup/windows/fh";
+        "writable" = "yes";
+        "valid users" = "cody";
+        "browseable" = "yes";
+      };
       "tank" = {
         "ea support" = "No";
         "path" = "/tank";

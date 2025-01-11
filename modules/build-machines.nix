@@ -21,10 +21,9 @@
         ];
       };
 
-      buildMachines = [
-        (lib.mkIf
-          config.p.nix.buildMachines.ward.enable
-          {
+      buildMachines = lib.mkMerge [
+        (lib.mkIf config.p.nix.buildMachines.ward.enable
+          [{
             hostName = "ward.little-moth.ts.net";
             maxJobs = 8;
             systems = [ "x86_64-linux" "aarch64-linux" ];
@@ -34,8 +33,8 @@
             protocol = "ssh-ng";
             publicHostKey = "c3NoLWVkMjU1MTkgQUFBQUMzTnphQzFsWkRJMU5URTVBQUFBSUsxN2h1UlFpV2pLc1FKTnljclNkdWRXWE1BaVp3eGJvVXhDUzg1VnVUOHYK";
             sshKey = if config.p.nix.buildMachines.ward.sshKey != "" then config.p.nix.buildMachines.ward.sshKey else null;
-          })
-      ];
+          }])
+        ];
     } // (if (options.nix ? sshServe) then {
       # darwin doesn't have this, nixos only.
       # TODO: find a nicer way to check.

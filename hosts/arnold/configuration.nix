@@ -698,6 +698,7 @@ in
   };
 
   services.logrotate.enable = true;
+  zramSwap.enable = true;
 
   system.stateVersion = "24.11";
 }

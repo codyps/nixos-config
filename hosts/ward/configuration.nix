@@ -289,7 +289,7 @@ in
 
   virtualisation.oci-containers.containers = {
     archivebox = {
-      image = "docker.io/archivebox/archivebox:latest";
+      image = "docker.io/archivebox/archivebox:dev";
       ports = [ "127.0.0.1:8000:8000" ];
       volumes = [
         "/ward/keep/archivebox:/data"
@@ -301,7 +301,7 @@ in
         "--pids-limit=-1"
         "--cpus=4"
         "--cpu-shares=512"
-        "--memory-reservation=32G"
+        "--memory=32G"
       ];
     };
 

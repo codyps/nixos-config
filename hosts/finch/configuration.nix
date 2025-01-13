@@ -239,7 +239,6 @@ in
     };
     requiredBy = [ "caddy.service" ];
     wantedBy = [ "sockets.target" ];
-    requiredBy = [ "caddy.socket" ];
   };
 
   networking.hostId = "8425e349";

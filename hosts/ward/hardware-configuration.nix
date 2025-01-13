@@ -53,7 +53,9 @@
     };
 
   swapDevices = [
-    "/dev/mapper/ward-swap"
+    {
+      device = "/dev/mapper/ward-swap";
+    }
   ];
 
   # Enables DHCP on each ethernet and wireless interface. In case of scripted networking

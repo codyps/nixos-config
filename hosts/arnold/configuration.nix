@@ -698,7 +698,16 @@ in
   };
 
   services.logrotate.enable = true;
+
+  services.zrepl.enable = true;
+
   zramSwap.enable = true;
+  services.uptimed.enable = true;
+
+  services.sabnzbd = {
+    enable = true;
+  };
+
 
   system.stateVersion = "24.11";
 }

@@ -505,11 +505,10 @@ in
       # NOTE: nixos can't handle virtualHosts with multiple hosts, so we have to set logFormat manually
       logFormat = "output file /var/log/caddy/arnold.einic.org.log";
       extraConfig = ''
-        @inline-files {
-          path ^.*\.(mp4|mkv)$
-        }
-        header @inline-files {
+        @mkv path *.mkv
+        header @mkv {
           Content-Disposition inline
+          Content-Type video/webm 
         }
 
         @free-games-claimer host free-games-claimer.arnold.einic.org

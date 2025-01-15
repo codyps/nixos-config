@@ -505,6 +505,13 @@ in
       # NOTE: nixos can't handle virtualHosts with multiple hosts, so we have to set logFormat manually
       logFormat = "output file /var/log/caddy/arnold.einic.org.log";
       extraConfig = ''
+        @inline-files {
+          path ^.*\.(mp4|mkv)$
+        }
+        header @inline-files {
+          Content-Disposition inline
+        }
+
         @free-games-claimer host free-games-claimer.arnold.einic.org
         route @free-games-claimer {
           import /persist/etc/secret/caddy-auth

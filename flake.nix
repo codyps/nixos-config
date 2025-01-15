@@ -46,6 +46,8 @@
         config.allowUnfreePredicate = pkg: builtins.elem (getName pkg) [
           "vscode"
           "copilot.vim"
+          # sabnzbd (consider substituting)
+          "unrar"
         ];
         inherit overlays;
       };

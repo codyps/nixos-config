@@ -298,7 +298,7 @@ in
         "io.containers.autoupdate" = "registry";
       };
       environment = {
-        CSRF_TRUSTED_ORIGINS = "https://archivebox.ward.einic.org";
+        CSRF_TRUSTED_ORIGINS = "https://archivebox.ward.ts.einic.org";
       };
       extraOptions = [
         "--pids-limit=-1"

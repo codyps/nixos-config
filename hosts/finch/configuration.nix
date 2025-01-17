@@ -170,7 +170,7 @@ in
 
     };
 
-    virtualHosts."https://finch.little-moth.ts.net" = {
+    virtualHosts."finch.little-moth.ts.net" = {
       extraConfig = ''
         bind fd/5 {
           protocols h1 h2

@@ -86,7 +86,7 @@ export DOCKER_BUILDKIT=1
 alias vim=nvim
 alias vi=nvim
 alias k=kubectl
-alias cargo='targo wrap-cargo'
+#alias cargo='targo wrap-cargo'
 
 if [ -e "/Applications/Tailscale.app/Contents/MacOS/Tailscale" ]; then
 	alias tailscale="/Applications/Tailscale.app/Contents/MacOS/Tailscale"

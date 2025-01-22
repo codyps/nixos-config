@@ -9,7 +9,6 @@ in
     [
       ./hardware-configuration.nix
       ../../nixos-modules/zfs.nix
-      ../../nixos-modules/tailscale.nix
       ../../modules/tailscale-initrd.nix
       ../../modules/bind-localhost-only.nix
     ];
@@ -209,6 +208,14 @@ in
           DHCP = "ipv4";
           BindCarrier = bind1-devs;
         };
+        # prioritize the local network directly instead of using tailscale
+        routingPolicyRules = [
+          {
+            To = "192.168.6.0/24";
+            Priority = 2500;
+          }
+        ];
+
         matchConfig.Name = "bond1";
       };
     };
@@ -402,27 +409,27 @@ in
 
 
         /*
-                   	"bind interfaces only" = "Yes";
-                   	"disable spoolss" = "Yes";
-                   	"dns proxy" = "No";
-                   	"load printers" = "No";
-                   	"logging" = "file";
-                   	"max log size" = "5120";
-                   	"passdb backend" = "tdbsam:/var/run/samba-cache/private/passdb.tdb";
-                   	"printcap name" = "/dev/null";
-                   	"registry shares" = "Yes";
-                   	"restrict anonymous" = "2";
-                   	"server multi channel support" = "No";
-                   	"server string" = "TrueNAS Server";
-                   	"winbind request timeout" = "2";
-                   	"idmap config * : range" = "90000001 - 100000000";
-                   	"fss:prune stale" = "True";
-                   	"rpc_daemon:fssd" = "fork";
-                   	"fruit:zero_file_id" = "False";
-                   	"fruit:nfs_aces" = "False";
-                   	"idmap config * : backend" = "tdb";
-                   	"create mask" = "0664";
-                   	"directory mask" = "0775";
+                    	"bind interfaces only" = "Yes";
+                    	"disable spoolss" = "Yes";
+                    	"dns proxy" = "No";
+                    	"load printers" = "No";
+                    	"logging" = "file";
+                    	"max log size" = "5120";
+                    	"passdb backend" = "tdbsam:/var/run/samba-cache/private/passdb.tdb";
+                    	"printcap name" = "/dev/null";
+                    	"registry shares" = "Yes";
+                    	"restrict anonymous" = "2";
+                    	"server multi channel support" = "No";
+                    	"server string" = "TrueNAS Server";
+                    	"winbind request timeout" = "2";
+                    	"idmap config * : range" = "90000001 - 100000000";
+                    	"fss:prune stale" = "True";
+                    	"rpc_daemon:fssd" = "fork";
+                    	"fruit:zero_file_id" = "False";
+                    	"fruit:nfs_aces" = "False";
+                    	"idmap config * : backend" = "tdb";
+                    	"create mask" = "0664";
+                    	"directory mask" = "0775";
         */
       };
       "windows-fh" = {
@@ -455,10 +462,10 @@ in
         "fruit:time machine" = "yes";
         "browseable" = "yes";
         "fruit:aapl" = "yes";
-                   	"durable handles" = "yes";
-                   	"kernel oplocks" = "no";
-                   	"kernel share modes" = "no";
-                   	"posix locking" = "no";
+                    	"durable handles" = "yes";
+                    	"kernel oplocks" = "no";
+                    	"kernel share modes" = "no";
+                    	"posix locking" = "no";
         */
 
         "ea support" = "No";

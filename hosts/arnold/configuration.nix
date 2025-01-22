@@ -375,62 +375,6 @@ in
         "create mask" = "0664";
         "directory mask" = "0775";
         "mdns name" = "mdns";
-        /*
-        #"use sendfile" = "yes";
-        #"max protocol" = "smb2";
-        # note: localhost is the ipv6 localhost ::1
-        #"hosts allow" = "10. 100. 192.168. 127.0.0.1 localhost";
-        #"hosts deny" = "0.0.0.0/0";
-        "guest account" = "nobody";
-        "map to guest" = "bad user";
-
-        "server min protocol" = "SMB3_11";
-        "server signing" = "mandatory";
-        "server smb encrypt" = "required";
-        "restrict anonymous" = "2";
-        */
-
-        #"vfs objects" = "catia fruit streams_xattr";
-
-        #"fruit:metadata" = "stream";
-        #"fruit:resource" = "stream";
-        ## requires catia
-        #"fruit:encoding" = "native";
-
-        ##"fruit:aapl" = "yes";
-        ##"fruit:veto_appledouble" = "no";
-        ##"fruit:posix_rename" = "yes";
-        #"fruit:zero_file_id" = "False";
-
-        #"domain master" = "yes";
-        #"guest ok" = "no";
-        #"create mask" = "0664";
-        #"directory mask" = "0775";
-
-
-        /*
-                    	"bind interfaces only" = "Yes";
-                    	"disable spoolss" = "Yes";
-                    	"dns proxy" = "No";
-                    	"load printers" = "No";
-                    	"logging" = "file";
-                    	"max log size" = "5120";
-                    	"passdb backend" = "tdbsam:/var/run/samba-cache/private/passdb.tdb";
-                    	"printcap name" = "/dev/null";
-                    	"registry shares" = "Yes";
-                    	"restrict anonymous" = "2";
-                    	"server multi channel support" = "No";
-                    	"server string" = "TrueNAS Server";
-                    	"winbind request timeout" = "2";
-                    	"idmap config * : range" = "90000001 - 100000000";
-                    	"fss:prune stale" = "True";
-                    	"rpc_daemon:fssd" = "fork";
-                    	"fruit:zero_file_id" = "False";
-                    	"fruit:nfs_aces" = "False";
-                    	"idmap config * : backend" = "tdb";
-                    	"create mask" = "0664";
-                    	"directory mask" = "0775";
-        */
       };
       "windows-fh" = {
         "ea support" = "No";
@@ -456,36 +400,17 @@ in
       "timemachine" = {
         "path" = "/tank/backup/timemachine4";
         "valid users" = "cody";
-        /*
-        "guest ok" = "no";
-        "writeable" = "yes";
-        "fruit:time machine" = "yes";
-        "browseable" = "yes";
-        "fruit:aapl" = "yes";
-                    	"durable handles" = "yes";
-                    	"kernel oplocks" = "no";
-                    	"kernel share modes" = "no";
-                    	"posix locking" = "no";
-        */
 
         "ea support" = "No";
         "posix locking" = "No";
         "read only" = "No";
         "smbd max xattr size" = "2097152";
         "vfs objects" = "catia fruit streams_xattr";
-        #"zfs_core:zfs_auto_create" = "true";
-        #"tn:vuid" = "e8f2fd79-7e7e-4ecb-adb3-d8517db947cb";
         "fruit:time machine max size" = "0";
         "fruit:time machine" = "True";
         "fruit:resource" = "stream";
         "fruit:metadata" = "stream";
         "nfs4:chown" = "True";
-        #"tn:home" = "False";
-        #"tn:path_suffix" = "%U";
-        #"tn:purpose" = "ENHANCED_TIMEMACHINE";
-
-
-
       };
     };
   };

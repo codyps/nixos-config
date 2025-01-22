@@ -7,7 +7,7 @@ in
   imports =
     [
       ./hardware-configuration.nix
-      ../../modules/zfs.nix
+      ../../nixos-modules/zfs.nix
       ../../modules/bind-localhost-only.nix
     ];
 
@@ -355,9 +355,16 @@ in
 
   systemd.network = {
     enable = true;
-    networks."10-enp2s0.network" = {
+    networks."10-enp3s0.network" = {
       networkConfig.DHCP = "ipv4";
-      matchConfig.Name = "enp2s0";
+      matchConfig.Name = "enp3s0";
+      # prioritize the local network directly instead of using tailscale
+      routingPolicyRules = [
+        {
+          To = "192.168.6.0/24";
+          Priority = 2500;
+        }
+      ];
     };
     wait-online.anyInterface = true;
   };

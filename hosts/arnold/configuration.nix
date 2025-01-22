@@ -8,7 +8,8 @@ in
   imports =
     [
       ./hardware-configuration.nix
-      ../../modules/zfs.nix
+      ../../nixos-modules/zfs.nix
+      ../../nixos-modules/tailscale.nix
       ../../modules/tailscale-initrd.nix
       ../../modules/bind-localhost-only.nix
     ];
@@ -256,6 +257,12 @@ in
     openssh.authorizedKeys.keys = authorizedKeys;
   };
 
+  users.users.securitycamera = {
+    hashedPasswordFile = "/persist/etc/secret/securitycamera.pass";
+    openssh.authorizedKeys.keys = authorizedKeys;
+    isNormalUser = true;
+  };
+
   environment.systemPackages = with pkgs; [
     neovim
     linuxPackages.perf
@@ -360,7 +367,7 @@ in
         "fruit:nfs_aces" = "False";
         "create mask" = "0664";
         "directory mask" = "0775";
-
+        "mdns name" = "mdns";
         /*
         #"use sendfile" = "yes";
         #"max protocol" = "smb2";
@@ -395,27 +402,27 @@ in
 
 
         /*
-                 	"bind interfaces only" = "Yes";
-                 	"disable spoolss" = "Yes";
-                 	"dns proxy" = "No";
-                 	"load printers" = "No";
-                 	"logging" = "file";
-                 	"max log size" = "5120";
-                 	"passdb backend" = "tdbsam:/var/run/samba-cache/private/passdb.tdb";
-                 	"printcap name" = "/dev/null";
-                 	"registry shares" = "Yes";
-                 	"restrict anonymous" = "2";
-                 	"server multi channel support" = "No";
-                 	"server string" = "TrueNAS Server";
-                 	"winbind request timeout" = "2";
-                 	"idmap config * : range" = "90000001 - 100000000";
-                 	"fss:prune stale" = "True";
-                 	"rpc_daemon:fssd" = "fork";
-                 	"fruit:zero_file_id" = "False";
-                 	"fruit:nfs_aces" = "False";
-                 	"idmap config * : backend" = "tdb";
-                 	"create mask" = "0664";
-                 	"directory mask" = "0775";
+                   	"bind interfaces only" = "Yes";
+                   	"disable spoolss" = "Yes";
+                   	"dns proxy" = "No";
+                   	"load printers" = "No";
+                   	"logging" = "file";
+                   	"max log size" = "5120";
+                   	"passdb backend" = "tdbsam:/var/run/samba-cache/private/passdb.tdb";
+                   	"printcap name" = "/dev/null";
+                   	"registry shares" = "Yes";
+                   	"restrict anonymous" = "2";
+                   	"server multi channel support" = "No";
+                   	"server string" = "TrueNAS Server";
+                   	"winbind request timeout" = "2";
+                   	"idmap config * : range" = "90000001 - 100000000";
+                   	"fss:prune stale" = "True";
+                   	"rpc_daemon:fssd" = "fork";
+                   	"fruit:zero_file_id" = "False";
+                   	"fruit:nfs_aces" = "False";
+                   	"idmap config * : backend" = "tdb";
+                   	"create mask" = "0664";
+                   	"directory mask" = "0775";
         */
       };
       "windows-fh" = {
@@ -432,6 +439,13 @@ in
         "valid users" = "cody";
         "browseable" = "yes";
       };
+      "securitycamera" = {
+        "ea support" = "No";
+        "path" = "/tank/DATA/securitycamera";
+        "writable" = "yes";
+        "valid users" = "securitycamera";
+        "browseable" = "yes";
+      };
       "timemachine" = {
         "path" = "/tank/backup/timemachine4";
         "valid users" = "cody";
@@ -441,10 +455,10 @@ in
         "fruit:time machine" = "yes";
         "browseable" = "yes";
         "fruit:aapl" = "yes";
-                 	"durable handles" = "yes";
-                 	"kernel oplocks" = "no";
-                 	"kernel share modes" = "no";
-                 	"posix locking" = "no";
+                   	"durable handles" = "yes";
+                   	"kernel oplocks" = "no";
+                   	"kernel share modes" = "no";
+                   	"posix locking" = "no";
         */
 
         "ea support" = "No";
@@ -647,6 +661,7 @@ in
     enable = true;
     openFirewall = true;
     nssmdns4 = true;
+    allowInterfaces = [ "bond0" ];
     publish = {
       enable = true;
       addresses = true;
@@ -656,6 +671,7 @@ in
       workstation = true;
     };
     extraServiceFiles = {
+      /*
       smb = ''
         <?xml version="1.0" standalone='no'?><!--*-nxml-*-->
         <!DOCTYPE service-group SYSTEM "avahi-service.dtd">
@@ -667,6 +683,7 @@ in
           </service>
         </service-group>
       '';
+      */
     };
   };
 

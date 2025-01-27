@@ -3,7 +3,7 @@ let
   ssh-auth = (import ../../nixos/ssh-auth.nix);
   authorizedKeys = ssh-auth.authorizedKeys;
   komgaPort = 10100;
-  transmissionPort = 10101;
+  transmissionPort = 9019;
   pia-wg-util = pkgs.writeShellApplication {
     name = "pia-wg-util";
     text = builtins.readFile ../../scripts/pia-wg-util.sh;
@@ -678,6 +678,7 @@ in
   # https://www.cloudnull.io/2019/04/running-services-in-network-name-spaces-with-systemd/
   # https://www.ismailzai.com/blog/creating-wireguard-jails-with-linux-network-namespaces
   # https://github.com/dadevel/wg-netns
+  # https://github.com/existentialtype/deluge-namespaced-wireguard
   systemd.services.pia-netns = {
     description = "Create a network namespace for PIA VPN";
     wantedBy = [ "transmission.service" "multi-user.target" ];
@@ -736,19 +737,28 @@ in
   };
 
   systemd.sockets."transmission-rpc-proxy" = {
+    socketConfig = {
+      ListenStream = "${toString transmissionPort}";
+    };
     wantedBy = [ "sockets.target" ];
   };
 
   systemd.services."transmission-rpc-proxy" = {
-    after = [ "transmission.service" ];
-    requires = [ "transmission.service" ];
+    after = [ "transmission.service" "transmission-rpc-proxy.socket" ];
+    requires = [ "transmission.service" "transmission-rpc-proxy.socket" ];
+    unitConfig = {
+      JoinsNamespaceOf = "transmission.service";
+    };
     serviceConfig = {
+      User = "transmission";
+      Group = "transmission";
       PrivateIPC = true;
       PrivateDevices = true;
+      PrivateNetwork = true;
       PrivateTmp = true;
     };
 
-    script = "${pkgs.systemd}/bin/systemd-socket-proxyd localhost:${toString transmissionPort}";
+    script = "${pkgs.systemd}/bin/systemd-socket-proxyd --exit-idle-time=5m localhost:${toString transmissionPort}";
   };
 
   system.stateVersion = "24.11";

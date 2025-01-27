@@ -36,6 +36,16 @@
 
           # something is using the old name, hack around it.
           utillinux = prev.util-linux;
+          
+          caddyFull = prev.pkgs.caddy.withPlugins {
+            plugins = [
+              "github.com/caddy-dns/cloudflare@v0.0.0-20240703190432-89f16b99c18e"
+              "github.com/caddyserver/cache-handler@v0.14.0"
+              "github.com/darkweak/storages/badger/caddy@v0.0.10"
+              "github.com/WeidiDeng/caddy-cloudflare-ip@v0.0.0-20231130002422-f53b62aa13cb"
+            ];
+            hash = "sha256-NZ3Cik3WHB1ad0ImuqU+IMKcg3zJ1AkL1xXpPwa89o4=";
+          };
         })
         (import ./nixpkgs/overlays/overlay.nix)
         ethereum-nix.overlays.default

@@ -116,15 +116,7 @@ in
   systemd.services.caddy.serviceConfig.EnvironmentFile = "/persist/etc/default/caddy";
   services.caddy = {
     enable = true;
-    package = pkgs.caddy.withPlugins {
-      plugins = [
-        "github.com/caddy-dns/cloudflare@v0.0.0-20240703190432-89f16b99c18e"
-        "github.com/caddyserver/cache-handler@v0.14.0"
-        "github.com/darkweak/storages/badger/caddy@v0.0.10"
-        "github.com/WeidiDeng/caddy-cloudflare-ip@v0.0.0-20231130002422-f53b62aa13cb"
-      ];
-      hash = "sha256-m6SVqy9ks4mvdcgqs+YD6MeE98WjGga25zbrOjPBMKs=";
-    };
+    package = pkgs.caddyFull;
 
     globalConfig = ''
       cache

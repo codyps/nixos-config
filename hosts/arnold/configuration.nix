@@ -3,11 +3,11 @@ let
   ssh-auth = (import ../../nixos/ssh-auth.nix);
   authorizedKeys = ssh-auth.authorizedKeys;
   komgaPort = 10100;
-  transmissionPort = 9019;
+  transmissionPort = 9091;
   pia-wg-util = pkgs.writeShellApplication {
     name = "pia-wg-util";
     text = builtins.readFile ../../scripts/pia-wg-util.sh;
-    runtimeInputs = [ pkgs.iproute2 pkgs.wireguard-tools pkgs.curl pkgs.jq pkgs.coreutils ];
+    runtimeInputs = [ pkgs.iproute2 pkgs.wireguard-tools pkgs.curl pkgs.jq pkgs.coreutils pkgs.iputils ];
   };
 in
 {
@@ -516,7 +516,7 @@ in
 
         @transmission host transmission.arnold.einic.org
         route @transmission {
-          reverse_proxy :${toString transmissionPort}
+          reverse_proxy 127.0.0.1:${toString transmissionPort}
         }
 
         @arnold host arnold.einic.org
@@ -657,7 +657,7 @@ in
 
   services.logrotate.enable = true;
 
-  services.zrepl.enable = true;
+  #services.zrepl.enable = true;
 
   zramSwap.enable = true;
   services.uptimed.enable = true;
@@ -738,7 +738,8 @@ in
 
   systemd.sockets."transmission-rpc-proxy" = {
     socketConfig = {
-      ListenStream = "${toString transmissionPort}";
+      ListenStream = "127.0.0.1:${toString transmissionPort}";
+      Accept = "no";
     };
     wantedBy = [ "sockets.target" ];
   };
@@ -756,9 +757,8 @@ in
       PrivateDevices = true;
       PrivateNetwork = true;
       PrivateTmp = true;
+      ExecStart = "${pkgs.systemd}/lib/systemd/systemd-socket-proxyd --exit-idle-time=5m 127.0.0.1:${toString transmissionPort}";
     };
-
-    script = "${pkgs.systemd}/bin/systemd-socket-proxyd --exit-idle-time=5m localhost:${toString transmissionPort}";
   };
 
   system.stateVersion = "24.11";

@@ -36,7 +36,7 @@ pia_list_countries() {
 }
 
 pia_add_key_fetch() {
-	wireguard_json="$(curl -vv -G \
+	wireguard_json="$(curl -G \
 	  --connect-to "$WG_HOSTNAME::$WG_SERVER_IP:" \
 	  --cacert "$DATA_DIR/cacert" \
 	  --data-urlencode "pt=${PIA_TOKEN}" \
@@ -110,6 +110,8 @@ pia_renew() {
 	echo "addKey success"
 
 	WG_SERVER_PORT="$(echo "$wireguard_json" | jq -r .server_port)"
+	# ip of server over the vpn.
+	WG_SERVER_VIP="$(echo "$wireguard_json" | jq -r .server_vip)"
 
 	WG_ADDR="$(echo "$wireguard_json" | jq -r .peer_ip)"
 	WG_SERVER_PUBKEY="$(echo "$wireguard_json" | jq -r .server_key)"
@@ -139,8 +141,9 @@ pia_payload_and_signature_load() {
 pia_payload_and_signature_refresh_fetch() {
 	echo "refreshing payload and signature"
 
-	payload_and_signature="$(curl -s -m 5 \
-		--connect-to "$WG_HOSTNAME::$WG_SERVER_IP:" \
+	payload_and_signature="$(ip netns exec "$NETNS_NAME" \
+		curl -s -m 5 \
+		--connect-to "$WG_HOSTNAME::$WG_SERVER_VIP:" \
 		--cacert "$DATA_DIR/cacert" \
 		-G --data-urlencode "token=${PIA_TOKEN}" \
 		"https://${WG_HOSTNAME}:19999/getSignature")"
@@ -182,8 +185,9 @@ pia_port_forward_bind() {
 	expires_at=$(echo "$payload" | base64 -d | jq -r '.expires_at')
 	port=$(echo "$payload" | base64 -d | jq -r '.port')
 
-	bind_port_response="$(curl -Gs -m 5 \
-		--connect-to "$WG_HOSTNAME::$WG_SERVER_IP:" \
+	bind_port_response="$(ip netns exec "$NETNS_NAME" \
+		curl -Gs -m 5 \
+		--connect-to "$WG_HOSTNAME::$WG_SERVER_VIP:" \
 		--cacert "$DATA_DIR/cacert" \
 		--data-urlencode "payload=${payload}" \
 		--data-urlencode "signature=${signature}" \

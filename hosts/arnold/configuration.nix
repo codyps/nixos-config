@@ -3,6 +3,12 @@ let
   ssh-auth = (import ../../nixos/ssh-auth.nix);
   authorizedKeys = ssh-auth.authorizedKeys;
   komgaPort = 10100;
+  transmissionPort = 10101;
+  pia-wg-util = pkgs.writeShellApplication {
+    name = "pia-wg-util";
+    text = builtins.readFile ../../scripts/pia-wg-util.sh;
+    runtimeInputs = [ pkgs.iproute2 pkgs.wireguard-tools pkgs.curl pkgs.jq pkgs.coreutils ];
+  };
 in
 {
   imports =
@@ -508,6 +514,11 @@ in
           reverse_proxy :7878
         }
 
+        @transmission host transmission.arnold.einic.org
+        route @transmission {
+          reverse_proxy :${toString transmissionPort}
+        }
+
         @arnold host arnold.einic.org
         route @arnold {
                 @secure {
@@ -660,9 +671,85 @@ in
     settings = {
       download-dir = "/tank/DATA/bt-downloads/complete";
       incomplete-dir = "/tank/DATA/bt-downloads/incomplete";
+      rpc-port = transmissionPort;
     };
   };
 
+  # https://www.cloudnull.io/2019/04/running-services-in-network-name-spaces-with-systemd/
+  # https://www.ismailzai.com/blog/creating-wireguard-jails-with-linux-network-namespaces
+  # https://github.com/dadevel/wg-netns
+  systemd.services.pia-netns = {
+    description = "Create a network namespace for PIA VPN";
+    wantedBy = [ "transmission.service" "multi-user.target" ];
+    before = [ "transmission.service" ];
+
+    path = [ pkgs.iproute2 ];
+
+    script = ''
+      #!/bin/sh
+      set -e
+
+      netns="pia"
+      trap "ip netns del $netns" EXIT
+      ip netns add "$netns"
+      ip -n "$netns" link set lo up
+
+      ip link add wg-"$netns" type wireguard
+      ip link set wg-"$netns" netns "$netns"
+
+      # we fill this in with `pia-wg.service`
+      mkdir -p /etc/netns/"$netns"
+      touch /etc/netns/"$netns"/resolv.conf
+
+      trap - EXIT
+      '';
+
+    serviceConfig = {
+      Type = "oneshot";
+      RemainAfterExit = true;
+      ExecStop = "${pkgs.iproute2}/bin/ip netns del pia";
+    };
+  };
+
+  # TODO: instead of having a ping loop internally, consider using a timer to send pings & restart the service if needed.
+  systemd.services.pia-wg = {
+    description = "Connect to PIA VPN";
+    requires = [ "pia-netns.service" ];
+    after = [ "pia-netns.service" ];
+    wantedBy = [ "multi-user.target" ];
+
+    serviceConfig = {
+      EnvironmentFile = "/persist/etc/default/pia-wg";
+      StateDirectory = "pia-wg";
+      ExecStart = "${pia-wg-util}/bin/pia-wg-util ''$STATE_DIRECTORY pia ca";
+      # TODO: add ExecStop to disconnect/reset the wireguard interface
+    };
+  };
+
+  systemd.services.transmission = {
+    serviceConfig = {
+      NetworkNamespacePath = "/run/netns/pia";
+      # Bind mount resolv.conf into the network namespace
+      # https://github.com/chrisbouchard/namespaced-wireguard-vpn/issues/9
+      BindReadOnlyPaths = [ "/etc/netns/pia/resolv.conf:/etc/resolv.conf" ];
+    };
+  };
+
+  systemd.sockets."transmission-rpc-proxy" = {
+    wantedBy = [ "sockets.target" ];
+  };
+
+  systemd.services."transmission-rpc-proxy" = {
+    after = [ "transmission.service" ];
+    requires = [ "transmission.service" ];
+    serviceConfig = {
+      PrivateIPC = true;
+      PrivateDevices = true;
+      PrivateTmp = true;
+    };
+
+    script = "${pkgs.systemd}/bin/systemd-socket-proxyd localhost:${toString transmissionPort}";
+  };
 
   system.stateVersion = "24.11";
 }

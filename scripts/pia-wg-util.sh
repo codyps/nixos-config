@@ -1,7 +1,7 @@
 #! /usr/bin/env bash
 set -euf -o pipefail
 
-pia_load_token() {
+pia_token_load() {
 	echo "loading token"
 	if ! [ -e "$DATA_DIR/token" ]; then
 		return 1
@@ -25,7 +25,7 @@ pia_token_refresh() {
 }
 
 pia_token() {
-	pia_load_token && return
+	pia_token_load && return
 	pia_token_refresh
 }
 
@@ -35,7 +35,7 @@ pia_list_countries() {
 	echo "$pia_servers" | jq
 }
 
-pia_add_key() {
+pia_add_key_fetch() {
 	wireguard_json="$(curl -vv -G \
 	  --connect-to "$WG_HOSTNAME::$WG_SERVER_IP:" \
 	  --cacert "$DATA_DIR/cacert" \
@@ -44,11 +44,26 @@ pia_add_key() {
 	  "https://${WG_HOSTNAME}:1337/addKey" )"
 }
 
-pia_renew() {
-	WG_PUBKEY="$1"
-	NETWORK_ID="$2"
-
+pia_add_key() {
 	pia_token
+	pia_add_key_fetch
+	if [ "$(echo "$wireguard_json" | jq -r '.status')" == "OK" ]; then
+		return 0
+	fi
+
+	echo "addKey failed: $wireguard_json"
+
+	pia_token_refresh
+	pia_add_key_fetch
+	if [ "$(echo "$wireguard_json" | jq -r '.status')" == "OK" ]; then
+		return 0
+	fi
+
+	echo "addKey failed (2): $wireguard_json"
+	return 1
+}
+
+pia_pick_server() {
 	pia_servers_resp="$(curl --max-time 15 'https://serverlist.piaservers.net/vpninfo/servers/v6') | head -1)"
 	pia_servers="$(echo "$pia_servers_resp" | head -1)"
 
@@ -62,23 +77,35 @@ pia_renew() {
 
 	server_json="$(printf "%s" "$servers_json" | jq --argjson server_n "$server_n" '.[$server_n]')"
 
+	echo "$server_json" >"$DATA_DIR/server"
+
 	WG_SERVER_IP=$(printf "%s" "$server_json" | jq -r .ip)
 	WG_HOSTNAME=$(printf "%s" "$server_json" | jq -r .cn)
 
 	echo "got server for network_id=$NETWORK_ID"
+}
 
-	pia_add_key
-
-	if [ "$(echo "$wireguard_json" | jq -r '.status')" != "OK" ];then
-		>&2 echo "addKey failed: $wireguard_json"
-		>&2 echo "retrying with new token"
-		pia_token_refresh
-		pia_add_key
-		if [ "$(echo "$wireguard_json" | jq -r '.status')" != "OK" ];then
-			>&2 echo "addKey failed: $wireguard_json"
-			return 1
-		fi
+pia_server_load() {
+	if ! [ -e "$DATA_DIR/server" ]; then
+		return 1
 	fi
+
+	server_json="$(cat "$DATA_DIR/server")"
+	WG_SERVER_IP=$(printf "%s" "$server_json" | jq -r .ip)
+	WG_HOSTNAME=$(printf "%s" "$server_json" | jq -r .cn)
+}
+
+pia_server() {
+	pia_server_load || pia_pick_server
+}
+
+pia_renew() {
+	pia_server
+	pia_add_key || {
+		echo "addKey failed, retrying with new server"
+		pia_pick_server
+		pia_add_key
+	}
 
 	echo "addKey success"
 
@@ -91,7 +118,9 @@ pia_renew() {
 	WG_SERVER_DNS="$(echo "$wireguard_json" | jq -r '.dns_servers[0]')"
 }
 
-pia_load_payload_and_signature() {
+pia_payload_and_signature_load() {
+	echo "loading payload and signature"
+
 	if ! [ -e "$DATA_DIR/payload_and_signature" ]; then
 		return 1
 	fi
@@ -107,22 +136,47 @@ pia_load_payload_and_signature() {
 	fi
 }
 
-pia_port_forward() {
-	if ! pia_load_payload_and_signature; then
-		payload_and_signature="$(curl -s -m 5 \
-			--connect-to "$WG_HOSTNAME::$WG_SERVER_IP:" \
-			--cacert "$DATA_DIR/cacert" \
-			-G --data-urlencode "token=${PIA_TOKEN}" \
-			"https://${WG_HOSTNAME}:19999/getSignature")"
+pia_payload_and_signature_refresh_fetch() {
+	echo "refreshing payload and signature"
 
-		if [ "$(echo "$payload_and_signature" | jq -r '.status')" != "OK" ];then
-			>&2 echo "getSignature failed: $payload_and_signature"
-			return 1
-		fi
+	payload_and_signature="$(curl -s -m 5 \
+		--connect-to "$WG_HOSTNAME::$WG_SERVER_IP:" \
+		--cacert "$DATA_DIR/cacert" \
+		-G --data-urlencode "token=${PIA_TOKEN}" \
+		"https://${WG_HOSTNAME}:19999/getSignature")"
 
-		echo "$payload_and_signature" >"$DATA_DIR/payload_and_signature"
+	if [ "$(echo "$payload_and_signature" | jq -r '.status')" != "OK" ];then
+		>&2 echo "getSignature failed: $payload_and_signature"
+		unset payload_and_signature
+		return 1
 	fi
 
+	echo "$payload_and_signature" >"$DATA_DIR/payload_and_signature"
+}
+
+pia_payload_and_signature_refresh() {
+	if pia_payload_and_signature_refresh_fetch; then
+		echo "refreshed payload and signature successfully (first try)"
+		return 0
+	fi
+
+	echo "refreshing payload and signature (retry with new token)"
+	pia_token_refresh
+	pia_payload_and_signature_refresh_fetch
+}
+
+pia_payload_and_signature() {
+	echo "getting payload and signature"
+	if pia_payload_and_signature_load; then
+		return 0
+	fi
+
+	echo "load failed, refreshing payload and signature"
+	pia_token
+	pia_payload_and_signature_refresh
+}
+
+pia_port_forward_bind() {
 	signature=$(echo "$payload_and_signature" | jq -r '.signature')
 	payload=$(echo "$payload_and_signature" | jq -r '.payload')
 	expires_at=$(echo "$payload" | base64 -d | jq -r '.expires_at')
@@ -143,6 +197,27 @@ pia_port_forward() {
 	echo "$port" >"$DATA_DIR/port"
 }
 
+pia_port_forward() {
+	pia_payload_and_signature
+	if pia_port_forward_bind; then
+		echo "port forward success"
+		return 0
+	fi
+
+	echo "port forward failed, refreshing payload and signature"
+	pia_payload_and_signature_refresh || {
+		echo "refresh failed"
+		return 1
+	}
+	if pia_port_forward_bind; then
+		echo "port forward success"
+		return 0
+	fi
+
+	echo "port forward failed"
+	return 1
+}
+
 DATA_DIR="$1"
 NETNS_NAME="$2"
 NETWORK_ID="$3"
@@ -150,6 +225,8 @@ NETWORK_ID="$3"
 WIREGUARD_NAME="wg-$NETNS_NAME"
 
 NETNS_DIR="/etc/netns/$NETNS_NAME"
+
+umask 0077
 
 if ! [ -e "$DATA_DIR/private_key" ]; then
 	wg genkey >"$DATA_DIR/private_key"

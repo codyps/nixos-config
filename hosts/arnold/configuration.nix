@@ -516,6 +516,7 @@ in
 
         @transmission host transmission.arnold.einic.org
         route @transmission {
+          import /persist/etc/secret/caddy-auth
           reverse_proxy 127.0.0.1:${toString transmissionPort}
         }
 
@@ -672,6 +673,10 @@ in
       download-dir = "/tank/DATA/bt-downloads/complete";
       incomplete-dir = "/tank/DATA/bt-downloads/incomplete";
       rpc-port = transmissionPort;
+      rpc-authentication-required = false;
+      rpc-host-whitelist = "transmission.arnold.einic.org";
+      rpc-bind-address = "127.0.0.1";
+      port-forwarding-enabled = false;
     };
   };
 

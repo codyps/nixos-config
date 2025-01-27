@@ -1,23 +1,58 @@
 #! /usr/bin/env bash
 set -euf -o pipefail
-set -x
+
+pia_load_token() {
+	echo "loading token"
+	if ! [ -e "$DATA_DIR/token" ]; then
+		return 1
+	fi
+
+	PIA_TOKEN="$(jq -r .token "$DATA_DIR/token")"
+}
+
+pia_token_refresh() {
+	echo "refreshing token"
+	generateToken="$(curl -s -u "$PIA_USERNAME:$PIA_PASSWORD" \
+		"https://privateinternetaccess.com/gtoken/generateToken")"
+
+	if [ "$(echo "$generateToken" | jq -r '.status')" != "OK" ]; then
+		>&2 echo "generateToken failed: $generateToken"
+		return
+	fi
+
+	echo "$generateToken" >"$DATA_DIR/token"
+	PIA_TOKEN="$(jq -r .token "$DATA_DIR/token")"
+}
+
+pia_token() {
+	pia_load_token && return
+	pia_token_refresh
+}
 
 pia_list_countries() {
-	PIA_TOKEN="$(curl -s -u "$PIA_USERNAME:$PIA_PASSWORD" \
-		"https://privateinternetaccess.com/gtoken/generateToken" | jq -r '.token')"
-
+	pia_token
 	pia_servers="$(curl --max-time 15 'https://serverlist.piaservers.net/vpninfo/servers/v6' | head -1)"
 	echo "$pia_servers" | jq
+}
+
+pia_add_key() {
+	wireguard_json="$(curl -vv -G \
+	  --connect-to "$WG_HOSTNAME::$WG_SERVER_IP:" \
+	  --cacert "$DATA_DIR/cacert" \
+	  --data-urlencode "pt=${PIA_TOKEN}" \
+	  --data-urlencode "pubkey=$WG_PUBKEY" \
+	  "https://${WG_HOSTNAME}:1337/addKey" )"
 }
 
 pia_renew() {
 	WG_PUBKEY="$1"
 	NETWORK_ID="$2"
 
-	PIA_TOKEN="$(curl -s -u "$PIA_USERNAME:$PIA_PASSWORD" \
-		"https://privateinternetaccess.com/gtoken/generateToken" | jq -r '.token')"
+	pia_token
+	pia_servers_resp="$(curl --max-time 15 'https://serverlist.piaservers.net/vpninfo/servers/v6') | head -1)"
+	pia_servers="$(echo "$pia_servers_resp" | head -1)"
 
-	pia_servers="$(curl --max-time 15 'https://serverlist.piaservers.net/vpninfo/servers/v6' | head -1)"
+	echo "got servers"
 
 	# remote ips
 	country_json="$(printf "%s" "$pia_servers" | jq --arg network_id "$NETWORK_ID" '.regions[] | select (.id == $network_id)')"
@@ -30,17 +65,22 @@ pia_renew() {
 	WG_SERVER_IP=$(printf "%s" "$server_json" | jq -r .ip)
 	WG_HOSTNAME=$(printf "%s" "$server_json" | jq -r .cn)
 
-	wireguard_json="$(curl -vv -G \
-	  --connect-to "$WG_HOSTNAME::$WG_SERVER_IP:" \
-	  --cacert "$DATA_DIR/cacert" \
-	  --data-urlencode "pt=${PIA_TOKEN}" \
-	  --data-urlencode "pubkey=$WG_PUBKEY" \
-	  "https://${WG_HOSTNAME}:1337/addKey" )"
+	echo "got server for network_id=$NETWORK_ID"
+
+	pia_add_key
 
 	if [ "$(echo "$wireguard_json" | jq -r '.status')" != "OK" ];then
 		>&2 echo "addKey failed: $wireguard_json"
-		return 1
+		>&2 echo "retrying with new token"
+		pia_token_refresh
+		pia_add_key
+		if [ "$(echo "$wireguard_json" | jq -r '.status')" != "OK" ];then
+			>&2 echo "addKey failed: $wireguard_json"
+			return 1
+		fi
 	fi
+
+	echo "addKey success"
 
 	WG_SERVER_PORT="$(echo "$wireguard_json" | jq -r .server_port)"
 
@@ -195,17 +235,25 @@ while true; do
 	ip -n "$NETNS_NAME" addr add dev "$WIREGUARD_NAME" "$WG_ADDR"
 	ip -n "$NETNS_NAME" route add default dev "$WIREGUARD_NAME"
 
+	echo "wireguard up"
+
 	pia_port_forward && {
+		echo "port forward success"
 		port_forward_time="$(date +%s)"
 	} || echo "port forward failed"
 
 	while true; do
+		echo "sleeping until ping check"
 		sleep 60
-		ping -n 1 8.8.8.8 || break
+		ping -n 1 8.8.8.8 || {
+			echo "ping failed"
+			break
+		}
 
 		# refresh port forward every 15 minutes
 		if [ "$((port_forward_time + 900))" -lt "$(date +%s)" ]; then
 			pia_port_forward && {
+				echo "port forward success"
 				port_forward_time="$(date +%s)"
 			} || echo "port forward failed"
 		fi

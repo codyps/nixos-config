@@ -663,6 +663,14 @@ in
     enable = true;
   };
 
+  services.transmission = {
+    enable = true;
+    settings = {
+      download-dir = "/tank/DATA/bt-downloads/complete";
+      incomplete-dir = "/tank/DATA/bt-downloads/incomplete";
+    };
+  };
+
 
   system.stateVersion = "24.11";
 }

@@ -56,6 +56,7 @@ in
       "/var/lib/audiobookshelf"
       "/var/lib/samba"
       "/var/lib/komga"
+      "/var/lib/transmission"
       "/etc/NetworkManager/system-connections"
       { directory = "/var/lib/colord"; user = "colord"; group = "colord"; mode = "u=rwx,g=rx,o="; }
     ];
@@ -667,6 +668,10 @@ in
     enable = true;
   };
 
+  # FIXME: this writes configuration into `/var/lib/transmission`, which we
+  # normally wipe and bind mount to preserve. This causes the same issues komga
+  # has. Examine relocating the config elsewhere or applying it in some
+  # alternate fashion
   services.transmission = {
     enable = true;
     settings = {
@@ -738,6 +743,7 @@ in
       # Bind mount resolv.conf into the network namespace
       # https://github.com/chrisbouchard/namespaced-wireguard-vpn/issues/9
       BindReadOnlyPaths = [ "/etc/netns/pia/resolv.conf:/etc/resolv.conf" ];
+      BindPaths = [ "/tank/DATA/cbz" ];
     };
   };
 

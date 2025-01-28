@@ -64,6 +64,8 @@ pia_add_key() {
 }
 
 pia_pick_server() {
+	echo "picking server"
+
 	pia_servers_resp="$(curl --max-time 15 'https://serverlist.piaservers.net/vpninfo/servers/v6') | head -1)"
 	pia_servers="$(echo "$pia_servers_resp" | head -1)"
 
@@ -89,6 +91,8 @@ pia_server_load() {
 	if ! [ -e "$DATA_DIR/server" ]; then
 		return 1
 	fi
+
+	echo "loading existing server"
 
 	server_json="$(cat "$DATA_DIR/server")"
 	WG_SERVER_IP=$(printf "%s" "$server_json" | jq -r .ip)

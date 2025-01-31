@@ -640,6 +640,22 @@ in
     };
   };
 
+  systemd.services.podman-komf.serviceConfig = {
+    EnvironmentFile = "/persist/etc/default/komf";
+  };
+
+  virtualisation.oci-containers.containers = {
+    komf = {
+      image = "sndxr/komf:latest";
+      ports = [ "127.0.0.1:8080:8080" ];
+      environment = {
+        KOMF_KOMGA_BASE_URI = "http://komga:25600";
+        KOMF_KAVITA_BASE_URI = "http://kavita:5000";
+        KOMF_LOG_LEVEL = "INFO";
+      };
+    };
+  };
+
   services.jellyfin.enable = true;
 
   # FIXME: pick exactly what we require for jellyfin
@@ -770,6 +786,10 @@ in
       PrivateTmp = true;
       ExecStart = "${pkgs.systemd}/lib/systemd/systemd-socket-proxyd --exit-idle-time=5m 127.0.0.1:${toString transmissionPort}";
     };
+  };
+
+  services.locate = {
+    enable = true;
   };
 
   system.stateVersion = "24.11";

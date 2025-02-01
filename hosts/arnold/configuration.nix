@@ -3,6 +3,7 @@ let
   ssh-auth = (import ../../nixos/ssh-auth.nix);
   authorizedKeys = ssh-auth.authorizedKeys;
   komgaPort = 10100;
+  kavitaPort = 10101;
   transmissionPort = 9091;
   pia-wg-util = pkgs.writeShellApplication {
     name = "pia-wg-util";
@@ -451,12 +452,6 @@ in
       # NOTE: nixos can't handle virtualHosts with multiple hosts, so we have to set logFormat manually
       logFormat = "output file /var/log/caddy/arnold.einic.org.log";
       extraConfig = ''
-        @mkv path *.mkv
-        header @mkv {
-          Content-Disposition inline
-          Content-Type video/webm 
-        }
-
         @free-games-claimer host free-games-claimer.arnold.einic.org
         route @free-games-claimer {
           import /persist/etc/secret/caddy-auth
@@ -501,6 +496,12 @@ in
         @komga host komga.arnold.einic.org
         route @komga {
           reverse_proxy 127.0.0.1:${toString komgaPort}
+        }
+
+        @kavita host kavita.arnold.einic.org
+        route @kavita {
+          import /persist/etc/secret/caddy-auth
+          reverse_proxy 127.0.0.1:${toString kavitaPort}
         }
 
         @jellyfin host jellyfin.arnold.einic.org
@@ -650,10 +651,17 @@ in
       image = "sndxr/komf:latest";
       ports = [ "127.0.0.1:8080:8080" ];
       environment = {
-        KOMF_KOMGA_BASE_URI = "http://komga:25600";
-        KOMF_KAVITA_BASE_URI = "http://kavita:5000";
+        KOMF_KOMGA_BASE_URI = "http://localhost:${toString komgaPort}";
+        KOMF_KAVITA_BASE_URI = "http://localhost:${toString kavitaPort}";
         KOMF_LOG_LEVEL = "INFO";
       };
+    };
+  };
+
+  services.kavita = {
+    enable = true;
+    settings = {
+      Port = kavitaPort;
     };
   };
 

@@ -27,4 +27,6 @@
   # TODO: ipv6 vs ipv4? (I copied this from my existing config)
   # TODO: grab the default port from somewhere? (this is _probably_ not the default)
   config.services.atticd.settings.listen = lib.mkDefault "[::1]:8915";
+
+  services.kavita.settings.IpAddresses = lib.mkDefault "127.0.0.1,::1";
 }

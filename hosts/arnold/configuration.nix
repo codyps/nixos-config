@@ -659,6 +659,7 @@ in
 
   services.kavita = {
     enable = true;
+    tokenKeyFile = "/persist/etc/kavita/tokenKeyFile";
     settings = {
       Port = kavitaPort;
     };

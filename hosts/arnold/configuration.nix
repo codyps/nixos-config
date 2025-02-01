@@ -812,5 +812,7 @@ in
     defaults.monitored = "-a -o on -s (S/../.././02|L/../../7/04)";
   };
 
+  hardware.cpu.intel.updateMicrocode = true;
+
   system.stateVersion = "24.11";
 }

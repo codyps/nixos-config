@@ -26,7 +26,6 @@ in
     cargo-generate
     tokei
     rust-bindgen
-    xsv
   ];
 
   # Auto upgrade nix package and the daemon service.

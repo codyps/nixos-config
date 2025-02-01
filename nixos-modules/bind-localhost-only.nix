@@ -28,5 +28,5 @@
   # TODO: grab the default port from somewhere? (this is _probably_ not the default)
   config.services.atticd.settings.listen = lib.mkDefault "[::1]:8915";
 
-  services.kavita.settings.IpAddresses = lib.mkDefault "127.0.0.1,::1";
+  config.services.kavita.settings.IpAddresses = lib.mkDefault "127.0.0.1,::1";
 }

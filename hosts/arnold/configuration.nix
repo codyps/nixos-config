@@ -15,9 +15,8 @@ in
   imports =
     [
       ./hardware-configuration.nix
-      ../../nixos-modules/zfs.nix
+      ../../nixos-modules/all-modules.nix
       ../../modules/tailscale-initrd.nix
-      ../../modules/bind-localhost-only.nix
     ];
 
   boot.loader.efi.efiSysMountPoint = "/boot.d/0";

@@ -56,6 +56,7 @@ in
       "/var/lib/audiobookshelf"
       "/var/lib/samba"
       "/var/lib/komga"
+      "/var/lib/kavita"
       "/var/lib/transmission"
       "/var/lib/jellyfin"
       "/etc/NetworkManager/system-connections"

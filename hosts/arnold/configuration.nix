@@ -4,6 +4,7 @@ let
   authorizedKeys = ssh-auth.authorizedKeys;
   komgaPort = 10100;
   kavitaPort = 10101;
+  komfPort = 10102;
   transmissionPort = 9091;
   pia-wg-util = pkgs.writeShellApplication {
     name = "pia-wg-util";
@@ -648,7 +649,7 @@ in
   virtualisation.oci-containers.containers = {
     komf = {
       image = "sndxr/komf:latest";
-      ports = [ "127.0.0.1:8080:8080" ];
+      ports = [ "127.0.0.1:${toString komfPort}:8080" ];
       environment = {
         KOMF_KOMGA_BASE_URI = "http://localhost:${toString komgaPort}";
         KOMF_KAVITA_BASE_URI = "http://localhost:${toString kavitaPort}";

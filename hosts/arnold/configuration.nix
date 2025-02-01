@@ -649,12 +649,16 @@ in
   virtualisation.oci-containers.containers = {
     komf = {
       image = "sndxr/komf:latest";
-      ports = [ "127.0.0.1:${toString komfPort}:8080" ];
+      ports = [ "127.0.0.1:${toString komfPort}:${toString komfPort}" ];
       environment = {
-        KOMF_KOMGA_BASE_URI = "http://localhost:${toString komgaPort}";
-        KOMF_KAVITA_BASE_URI = "http://localhost:${toString kavitaPort}";
+        KOMF_SERVER_PORT = toString komfPort;
+        KOMF_KOMGA_BASE_URI = "http://host-gateway:${toString komgaPort}";
+        KOMF_KAVITA_BASE_URI = "http://host-gateway:${toString kavitaPort}";
         KOMF_LOG_LEVEL = "INFO";
       };
+      volumes = [
+        "/persist/var/lib/komf:/config"
+      ];
     };
   };
 

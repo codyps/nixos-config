@@ -652,8 +652,8 @@ in
       ports = [ "127.0.0.1:${toString komfPort}:${toString komfPort}" ];
       environment = {
         KOMF_SERVER_PORT = toString komfPort;
-        KOMF_KOMGA_BASE_URI = "http://host-gateway:${toString komgaPort}";
-        KOMF_KAVITA_BASE_URI = "http://host-gateway:${toString kavitaPort}";
+        KOMF_KOMGA_BASE_URI = "http://host.containers.internal:${toString komgaPort}";
+        KOMF_KAVITA_BASE_URI = "http://host.containers.internal:${toString kavitaPort}";
         KOMF_LOG_LEVEL = "INFO";
       };
       volumes = [

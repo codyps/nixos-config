@@ -499,7 +499,6 @@ in
 
         @kavita host kavita.arnold.einic.org
         route @kavita {
-          import /persist/etc/secret/caddy-auth
           reverse_proxy 127.0.0.1:${toString kavitaPort}
         }
 

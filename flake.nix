@@ -46,6 +46,11 @@
             ];
             hash = "sha256-NZ3Cik3WHB1ad0ImuqU+IMKcg3zJ1AkL1xXpPwa89o4=";
           };
+
+          # re-import audiobookshelf with ffmpeg-full replaced by ffmpeg-headless
+          audiobookshelf-headless = prev.callPackage (nixpkgs + "/pkgs/by-name/au/audiobookshelf/package.nix") {
+            ffmpeg-full = prev.ffmpeg-headless;
+          };
         })
         (import ./nixpkgs/overlays/overlay.nix)
         ethereum-nix.overlays.default

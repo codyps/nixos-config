@@ -414,6 +414,7 @@ in
   };
 
   services.audiobookshelf = {
+    package = pkgs.audiobookshelf-headless;
     enable = true;
     port = 8917;
   };

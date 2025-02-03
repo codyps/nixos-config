@@ -48,9 +48,14 @@
           };
 
           # re-import audiobookshelf with ffmpeg-full replaced by ffmpeg-headless
-          audiobookshelf-headless = prev.callPackage (nixpkgs + "/pkgs/by-name/au/audiobookshelf/package.nix") {
-            ffmpeg-full = prev.ffmpeg-headless;
-          };
+          audiobookshelf-headless = prev.pkgs.audiobookshelf.overrideAttrs (old: {
+            wrapper = import (nixpkgs + "/pkgs/by-name/au/audiobookshelf/wrapper.nix") {
+              nunicode = prev.pkgs.nunicode;
+              ffmpeg-full = prev.pkgs.ffmpeg-headless;
+              stdenv = prev.stdenv;
+              getopt = prev.pkgs.getopt;
+            };
+          });
         })
         (import ./nixpkgs/overlays/overlay.nix)
         ethereum-nix.overlays.default

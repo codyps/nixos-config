@@ -27,14 +27,10 @@ in
 
   # Bootloader.
   boot.loader.grub.enable = true;
-  boot.loader.grub.device = "/dev/disk/by-id/wwn-0x500a0751e6d4d4a7";
+  boot.loader.grub.device = "/dev/sda";
   boot.loader.grub.useOSProber = true;
 
-  nix.settings = {
-    experimental-features = [ "nix-command" "flakes" ];
-    trusted-users = [ "root" "@wheel" ];
-    builders-use-substitutes = true;
-  };
+  nix.settings.experimental-features = [ "nix-command" "flakes" ];
 
   networking.hostName = "constance"; # Define your hostname.
   # networking.wireless.enable = true;  # Enables wireless support via wpa_supplicant.
@@ -44,6 +40,10 @@ in
   system.autoUpgrade.enable = true;
   services.tailscale.enable = true;
   services.homed.enable = true;
+
+  # Configure network proxy if necessary
+  # networking.proxy.default = "http://user:password@proxy:port/";
+  # networking.proxy.noProxy = "127.0.0.1,localhost,internal.domain";
 
   # Enable networking
   networking.networkmanager.enable = true;
@@ -71,7 +71,6 @@ in
 
   # Enable the Pantheon Desktop Environment.
   services.xserver.displayManager.lightdm.enable = true;
-  services.xserver.displayManager.lightdm.greeters.pantheon.enable = true;
   services.xserver.desktopManager.pantheon.enable = true;
   services.gvfs.enable = true;
 
@@ -108,15 +107,14 @@ in
   # Enable touchpad support (enabled default in most desktopManager).
   # services.xserver.libinput.enable = true;
 
-  users.defaultUserShell = pkgs.zsh;
-
+  # Define a user account. Don't forget to set a password with ‘passwd’.
   users.users.cody2 = {
     isNormalUser = true;
     description = "Cody 2";
     extraGroups = [ "networkmanager" "wheel" ];
     packages = with pkgs; [
       firefox
-      #  thunderbird
+    #  thunderbird
     ];
   };
 
@@ -125,14 +123,13 @@ in
 
   programs.neovim.enable = true;
   programs.neovim.defaultEditor = true;
-  programs.zsh.enable = true;
 
   # List packages installed in system profile. To search, run:
   # $ nix search wget
   environment.systemPackages = with pkgs; [
     neovim
     cifs-utils
-    #zsh
+    zsh
   ];
 
   # Some programs need SUID wrappers, can be configured further or are
@@ -155,43 +152,12 @@ in
   # networking.firewall.enable = false;
 
   fileSystems."/tank" = {
-    device = "//arnold/tank";
-    fsType = "cifs";
-    options =
-      let
+      device = "//arnold/tank";
+      fsType = "cifs";
+      options = let
         automount_opts = "x-systemd.automount,noauto,x-systemd.idle-timeout=60,x-systemd.device-timeout=5s,x-systemd.mount-timeout=5s";
 
-      in
-      [ "${automount_opts},credentials=/home/cody/smb-secrets" ];
-  };
-
-  hardware.graphics = {
-    enable = true;
-    extraPackages = [ pkgs.mesa.drivers ];
-  };
-
-  services.xserver.videoDrivers = [
-    #"radeon"
-    "intel"
-    "modesetting"
-    "fbdev"
-  ];
-
-  services.geth.holesky = {
-    enable = true;
-    ipc.enable = true;
-    network = "holesky";
-    authrpc.jwtsecret = execution_jwt_path;
-  };
-
-  services.lighthouse = {
-    beacon = {
-      enable = true;
-      execution.jwtPath = execution_jwt_path;
-      extraArgs = "--checkpoint-sync-url 'https://checkpoint-sync.holesky.ethpandaops.io/'";
-    };
-    validator.enable = true;
-    network = "holesky";
+      in ["${automount_opts},credentials=/home/cody/smb-secrets"];
   };
 
   # This value determines the NixOS release from which the default

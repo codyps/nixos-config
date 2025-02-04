@@ -87,8 +87,7 @@ in
   services.blueman.enable = true;
 
   # Enable sound with pipewire.
-  sound.enable = true;
-  hardware.pulseaudio.enable = false;
+  services.pulseaudio.enable = false;
   security.rtkit.enable = true;
   security.sudo.wheelNeedsPassword = false;
   services.pipewire = {
@@ -104,8 +103,12 @@ in
     #media-session.enable = true;
   };
 
+  programs.zsh.enable = true;
+
   # Enable touchpad support (enabled default in most desktopManager).
   # services.xserver.libinput.enable = true;
+
+  users.defaultUserShell = pkgs.zsh;
 
   # Define a user account. Don't forget to set a password with ‘passwd’.
   users.users.cody2 = {
@@ -159,6 +162,15 @@ in
 
       in ["${automount_opts},credentials=/home/cody/smb-secrets"];
   };
+
+  hardware.graphics = {
+    enable = true;
+    extraPackages = [ pkgs.mesa.drivers ];
+  };
+
+  services.xserver.videoDrivers = [
+    "modesetting"
+  ];
 
   # This value determines the NixOS release from which the default
   # settings for stateful data, like file locations and database versions

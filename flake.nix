@@ -192,6 +192,7 @@
             system = "x86_64-linux";
             specialArgs = { inherit home-manager; };
             modules = [
+              ./nixos-modules/all-modules.nix
               ./hosts/constance/configuration.nix
             ];
           };

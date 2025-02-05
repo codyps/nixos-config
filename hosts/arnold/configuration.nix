@@ -5,7 +5,12 @@ let
   komgaPort = 10100;
   kavitaPort = 10101;
   komfPort = 10102;
+  calibreWebAutomatedPort = 10103;
+
+  # NOTE: because `transmission-remote` looks at localhost:9091 by default, if
+  # we change this we should wrap `transmission-remote`.
   transmissionPort = 9091;
+
   pia-wg-util = pkgs.writeShellApplication {
     name = "pia-wg-util";
     text = builtins.readFile ../../scripts/pia-wg-util.sh;
@@ -526,68 +531,7 @@ in
 
         @arnold host arnold.einic.org
         route @arnold {
-                @secure {
-                        not path /~*
-                        #path /tank/*
-                        #path /games/*
-                        not path /audiobooks
-                        not path /audiobooks/*
-                        not path /switch
-                        not path /switch/*
-                }
-
-                @switch {
-                        path /switch
-                        path /switch/*
-                }
-
                 import /persist/etc/secret/caddy-auth-2
-
-                redir /jackett /jackett/
-                reverse_proxy /jackett/* http://127.0.0.1:9117
-
-                redir /tank /tank/
-                handle_path /tank/* {
-                    file_server browse {
-                        root /tank
-                    }
-                }
-
-                redir /switch /switch/
-                handle_path /switch/* {
-                    file_server browse {
-                        root /tank/DATA/games/console/nintendo-switch
-                    }
-                }
-
-                redir /audiobooks /audiobooks/
-                handle_path /audiobooks/* {
-                    file_server browse {
-                        root /tank/DATA/audiobooks
-                    }
-                }
-
-                redir /games /games/
-                handle_path /games/* {
-                    file_server browse {
-                        root /tank/DATA/games
-                    }
-                }
-
-                @user_html {
-                     path_regexp user '^/~([^/]+)'
-                }
-
-                route @user_html {
-                    uri strip_prefix {re.user.0}
-                    file_server browse {
-                        root /home/{re.user.1}/public_html/
-                    }
-                }
-
-                root * /srv/http
-                templates
-                file_server
         }
 
         root * /srv/http
@@ -595,6 +539,11 @@ in
         encode zstd gzip
       '';
     };
+  };
+
+  services.syncthing = {
+    enable = true;
+    dataDir = "/tank/DATA/syncthing";
   };
 
   services.avahi = {
@@ -647,8 +596,7 @@ in
     EnvironmentFile = "/persist/etc/default/komf";
   };
 
-  virtualisation.oci-containers.containers = {
-    komf = {
+  virtualisation.oci-containers.containers.komf = {
       image = "sndxr/komf:latest";
       ports = [ "127.0.0.1:${toString komfPort}:${toString komfPort}" ];
       environment = {
@@ -660,7 +608,21 @@ in
       volumes = [
         "/persist/var/lib/komf:/config"
       ];
-    };
+  };
+
+  virtualisation.oci-containers.containers.calibre-web-automated = {
+    image = "crocodilestick/calibre-web-automated:latest";
+    ports = [ "127.0.0.1:${toString calibreWebAutomatedPort}:8083" ];
+    environment = [
+      "PUID=1000"
+      "PGID=1000"
+      "TZ=America/New_York"
+    ];
+    volumes = [
+      "/persist/var/lib/calibre-web-automated:/config"
+      "/tank/DATA/calibre-library:/calibre-library"
+      "/tank/TMP/ingest/cwa-book-ingest:/cwa-book-ingest"
+    ];
   };
 
   services.kavita = {

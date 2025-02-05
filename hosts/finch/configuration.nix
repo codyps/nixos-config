@@ -317,7 +317,6 @@ in
 
   services.syncthing = {
     enable = true;
-    user = "syncthing";
     dataDir = "/tank/syncthing";
   };
 

@@ -625,6 +625,12 @@ in
       TZ = "America/New_York";
     };
     volumes = [
+      # NOTE: ideally, we'd either construct a temporary `/etc/passwd` (which
+      # would let us restrict the content as needed for the container) or
+      # resolve the username/group to a uid/gid in the service script and use
+      # that in the container. Bind mounting leaks info, but is quick & easy.
+      "/etc/passwd:/etc/passwd:ro"
+      "/etc/group:/etc/group:ro"
       "/persist/var/lib/calibre-web-automated:/config"
       "/tank/DATA/calibre-library:/calibre-library"
       "/tank/TMP/ingest/cwa-book-ingest:/cwa-book-ingest"

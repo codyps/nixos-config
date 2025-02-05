@@ -613,11 +613,11 @@ in
   virtualisation.oci-containers.containers.calibre-web-automated = {
     image = "crocodilestick/calibre-web-automated:latest";
     ports = [ "127.0.0.1:${toString calibreWebAutomatedPort}:8083" ];
-    environment = [
-      "PUID=1000"
-      "PGID=1000"
-      "TZ=America/New_York"
-    ];
+    environment = {
+      PUID ="1000";
+      PGID = "1000";
+      TZ = "America/New_York";
+    };
     volumes = [
       "/persist/var/lib/calibre-web-automated:/config"
       "/tank/DATA/calibre-library:/calibre-library"

@@ -7,8 +7,7 @@ in
   imports =
     [
       ./hardware-configuration.nix
-      ../../nixos-modules/zfs.nix
-      ../../modules/bind-localhost-only.nix
+      ../../nixos-modules/all-modules.nix
     ];
 
   boot.kernelParams = [ "ip=dhcp" ];

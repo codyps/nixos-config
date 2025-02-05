@@ -614,23 +614,25 @@ in
     description = "Calibre Web Automated";
     isSystemUser = true;
     group = "calibre-web-automated";
+    # FIXME: if we could set environment variables in the container dynamically
+    # (ie: at container creation time) we wouldn't need static uid/gid, but
+    # nixos doesn't support that right now.
+    uid = 502;
   };
-  users.groups.calibre-web-automated = {};
+  users.groups.calibre-web-automated = {
+    gid = 502;
+  };
 
   virtualisation.oci-containers.containers.calibre-web-automated = {
     image = "crocodilestick/calibre-web-automated:latest";
-    user = "calibre-web-automated:calibre-web-automated";
     ports = [ "127.0.0.1:${toString calibreWebAutomatedPort}:8083" ];
     environment = {
       TZ = "America/New_York";
+
+      PUID = toString config.users.users.calibre-web-automated.uid;
+      PGID = toString config.users.groups.calibre-web-automated.gid;
     };
     volumes = [
-      # NOTE: ideally, we'd either construct a temporary `/etc/passwd` (which
-      # would let us restrict the content as needed for the container) or
-      # resolve the username/group to a uid/gid in the service script and use
-      # that in the container. Bind mounting leaks info, but is quick & easy.
-      "/etc/passwd:/etc/passwd:ro"
-      "/etc/group:/etc/group:ro"
       "/persist/var/lib/calibre-web-automated:/config"
       "/tank/DATA/calibre-library:/calibre-library"
       "/tank/TMP/ingest/cwa-book-ingest:/cwa-book-ingest"

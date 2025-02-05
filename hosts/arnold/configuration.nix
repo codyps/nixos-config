@@ -610,12 +610,18 @@ in
       ];
   };
 
+  users.users.calibre-web-automated = {
+    description = "Calibre Web Automated";
+    isSystemUser = true;
+    group = "calibre-web-automated";
+  };
+  users.groups.calibre-web-automated = {};
+
   virtualisation.oci-containers.containers.calibre-web-automated = {
     image = "crocodilestick/calibre-web-automated:latest";
+    user = "calibre-web-automated:calibre-web-automated";
     ports = [ "127.0.0.1:${toString calibreWebAutomatedPort}:8083" ];
     environment = {
-      PUID ="1000";
-      PGID = "1000";
       TZ = "America/New_York";
     };
     volumes = [

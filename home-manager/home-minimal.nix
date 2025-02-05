@@ -216,6 +216,7 @@ in
     ".tmux.conf".source = ../config/.tmux.conf;
     ".config/kitty/kitty.conf".source = ../config/.config/kitty/kitty.conf;
     ".config/atuin/config.toml".source = ../config/.config/atuin/config.toml;
+    ".ssh/config".source = ../config/.ssh/config;
   };
 
   systemd.user.services.atuind = {

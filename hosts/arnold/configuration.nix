@@ -529,11 +529,6 @@ in
           reverse_proxy 127.0.0.1:${toString transmissionPort}
         }
 
-        @arnold host arnold.einic.org
-        route @arnold {
-                import /persist/etc/secret/caddy-auth-2
-        }
-
         @calibre-web-automated host calibre-web-automated.arnold.einic.org
         route @calibre-web-automated {
           reverse_proxy 127.0.0.1:${toString calibreWebAutomatedPort}

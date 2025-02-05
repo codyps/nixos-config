@@ -65,6 +65,12 @@ in
       "/var/lib/kavita"
       "/var/lib/transmission"
       "/var/lib/jellyfin"
+      "/var/lib/pia-wg"
+      "/var/lib/containers"
+      "/var/lib/systemd"
+      "/var/lib/caddy"
+      "/var/cache/jellyfin"
+      "/var/db"
       "/etc/NetworkManager/system-connections"
       { directory = "/var/lib/colord"; user = "colord"; group = "colord"; mode = "u=rwx,g=rx,o="; }
     ];

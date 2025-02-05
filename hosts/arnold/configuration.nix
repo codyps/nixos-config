@@ -617,7 +617,7 @@ in
     # FIXME: if we could set environment variables in the container dynamically
     # (ie: at container creation time) we wouldn't need static uid/gid, but
     # nixos doesn't support that right now.
-    uid = 982;
+    uid = 988;
   };
   users.groups.calibre-web-automated = {
     gid = 982;

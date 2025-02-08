@@ -174,6 +174,7 @@ in
       fzf-vim
       fzfWrapper
       kotlin-vim
+      pest-vim
       rust-vim
       securemodelines
       vim-airline

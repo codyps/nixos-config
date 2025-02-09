@@ -185,8 +185,11 @@ in
       '';
     };
 
-    virtualHosts."ward.little-moth.ts.net,*.ward.ts.einic.org" = {
+    # NOTE: merged these because we have the same listenaddress and it seemed to fail with 2 seperate ones with the same address
+    virtualHosts."ward.little-moth.ts.net, *.ward.ts.einic.org" = {
       listenAddresses = [ "100.115.212.42" ];
+      # NOTE: nixos can't handle virtualHosts with multiple hosts, so we have to set logFormat manually
+      logFormat = "output file /var/log/caddy/ward.ts.einic.org.log";
       extraConfig = ''
         root /srv
 

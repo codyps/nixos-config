@@ -185,7 +185,7 @@ in
       '';
     };
 
-    virtualHosts."*.ward.ts.einic.org" = {
+    virtualHosts."ward.little-moth.ts.net,*.ward.ts.einic.org" = {
       listenAddresses = [ "100.115.212.42" ];
       extraConfig = ''
         root /srv
@@ -208,66 +208,58 @@ in
           reverse_proxy http://localhost:8000
         }
 
-        handle {
-          abort
-        }
-      '';
-    };
+        @tsnet host ward.little-moth.ts.net
+        handle @tsnet {
+          redir /nix-cache /nix-cache/ 301
+          handle_path /nix-cache/* {
+            cache {
+              badger {
+                path /ward/keep/nix-cache
+              }
 
-    virtualHosts."ward.little-moth.ts.net" = {
-      listenAddresses = [ "100.115.212.42" ];
-      extraConfig = ''
-        root /srv
+              key {
+                disable_host
+                disable_scheme
+              }
 
-        redir /nix-cache /nix-cache/ 301
-        handle_path /nix-cache/* {
-          cache {
-            badger {
-              path /ward/keep/nix-cache
+              ttl 30000h
+              default_cache_control no-store
             }
+            reverse_proxy https://cache.nixos.org {
+              header_up Host {upstream_hostport}
 
-            key {
-              disable_host
-              disable_scheme
-            }
-
-            ttl 30000h
-            default_cache_control no-store
-          }
-          reverse_proxy https://cache.nixos.org {
-            header_up Host {upstream_hostport}
-
-            @ok status 200 302
-            handle_response @ok {
-              header Cache-Control "public, immutable"
-              copy_response
+              @ok status 200 302
+              handle_response @ok {
+                header Cache-Control "public, immutable"
+                copy_response
+              }
             }
           }
-        }
 
-        redir /harmonia /harmonia/ 301
-        handle_path /harmonia/* {
-          reverse_proxy http://localhost:8916 {
+          redir /harmonia /harmonia/ 301
+          handle_path /harmonia/* {
+            reverse_proxy http://localhost:8916 {
+            }
           }
-        }
 
-        redir /hydra /hydra/ 301
-        handle_path /hydra/* {
-          reverse_proxy http://localhost:${toString config.services.hydra.port} {
-            header_up Host {upstream_hostport}
-            header_up X-Request-Base /hydra
+          redir /hydra /hydra/ 301
+          handle_path /hydra/* {
+            reverse_proxy http://localhost:${toString config.services.hydra.port} {
+              header_up Host {upstream_hostport}
+              header_up X-Request-Base /hydra
+            }
           }
-        }
 
-        redir /audiobooks /audiobooks/ 301
-        handle_path /audiobooks/* {
-          root /ward/keep/libation/data/Books
-          file_server browse
-        }
+          redir /audiobooks /audiobooks/ 301
+          handle_path /audiobooks/* {
+            root /ward/keep/libation/data/Books
+            file_server browse
+          }
 
-        redir /grafana /grafana/ 301
-        handle_path /grafana/* {
-          reverse_proxy http://${toString config.services.grafana.settings.server.http_addr}:${toString config.services.grafana.settings.server.http_port}
+          redir /grafana /grafana/ 301
+          handle_path /grafana/* {
+            reverse_proxy http://${toString config.services.grafana.settings.server.http_addr}:${toString config.services.grafana.settings.server.http_port}
+          }
         }
 
         # return 404 for all other requests
@@ -413,8 +405,9 @@ in
 
   environment.etc."gdm/greeter.dconf-defaults" = {
     text = ''
-      [org.gnome.settings-daemon.plugins.power]
+      [org/gnome/settings-daemon/plugins/power]
       sleep-inactive-ac-type='nothing'
+      sleep-inactive-ac-timeout=0
     '';
   };
 

@@ -272,6 +272,12 @@ in
         }
     });
   '';
+  environment.etc."gdm/greeter.dconf-defaults" = {
+    text = ''
+      [org.gnome.settings-daemon.plugins.power]
+      sleep-inactive-ac-type='nothing'
+    '';
+  };
 
   users.mutableUsers = false;
   users.users.cody = {

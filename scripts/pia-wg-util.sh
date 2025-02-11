@@ -210,7 +210,6 @@ pia_port_forward_bind() {
 pia_port_forward() {
 	pia_payload_and_signature
 	if pia_port_forward_bind; then
-		echo "port forward success"
 		return 0
 	fi
 
@@ -219,8 +218,8 @@ pia_port_forward() {
 		echo "refresh failed"
 		return 1
 	}
+
 	if pia_port_forward_bind; then
-		echo "port forward success"
 		return 0
 	fi
 
@@ -325,14 +324,13 @@ while true; do
 	echo "wireguard up"
 
 	pia_port_forward && {
-		echo "port forward success"
 		port_forward_time="$(date +%s)"
 	} || echo "port forward failed"
 
 	while true; do
 		echo "sleeping until ping check"
 		sleep 60s
-		ping -c1 8.8.8.8 || {
+		ping -q -c1 8.8.8.8 || {
 			echo "ping failed"
 			break
 		}
@@ -340,7 +338,6 @@ while true; do
 		# refresh port forward every 15 minutes
 		if [ "$((port_forward_time + 900))" -lt "$(date +%s)" ]; then
 			pia_port_forward && {
-				echo "port forward success"
 				port_forward_time="$(date +%s)"
 			} || echo "port forward failed"
 		fi

@@ -202,6 +202,8 @@ pia_port_forward_bind() {
 		return 1
 	fi
 
+	echo "port forward success, port=$port"
+
 	echo "$port" >"$DATA_DIR/port"
 }
 
@@ -329,8 +331,8 @@ while true; do
 
 	while true; do
 		echo "sleeping until ping check"
-		sleep 60
-		ping -n 1 8.8.8.8 || {
+		sleep 60s
+		ping -c1 8.8.8.8 || {
 			echo "ping failed"
 			break
 		}

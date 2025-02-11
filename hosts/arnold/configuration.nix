@@ -307,6 +307,7 @@ in
     git
     curl
     htop
+    wireguard-tools
   ];
 
   programs.mtr.enable = true;

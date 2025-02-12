@@ -133,7 +133,7 @@ in
     virtualHosts."*.einic.org" = {
       extraConfig = ''
 
-        @arnold host arnold.einic.org
+        @arnold host arnold.einic.org *.arnold.einic.org
         handle @arnold {
           reverse_proxy https://192.168.6.10
         }

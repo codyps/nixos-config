@@ -132,6 +132,12 @@ in
 
     virtualHosts."*.einic.org" = {
       extraConfig = ''
+
+        @arnold host arnold.einic.org
+        handle @arnold {
+          reverse_proxy https://192.168.6.10
+        }
+
         @audiobooks host audiobooks.einic.org
         handle @audiobooks {
           root /ward/keep/libation/data/Books

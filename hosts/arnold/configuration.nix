@@ -174,7 +174,12 @@ in
   networking.useDHCP = false;
   networking.networkmanager.enable = false;
   networking.firewall.trustedInterfaces = [ "tailscale0" "podman0" ];
-  networking.firewall.allowedTCPPorts = [ 80 443 ];
+  networking.firewall.allowedTCPPorts = [
+    # caddy
+    80 443 
+    # syncthing
+    22000
+  ];
   networking.firewall.allowPing = true;
 
   networking.hostName = "arnold";

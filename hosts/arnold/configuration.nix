@@ -180,6 +180,14 @@ in
     # syncthing
     22000
   ];
+
+  networking.firewall.allowedUDPPorts = [
+    # jellyfin
+    1900 7359
+    # syncthing
+    21027
+  ];
+
   networking.firewall.allowPing = true;
 
   networking.hostName = "arnold";

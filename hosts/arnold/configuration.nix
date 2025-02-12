@@ -807,5 +807,13 @@ in
 
   hardware.cpu.intel.updateMicrocode = true;
 
+  hardware.opengl = {
+    enable = true;
+    extraPackages = with pkgs; [
+      vaapiIntel
+      intel-media-sdk
+    ];
+  };
+
   system.stateVersion = "24.11";
 }

@@ -678,7 +678,7 @@ in
     extraPackages = with pkgs; [
       intel-media-driver
       intel-vaapi-driver
-      vaapiVdpau
+      vaapiIntel
       libvdpau-va-gl
       intel-compute-runtime # OpenCL filter support (hardware tonemapping and subtitle burn-in)
       vpl-gpu-rt # QSV on 11th gen or newer
@@ -812,13 +812,6 @@ in
 
   hardware.cpu.intel.updateMicrocode = true;
 
-  hardware.opengl = {
-    enable = true;
-    extraPackages = with pkgs; [
-      vaapiIntel
-      intel-media-sdk
-    ];
-  };
 
   system.stateVersion = "24.11";
 }

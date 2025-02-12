@@ -691,6 +691,8 @@ in
       intel-compute-runtime-legacy1 # OpenCL filter support (hardware tonemapping and subtitle burn-in), Gen 8,9,11
       vpl-gpu-rt # QSV on 11th gen or newer
       intel-media-sdk # QSV up to 11th gen
+      ocl-icd
+      intel-opencl-icd-legacy1
     ];
   };
 

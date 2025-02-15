@@ -571,6 +571,24 @@ in
           reverse_proxy 127.0.0.1:${toString calibreWebAutomatedPort}
         }
 
+        @prowlarr host prowlarr.arnold.einic.org
+        route @prowlarr {
+          import /persist/etc/secret/caddy-auth
+          reverse_proxy :9696
+        }
+
+        @readarr host readarr.arnold.einic.org
+        route @readarr {
+          import /persist/etc/secret/caddy-auth
+          reverse_proxy :8787
+        }
+
+        @radarr host radarr.arnold.einic.org
+        route @radarr {
+          import /persist/etc/secret/caddy-auth
+          reverse_proxy :7878
+        }
+
         root * /srv/http
 
         encode zstd gzip

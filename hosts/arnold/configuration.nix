@@ -73,7 +73,7 @@ in
       "/var/lib/systemd"
       "/var/lib/caddy"
       "/var/lib/readarr"
-      "/var/lib/prowlarr"
+      "/var/lib/private/prowlarr"
       "/var/lib/sonarr"
       "/var/lib/radarr"
       "/var/cache/jellyfin"

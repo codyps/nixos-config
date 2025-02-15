@@ -83,6 +83,10 @@ in
     ];
   };
 
+  systemd.tmpfiles.rules = [
+    "d /var/lib/private 0700 root root"
+  ];
+
   # FIXME: if we disable this, then everything breaks becasue we don't every load keys. We'll have to insert our own key loading
   boot.zfs.requestEncryptionCredentials = false;
 

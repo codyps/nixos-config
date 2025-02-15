@@ -584,6 +584,12 @@ in
           reverse_proxy :7878
         }
 
+        @sabnzbd host sabnzbd.arnold.einic.org
+        route @sabnzbd {
+          import /persist/etc/secret/caddy-auth
+          reverse_proxy :8080
+        }
+        
         root * /srv/http
 
         encode zstd gzip

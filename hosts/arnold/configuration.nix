@@ -66,6 +66,7 @@ in
       "/var/lib/transmission"
       "/var/lib/jellyfin"
       "/var/lib/pia-wg"
+      "/var/lib/sabnzbd"
       "/var/lib/containers"
       "/var/lib/systemd"
       "/var/lib/caddy"
@@ -701,10 +702,6 @@ in
 
   zramSwap.enable = true;
   services.uptimed.enable = true;
-
-  services.sabnzbd = {
-    enable = true;
-  };
 
   # FIXME: this writes configuration into `/var/lib/transmission`, which we
   # normally wipe and bind mount to preserve. This causes the same issues komga

@@ -819,6 +819,15 @@ in
     defaults.monitored = "-a -o on -s (S/../.././02|L/../../7/04)";
   };
 
+  services.sabnzbd = {
+    enable = true;
+    configFile = "/persist/etc/sabnzbd/sabnzbd.ini";
+  };
+
+  services.prowlarr = {
+    enable = true;
+  };
+
   hardware.cpu.intel.updateMicrocode = true;
 
 

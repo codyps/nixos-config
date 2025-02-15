@@ -31,7 +31,7 @@ in
 
   # hack because nixos doesn't have multi-boot partition support for systemd-boot
   boot.loader.systemd-boot.extraInstallCommands = ''
-    ${pkgs.rsync}/bin/rsync -ahiv --delete /boot.d/0/ /boot.d/1/
+    ${pkgs.rsync}/bin/rsync -ahiq --delete /boot.d/0/ /boot.d/1/
   '';
   # TODO: avoid overwriting the random-seed if we wrote it to the alternate boot partition
   # TODO: tweak systemd-boot-random-seed.service and others to use the other
@@ -40,6 +40,8 @@ in
 
   boot.loader.systemd-boot.enable = true;
   boot.loader.efi.canTouchEfiVariables = true;
+
+  hardware.cpu.intel.updateMicrocode = true;
 
   systemd.watchdog.runtimeTime = "30s";
 
@@ -70,6 +72,10 @@ in
       "/var/lib/containers"
       "/var/lib/systemd"
       "/var/lib/caddy"
+      "/var/lib/readarr"
+      "/var/lib/prowlarr"
+      "/var/lib/sonarr"
+      "/var/lib/radarr"
       "/var/cache/jellyfin"
       "/var/db"
       "/etc/NetworkManager/system-connections"
@@ -817,16 +823,28 @@ in
   };
 
   services.sabnzbd = {
+    # TODO: generate/track config file here instead of using the default
     enable = true;
     configFile = "/persist/etc/sabnzbd/sabnzbd.ini";
   };
 
   services.prowlarr = {
+    # TODO: set port here
     enable = true;
   };
 
-  hardware.cpu.intel.updateMicrocode = true;
+  services.readarr = {
+    # TODO: set port here
+    enable = true;
+  };
 
+  services.sonarr = {
+    enable = true;
+  };
+
+  services.radarr = {
+    enable = true;
+  };
 
   system.stateVersion = "24.11";
 }

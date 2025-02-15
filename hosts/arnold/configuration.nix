@@ -555,11 +555,6 @@ in
           }
         }
 
-        @radarr host radarr.arnold.einic.org
-        route @radarr {
-          reverse_proxy :7878
-        }
-
         @transmission host transmission.arnold.einic.org
         route @transmission {
           import /persist/etc/secret/caddy-auth

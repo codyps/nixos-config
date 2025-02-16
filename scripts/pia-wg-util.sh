@@ -128,16 +128,19 @@ pia_payload_and_signature_load() {
 	echo "loading payload and signature"
 
 	if ! [ -e "$DATA_DIR/payload_and_signature" ]; then
+		>&2 echo "payload_and_signature file not found"
 		return 1
 	fi
 
 	payload_and_signature="$(cat "$DATA_DIR/payload_and_signature")"
 	if [ "$(echo "$payload_and_signature" | jq -r '.status')" != "OK" ]; then
+		>&2 echo "payload_and_signature content not ok: $payload_and_signature"
 		return 1
 	fi
 	payload=$(echo "$payload_and_signature" | jq -r '.payload')
 	expires_at=$(echo "$payload" | base64 -d | jq -r '.expires_at')
-	if [ "$(date -d "$expires_at" +%s)" -gt "$(date +%s)" ]; then
+	if [ "$(date -d "$expires_at" +%s)" -lt "$(date +%s)" ]; then
+		echo "port forward expired"
 		return 1
 	fi
 }

@@ -869,5 +869,15 @@ in
     enable = true;
   };
 
+  virtualisation.oci-containers.containers.recyclarr = {
+      image = "ghcr.io/recyclarr/recyclarr";
+      environment = {
+        TZ = "America/New_York";
+      };
+      volumes = [
+        "/persist/var/lib/private/recyclarr:/config"
+      ];
+  };
+
   system.stateVersion = "24.11";
 }

@@ -76,6 +76,15 @@
           };
         in
         {
+          devShell = pkgs.mkShell {
+            nativeBuildInputs = with pkgs; [
+              age
+              gnupg
+              ssh-to-pgp
+              ssh-to-age
+              sops
+            ];
+          };
           formatter = pkgs.nixpkgs-fmt;
         }
       ) //

@@ -43,8 +43,8 @@ in
       '';
     };
 
-    port = mkOption {
-      type = types.port;
+    webui_port = mkOption {
+      type = types.webui_port;
       default = 8080;
       description = ''
         qBittorrent web UI port.
@@ -63,7 +63,7 @@ in
       type = types.bool;
       default = false;
       description = ''
-        Open services.qBittorrent.port to the outside network.
+        Open services.qBittorrent.webui_port to the outside network.
       '';
     };
 
@@ -80,8 +80,8 @@ in
     environment.systemPackages = [ pkgs.qbittorrent ];
 
     networking.firewall = mkIf cfg.openFirewall {
-      allowedTCPPorts = [ cfg.port ];
-      allowedUDPPorts = [ cfg.port ];
+      allowedTCPPorts = [ cfg.webui_port ];
+      allowedUDPPorts = [ cfg.webui_port ];
     };
 
     systemd.services.qbittorrent = {
@@ -91,11 +91,9 @@ in
         ExecStart = ''
           ${cfg.package}/bin/qbittorrent-nox \
             --profile=${configDir} \
-            --webui-port=${toString cfg.port}
+            --webui-port=${toString cfg.webui_port}
         '';
-        # To prevent "Quit & shutdown daemon" from working; we want systemd to
-        # manage it!
-        Restart = "on-success";
+        Restart = "always";
         User = cfg.user;
         Group = cfg.group;
         UMask = "0002";

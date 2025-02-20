@@ -74,6 +74,7 @@ in
       "/var/lib/caddy"
       "/var/lib/readarr"
       "/var/lib/private/prowlarr"
+      "/var/lib/private/recyclarr"
       "/var/lib/sonarr"
       "/var/lib/radarr"
       "/var/cache/jellyfin"
@@ -869,14 +870,48 @@ in
     enable = true;
   };
 
+  /*
+  # FIXME: use dynamic user.
+  users.users.recyclarr = {
+    description = "Recyclarr";
+    isSystemUser = true;
+    group = "recyclarr";
+  };
+  users.groups.recyclarr = {};
+  */
+
+  # FIXME: use dynamic user.
+  systemd.services.recyclarr = {
+    serviceConfig = {
+      #User = "recyclarr";
+      DynamicUser = true;
+      #LoadCredential = "recyclarr-secrets.yaml:${config.sops.secrets."recyclarr/secrets.yaml".path}";
+      # copy the secrets into the services data dir
+      #ExecStartPre = "cp ${config.sops.secrets."recyclarr/secrets.yaml".path} /var/lib/private/recyclarr/secrets.yaml";
+    };
+  };
+
   virtualisation.oci-containers.containers.recyclarr = {
       image = "ghcr.io/recyclarr/recyclarr";
+      serviceName = "recyclarr";
+      extraOptions = [
+        "--security-opt=no-new-privileges"
+      #  "--host-user=recyclarr"
+      ];
+      #user = "recyclarr:recyclarr";
       environment = {
         TZ = "America/New_York";
       };
       volumes = [
         "/persist/var/lib/private/recyclarr:/config"
+        "/persist/var/lib/private/recyclarr/secrets.yaml:/config/secrets.yaml:ro"
       ];
+  };
+
+  sops.secrets."recyclarr-secrets.yml" = {
+    restartUnits = [ "recyclarr.service" ];
+    owner = "nobody:nogroup";
+    path = "/persist/var/lib/private/recyclarr/secrets.yaml";
   };
 
   system.stateVersion = "24.11";

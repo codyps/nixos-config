@@ -885,6 +885,8 @@ in
   # FIXME: use dynamic user.
   systemd.services.recyclarr = {
     serviceConfig = {
+      User = "${config.users.users.recyclarr.name}";
+      Group = "${config.users.users.recyclarr.group}";
       Type = lib.mkForce "oneshot";
       Restart = lib.mkForce "on-failure";
     };
@@ -895,7 +897,7 @@ in
       Persistent = true;
       OnCalendar = "daily";
       AccuracySec = "1h";
-      RandomizedDelaySec = "20m";
+      RandomizedDelaySec = "1h";
     };
   };
 
@@ -911,7 +913,6 @@ in
       cmd = [ "sync" "--app-data" "/config" ];
       environment = {
         TZ = "America/New_York";
-        "RECYCLARR_APP_DATA" = "/config";
       };
       volumes = [
         "/persist/var/lib/private/recyclarr:/config"

@@ -885,21 +885,30 @@ in
   # FIXME: use dynamic user.
   systemd.services.recyclarr = {
     serviceConfig = {
-      User = "recyclarr";
-      #DynamicUser = true;
-      #LoadCredential = "recyclarr-secrets.yaml:${config.sops.secrets."recyclarr/secrets.yaml".path}";
-      # copy the secrets into the services data dir
-      #ExecStartPre = "cp ${config.sops.secrets."recyclarr/secrets.yaml".path} /var/lib/private/recyclarr/secrets.yaml";
+      Type = lib.mkForce "oneshot";
+      Restart = lib.mkForce "on-failure";
+    };
+    after = mounts;
+    requires = mounts;
+  };
+
+  systemd.timer.recyclarr = {
+    wantedBy = [ "multi-user.target" ];
+    serviceConfig = {
+      Unit = "recyclarr.service";
+      OnCalendar = "*-*-* *:00:00";
     };
   };
 
   virtualisation.oci-containers.containers.recyclarr = {
+      autoStart = false;
       image = "ghcr.io/recyclarr/recyclarr";
       serviceName = "recyclarr";
       extraOptions = [
         "--security-opt=no-new-privileges"
         "--host-user=recyclarr"
       ];
+      cmd = [ "sync" "--app-data" "/config" ];
       user = "recyclarr:recyclarr";
       environment = {
         TZ = "America/New_York";
@@ -911,6 +920,9 @@ in
         "${./recyclarr/recyclarr.yml}:/config/recyclarr.yml:ro"
         "${./recyclarr/settings.yml}:/config/settings.yml:ro"
       ];
+      labels = {
+        "io.containers.autoupdate" = "registry";
+      };
   };
 
   sops.secrets."recyclarr-secrets.yml" = {

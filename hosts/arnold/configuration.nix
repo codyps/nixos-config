@@ -894,7 +894,7 @@ in
     wantedBy = [ "multi-user.target" ];
     serviceConfig = {
       Unit = "recyclarr.service";
-      OnCalendar = "*-*-* *:00:00";
+      OnCalendar = "daily";
     };
   };
 

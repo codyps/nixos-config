@@ -910,13 +910,13 @@ exec podman  \
   -e TZ=America/New_York \
   -v /persist/var/lib/private/recyclarr:/config \
   -v /run/secrets/recyclarr-secrets.yml:/config/secrets.yml:ro \
-  -v "${./recyclarr/recyclarr.yml}:/config/recyclarr.yml:ro"
-  -v "${./recyclarr/settings.yml}:/config/settings.yml:ro"
+  -v "${./recyclarr/recyclarr.yml}:/config/recyclarr.yml:ro" \
+  -v "${./recyclarr/settings.yml}:/config/settings.yml:ro" \
   -l io.containers.autoupdate=registry \
   --pull missing \
   '--security-opt=no-new-privileges' \
-  '--uidmap=1000:$(id -u recyclarr)' \
-  '--gidmap=1000:$(id -g recyclarr)' \
+  --uidmap=1000:$(id -u recyclarr) \
+  --gidmap=1000:$(id -g recyclarr) \
   ghcr.io/recyclarr/recyclarr \
   sync \
   --app-data \

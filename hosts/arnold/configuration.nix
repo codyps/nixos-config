@@ -912,7 +912,20 @@ in
       ];
   };
 
-  sops.secrets."recyclarr-secrets.yml" = {
+  systemd.tmpfiles.settings."10-recyclarr" = {
+    "/var/lib/private/recyclarr/recyclarr.yml"."L+" = {
+      argument = ./recyclarr/recyclarr.yml;
+    };
+    "/var/lib/private/recyclarr/settings.yml"."L+" = {
+      argument = ./recyclarr/settings.yml;
+    };
+  };
+
+  systemd.services.recyclarr.Unit.After = [ "sops-nix.service" ];
+
+  sops.defaultSopsFile = ./secrets.yml;
+
+  sops.secrets.recyclarr = {
     restartUnits = [ "recyclarr.service" ];
     owner = "nobody:nogroup";
     path = "/persist/var/lib/private/recyclarr/secrets.yaml";

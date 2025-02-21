@@ -888,11 +888,9 @@ in
       Type = lib.mkForce "oneshot";
       Restart = lib.mkForce "on-failure";
     };
-    after = mounts;
-    requires = mounts;
   };
 
-  systemd.timer.recyclarr = {
+  systemd.timers.recyclarr = {
     wantedBy = [ "multi-user.target" ];
     serviceConfig = {
       Unit = "recyclarr.service";

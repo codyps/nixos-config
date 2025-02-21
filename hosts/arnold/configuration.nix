@@ -905,7 +905,7 @@ in
       serviceName = "recyclarr";
       extraOptions = [
         "--security-opt=no-new-privileges"
-        "--host-user=recyclarr"
+        "--hostuser=recyclarr"
       ];
       cmd = [ "sync" "--app-data" "/config" ];
       user = "recyclarr:recyclarr";

@@ -907,8 +907,8 @@ in
       serviceName = "recyclarr";
       extraOptions = [
         "--security-opt=no-new-privileges"
-        "--hostuser=recyclarr"
-        #"--user=${config.users.users.recyclarr.name}:${config.users.users.recyclarr.group}"
+        "--uidmap=1000:$(id -u ${config.users.users.recyclarr.name})"
+        "--gidmap=1000:$(id -g ${config.users.users.recyclarr.name})"
       ];
       cmd = [ "sync" "--app-data" "/config" ];
       environment = {

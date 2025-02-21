@@ -896,6 +896,7 @@ in
     # manually.
     # This means that we're ignoring the upstream generation of the script, but
     # it works pretty well.
+    # NOTE: using `--uidmap` breaks podman, so we use `--user` instead.
     script = lib.mkForce ''
 exec podman  \
   run \
@@ -915,8 +916,7 @@ exec podman  \
   -l io.containers.autoupdate=registry \
   --pull missing \
   '--security-opt=no-new-privileges' \
-  --uidmap=1000:$(id -u recyclarr) \
-  --gidmap=1000:$(id -g recyclarr) \
+  --user $(id -u recyclarr):$(id -g recyclarr) \
   ghcr.io/recyclarr/recyclarr \
   sync \
   --app-data \

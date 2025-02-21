@@ -908,27 +908,21 @@ in
       };
       volumes = [
         "/persist/var/lib/private/recyclarr:/config"
-        "/persist/var/lib/private/recyclarr/secrets.yaml:/config/secrets.yaml:ro"
+        "/run/secrets/recyclarr-secrets.yml:/config/secrets.yml:ro"
+        "${./recyclarr/recyclarr.yml}:/config/recyclarr.yml:ro"
+        "${./recyclarr/settings.yml}:/config/settings.yml:ro"
       ];
   };
 
-  systemd.tmpfiles.settings."10-recyclarr" = {
-    "/var/lib/private/recyclarr/recyclarr.yml"."L+" = {
-      argument = ./recyclarr/recyclarr.yml;
-    };
-    "/var/lib/private/recyclarr/settings.yml"."L+" = {
-      argument = ./recyclarr/settings.yml;
-    };
-  };
-
   systemd.services.recyclarr.unitConfig.After = [ "sops-nix.service" ];
+  systemd.services.recyclarr.unitConfig.Requires = [ "sops-nix.service" ];
 
-  sops.defaultSopsFile = ./secrets.yml;
-
-  sops.secrets.recyclarr = {
+  sops.secrets."recyclarr-secrets.yml" = {
     restartUnits = [ "recyclarr.service" ];
-    owner = "nobody:nogroup";
-    path = "/persist/var/lib/private/recyclarr/secrets.yaml";
+    sopsFile = ./recyclarr/secrets.yml;
+    format = "binary";
+    owner = config.users.users.nobody.name;
+    group = config.users.users.nobody.group;
   };
 
   system.stateVersion = "24.11";

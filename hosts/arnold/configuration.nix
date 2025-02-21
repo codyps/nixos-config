@@ -885,8 +885,8 @@ in
   # FIXME: use dynamic user.
   systemd.services.recyclarr = {
     serviceConfig = {
-      User = "${config.users.users.recyclarr.name}";
-      Group = "${config.users.users.recyclarr.group}";
+      #User = "${config.users.users.recyclarr.name}";
+      #Group = "${config.users.users.recyclarr.group}";
       Type = lib.mkForce "oneshot";
       Restart = lib.mkForce "on-failure";
     };

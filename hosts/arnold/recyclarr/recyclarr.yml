@@ -5,7 +5,7 @@ sonarr:
   #web-1080p-v4:
   sonarr:
     # FIXME
-    base_url: http://localhost:8989
+    base_url: http://host.containers.internal:8989
 
     include:
       # Comment out any of the following includes to disable them

@@ -914,9 +914,6 @@ in
       ];
   };
 
-  systemd.services.recyclarr.unitConfig.After = [ "sops-nix.service" ];
-  systemd.services.recyclarr.unitConfig.Requires = [ "sops-nix.service" ];
-
   sops.secrets."recyclarr-secrets.yml" = {
     restartUnits = [ "recyclarr.service" ];
     sopsFile = ./recyclarr/secrets.yml;

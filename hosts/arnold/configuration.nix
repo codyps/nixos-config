@@ -890,6 +890,38 @@ in
       Type = lib.mkForce "oneshot";
       Restart = lib.mkForce "on-failure";
     };
+
+    # NOTE: oci-containers doesn't let us pass arbitrary shell substituions so we
+    # can't get runtime values for the user/group. So we poke the script
+    # manually.
+    # This means that we're ignoring the upstream generation of the script, but
+    # it works pretty well.
+    script = lib.mkForce ''
+exec podman  \
+  run \
+  --rm \
+  --name=recyclarr \
+  --log-driver=journald \
+  --cidfile=/run/podman-recyclarr.ctr-id \
+  --cgroups=no-conmon \
+  --sdnotify=conmon \
+  -d \
+  --replace \
+  -e TZ=America/New_York \
+  -v /persist/var/lib/private/recyclarr:/config \
+  -v /run/secrets/recyclarr-secrets.yml:/config/secrets.yml:ro \
+  -v "${./recyclarr/recyclarr.yml}:/config/recyclarr.yml:ro"
+  -v "${./recyclarr/settings.yml}:/config/settings.yml:ro"
+  -l io.containers.autoupdate=registry \
+  --pull missing \
+  '--security-opt=no-new-privileges' \
+  '--uidmap=1000:$(id -u recyclarr)' \
+  '--gidmap=1000:$(id -g recyclarr)' \
+  ghcr.io/recyclarr/recyclarr \
+  sync \
+  --app-data \
+  /config
+      '';
   };
 
   systemd.timers.recyclarr = {
@@ -905,6 +937,7 @@ in
       autoStart = false;
       image = "ghcr.io/recyclarr/recyclarr";
       serviceName = "recyclarr";
+      /*
       extraOptions = [
         "--security-opt=no-new-privileges"
         "--uidmap=1000:$(id -u ${config.users.users.recyclarr.name})"
@@ -923,6 +956,7 @@ in
       labels = {
         "io.containers.autoupdate" = "registry";
       };
+      */
   };
 
   sops.secrets."recyclarr-secrets.yml" = {

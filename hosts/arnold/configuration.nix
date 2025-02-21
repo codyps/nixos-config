@@ -906,9 +906,9 @@ in
       extraOptions = [
         "--security-opt=no-new-privileges"
         "--hostuser=recyclarr"
+        "--user=${config.users.users.recyclarr.name}:${config.users.users.recyclarr.group}"
       ];
       cmd = [ "sync" "--app-data" "/config" ];
-      user = "recyclarr:recyclarr";
       environment = {
         TZ = "America/New_York";
         "RECYCLARR_APP_DATA" = "/config";

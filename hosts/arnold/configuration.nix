@@ -891,10 +891,11 @@ in
   };
 
   systemd.timers.recyclarr = {
-    wantedBy = [ "multi-user.target" ];
-    serviceConfig = {
-      Unit = "recyclarr.service";
+    timerConfig = {
+      Persistent = true;
       OnCalendar = "daily";
+      AccuracySec = "1h";
+      RandomizedDelaySec = "20m";
     };
   };
 

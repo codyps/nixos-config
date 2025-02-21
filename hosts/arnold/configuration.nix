@@ -921,7 +921,7 @@ in
     };
   };
 
-  systemd.services.recyclarr.Unit.After = [ "sops-nix.service" ];
+  systemd.services.recyclarr.unitConfig.After = [ "sops-nix.service" ];
 
   sops.defaultSopsFile = ./secrets.yml;
 

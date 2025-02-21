@@ -905,6 +905,7 @@ in
       #user = "recyclarr:recyclarr";
       environment = {
         TZ = "America/New_York";
+        "RECYCLARR_APP_DATA" = "/config";
       };
       volumes = [
         "/persist/var/lib/private/recyclarr:/config"

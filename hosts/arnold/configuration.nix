@@ -77,6 +77,7 @@ in
       "/var/lib/private/recyclarr"
       "/var/lib/sonarr"
       "/var/lib/radarr"
+      "/var/lib/uptimed"
       "/var/cache/jellyfin"
       "/var/db"
       "/etc/NetworkManager/system-connections"
@@ -836,26 +837,26 @@ in
       ExecStart = "${pkgs.systemd}/lib/systemd/systemd-socket-proxyd --exit-idle-time=5m 127.0.0.1:${toString transmissionPort}";
       NetworkNamespacePath = "/run/netns/pia";
 
-      ProtectSystem = "strict";
-      ProtectHome = true;
-      PrivateDevices = true;
-      PrivateTmp = true;
-      PrivateIPC = true;
-      PrivatePIDs = true;
-      PrivateUsers = true;
-      ProtectHostname = true;
-      ProtectClock = true;
-      ProtectKernelTunables = true;
-      ProtectKernelModules = true;
-      ProtectKernelLogs = true;
-      ProtectControlGroups = true;
-      RestrictAddressFamilies="AF_INET AF_INET6";
-      LockPersonality = true;
-      MemoryDenyWriteExecute = true;
-      RestrictRealtime = true;
-      RestrictSUIDSGID = true;
-      RemoveIPC = true;
-      PrivateMounts = true;
+      #ProtectSystem = "strict";
+      #ProtectHome = true;
+      #PrivateDevices = true;
+      #PrivateTmp = true;
+      #PrivateIPC = true;
+      #PrivatePIDs = true;
+      #PrivateUsers = true;
+      #ProtectHostname = true;
+      #ProtectClock = true;
+      #ProtectKernelTunables = true;
+      #ProtectKernelModules = true;
+      #ProtectKernelLogs = true;
+      #ProtectControlGroups = true;
+      #RestrictAddressFamilies="AF_INET AF_INET6";
+      #LockPersonality = true;
+      #MemoryDenyWriteExecute = true;
+      #RestrictRealtime = true;
+      #RestrictSUIDSGID = true;
+      #RemoveIPC = true;
+      #PrivateMounts = true;
     };
   };
 

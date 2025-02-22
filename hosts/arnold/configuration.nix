@@ -744,6 +744,7 @@ in
   # alternate fashion
   services.transmission = {
     enable = true;
+    package = pkgs.transmission_4;
     settings = {
       download-dir = "/tank/DATA/bt-downloads/complete";
       incomplete-dir = "/tank/DATA/bt-downloads/incomplete";
@@ -828,11 +829,10 @@ in
   };
 
   systemd.services."transmission-rpc-proxy" = {
-    after = [ "transmission.service" "transmission-rpc-proxy.socket" ];
-    requires = [ "transmission.service" "transmission-rpc-proxy.socket" ];
+    after = [ "transmission-rpc-proxy.socket" "pia-wg.service" ];
+    requires = [ "transmission-rpc-proxy.socket" "pia-wg.service" ];
     serviceConfig = {
-      User = "transmission";
-      Group = "transmission";
+      DynamicUser = true;
 
       ExecStart = "${pkgs.systemd}/lib/systemd/systemd-socket-proxyd --exit-idle-time=5m 127.0.0.1:${toString transmissionPort}";
       NetworkNamespacePath = "/run/netns/pia";

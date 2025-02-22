@@ -6,8 +6,6 @@ let
   cfg = config.services.qbittorrent;
   configDir = "${cfg.dataDir}/.config";
   openFilesLimit = 4096;
-
-  qbittorrent = pkgs.qbittorrent.override { guiSupport = false; };
 in
 {
   options.services.qbittorrent = {
@@ -53,7 +51,7 @@ in
 
     package = mkOption {
       type = types.package;
-      default = pkgs.qbittorrent;
+      default = pkgs.qbittorrent-nox;
       description = ''
         The qBittorrent package to use.
       '';
@@ -76,9 +74,6 @@ in
   };
 
   config = mkIf cfg.enable {
-
-    environment.systemPackages = [ pkgs.qbittorrent ];
-
     networking.firewall = mkIf cfg.openFirewall {
       allowedTCPPorts = [ cfg.webui_port ];
       allowedUDPPorts = [ cfg.webui_port ];

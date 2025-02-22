@@ -599,6 +599,12 @@ in
           import /persist/etc/secret/caddy-auth
           reverse_proxy :8080
         }
+
+        @qbittorrent host qbittorrent.arnold.einic.org
+        route @qbittorrent {
+          import /persist/etc/secret/caddy-auth
+          reverse_proxy :${toString config.services.qbittorrent.webui-port}
+        }
         
         root * /srv/http
 
@@ -740,6 +746,7 @@ in
 
   services.qbittorrent = {
     enable = true;
+    webui-port = 10114;
   };
 
   systemd.services.qbittorrent = {
@@ -756,7 +763,7 @@ in
 
   systemd.sockets."qbittorrent-rpc-proxy" = {
     socketConfig = {
-      ListenStream = "127.0.0.1:${toString config.qbittorrent.webui_port}";
+      ListenStream = "127.0.0.1:${toString config.services.qbittorrent.webui-port}";
       Accept = "no";
     };
     wantedBy = [ "sockets.target" ];
@@ -768,7 +775,7 @@ in
     serviceConfig = {
       DynamicUser = true;
 
-      ExecStart = "${pkgs.systemd}/lib/systemd/systemd-socket-proxyd --exit-idle-time=5m 127.0.0.1:${toString config.qbittorrent.webui_port}";
+      ExecStart = "${pkgs.systemd}/lib/systemd/systemd-socket-proxyd --exit-idle-time=5m 127.0.0.1:${toString config.services.qbittorrent.webui-port}";
       NetworkNamespacePath = "/run/netns/pia";
     };
   };

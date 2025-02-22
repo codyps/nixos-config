@@ -44,8 +44,8 @@ in
       '';
     };
 
-    webui_port = mkOption {
-      type = types.webui_port;
+    webui-port = mkOption {
+      type = types.port;
       default = 8080;
       description = ''
         qBittorrent web UI port.
@@ -64,7 +64,7 @@ in
       type = types.bool;
       default = false;
       description = ''
-        Open services.qBittorrent.webui_port to the outside network.
+        Open services.qBittorrent.webui-port to the outside network.
       '';
     };
 
@@ -78,8 +78,8 @@ in
 
   config = mkIf cfg.enable {
     networking.firewall = mkIf cfg.openFirewall {
-      allowedTCPPorts = [ cfg.webui_port ];
-      allowedUDPPorts = [ cfg.webui_port ];
+      allowedTCPPorts = [ cfg.webui-port ];
+      allowedUDPPorts = [ cfg.webui-port ];
     };
 
     systemd.services.qbittorrent = {
@@ -88,7 +88,7 @@ in
       script = ''
           ${cfg.package}/bin/qbittorrent-nox \
             --profile=${configDir} \
-            --webui-port=${toString cfg.webui_port}
+            --webui-port=${toString cfg.webui-port}
         '';
       serviceConfig = {
         Restart = "always";

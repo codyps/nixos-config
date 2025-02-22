@@ -6,6 +6,9 @@ let
   cfg = config.services.qbittorrent;
   configDir = "${cfg.dataDir}/.config";
   openFilesLimit = 4096;
+  rootDir = "/run/qbittorrent";
+
+  inherit (lib) mkOption types mkIf mkDefault;
 in
 {
   options.services.qbittorrent = {
@@ -82,18 +85,69 @@ in
     systemd.services.qbittorrent = {
       description = "qBittorrent Daemon";
       wantedBy = [ "multi-user.target" ];
-      serviceConfig = {
-        ExecStart = ''
+      script = ''
           ${cfg.package}/bin/qbittorrent-nox \
             --profile=${configDir} \
             --webui-port=${toString cfg.webui_port}
         '';
+      serviceConfig = {
         Restart = "always";
         User = cfg.user;
         Group = cfg.group;
         UMask = "0002";
         LimitNOFILE = cfg.openFilesLimit;
         StateDirectory = "qbittorrent";
+        RuntimeDirectory = [ (baseNameOf rootDir)];
+        RuntimeDirectoryMode = "0755";
+        UMask = "0066";
+
+        RootDirectory = rootDir;
+        RootDirectoryStartOnly = true;
+
+        MountAPIVFS = true;
+
+        BindPaths =
+          [
+            "${cfg.dataDir}"
+            "/run"
+          ];
+        BindReadOnlyPaths = [
+          builtins.storeDir
+          "/etc"
+        ];
+
+        AmbientCapabilities = "";
+        CapabilityBoundingSet = "";
+
+        DeviceAllow = "";
+        LockPersonality = true;
+        MemoryDenyWriteExecute = true;
+        NoNewPrivileges = true;
+        PrivateDevices = true;
+        PrivateMounts = mkDefault true;
+        PrivateNetwork = mkDefault false;
+        PrivateTmp = true;
+        PrivateUsers = mkDefault true;
+        ProtectClock = true;
+        ProtectControlGroups = true;
+        ProtectHostname = true;
+        ProtectKernelLogs = true;
+        ProtectKernelModules = true;
+        ProtectKernelTunables = true;
+        ProtectSystem = "strict";
+        RemoveIPC = true;
+
+        RestrictAddressFamilies = [
+          "AF_UNIX"
+          "AF_INET"
+          "AF_INET6"
+        ];
+
+        RestrictNamespaces = true;
+        RestrictRealtime = true;
+        RestrictSUIDSGID = true;
+
+        SystemCallArchitectures = "native";
       };
     };
 

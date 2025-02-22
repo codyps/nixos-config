@@ -738,6 +738,41 @@ in
   zramSwap.enable = true;
   services.uptimed.enable = true;
 
+  services.qbittorrent = {
+    enable = true;
+  };
+
+  systemd.services.qbittorrent = {
+    requires = [ "pia-wg.service" ];
+    after = [ "pia-wg.service" ];
+
+    serviceConfig = {
+      NetworkNamespacePath = "/run/netns/pia";
+
+      BindReadOnlyPaths = [ "/etc/netns/pia/resolv.conf:/etc/resolv.conf" ];
+      BindPaths = [ "/tank/DATA/cbz" "/tank/DATA/bt-downloads" ];
+    };
+  };
+
+  systemd.sockets."qbittorrent-rpc-proxy" = {
+    socketConfig = {
+      ListenStream = "127.0.0.1:${toString config.qbittorrent.webui_port}";
+      Accept = "no";
+    };
+    wantedBy = [ "sockets.target" ];
+  };
+
+  systemd.services."qbittorrent-rpc-proxy" = {
+    after = [ "qbittorrent-rpc-proxy.socket" "pia-wg.service" ];
+    requires = [ "qbittorrent-rpc-proxy.socket" "pia-wg.service" ];
+    serviceConfig = {
+      DynamicUser = true;
+
+      ExecStart = "${pkgs.systemd}/lib/systemd/systemd-socket-proxyd --exit-idle-time=5m 127.0.0.1:${toString config.qbittorrent.webui_port}";
+      NetworkNamespacePath = "/run/netns/pia";
+    };
+  };
+
   # FIXME: this writes configuration into `/var/lib/transmission`, which we
   # normally wipe and bind mount to preserve. This causes the same issues komga
   # has. Examine relocating the config elsewhere or applying it in some
@@ -753,57 +788,6 @@ in
       rpc-host-whitelist = "transmission.arnold.einic.org";
       rpc-bind-address = "127.0.0.1";
       port-forwarding-enabled = false;
-    };
-  };
-
-  # https://www.cloudnull.io/2019/04/running-services-in-network-name-spaces-with-systemd/
-  # https://www.ismailzai.com/blog/creating-wireguard-jails-with-linux-network-namespaces
-  # https://github.com/dadevel/wg-netns
-  # https://github.com/existentialtype/deluge-namespaced-wireguard
-  systemd.services.pia-netns = {
-    description = "Create a network namespace for PIA VPN";
-    wantedBy = [ "multi-user.target" ];
-
-    path = [ pkgs.iproute2 ];
-
-    script = ''
-      #!/bin/sh
-      set -e
-
-      netns="pia"
-      trap "ip netns del $netns" EXIT
-      ip netns add "$netns"
-      ip -n "$netns" link set lo up
-
-      ip link add wg-"$netns" type wireguard
-      ip link set wg-"$netns" netns "$netns"
-
-      # we fill this in with `pia-wg.service`
-      mkdir -p /etc/netns/"$netns"
-      touch /etc/netns/"$netns"/resolv.conf
-
-      trap - EXIT
-      '';
-
-    serviceConfig = {
-      Type = "oneshot";
-      RemainAfterExit = true;
-      ExecStop = "${pkgs.iproute2}/bin/ip netns del pia";
-    };
-  };
-
-  # TODO: instead of having a ping loop internally, consider using a timer to send pings & restart the service if needed.
-  systemd.services.pia-wg = {
-    description = "Connect to PIA VPN";
-    requires = [ "pia-netns.service" ];
-    after = [ "pia-netns.service" ];
-    wantedBy = [ "multi-user.target" ];
-
-    serviceConfig = {
-      EnvironmentFile = "/persist/etc/default/pia-wg";
-      StateDirectory = "pia-wg";
-      ExecStart = "${pia-wg-util}/bin/pia-wg-util ''$STATE_DIRECTORY pia ca";
-      # TODO: add ExecStop to disconnect/reset the wireguard interface
     };
   };
 
@@ -857,6 +841,58 @@ in
       #RestrictSUIDSGID = true;
       #RemoveIPC = true;
       #PrivateMounts = true;
+    };
+  };
+
+
+  # https://www.cloudnull.io/2019/04/running-services-in-network-name-spaces-with-systemd/
+  # https://www.ismailzai.com/blog/creating-wireguard-jails-with-linux-network-namespaces
+  # https://github.com/dadevel/wg-netns
+  # https://github.com/existentialtype/deluge-namespaced-wireguard
+  systemd.services.pia-netns = {
+    description = "Create a network namespace for PIA VPN";
+    wantedBy = [ "multi-user.target" ];
+
+    path = [ pkgs.iproute2 ];
+
+    script = ''
+      #!/bin/sh
+      set -e
+
+      netns="pia"
+      trap "ip netns del $netns" EXIT
+      ip netns add "$netns"
+      ip -n "$netns" link set lo up
+
+      ip link add wg-"$netns" type wireguard
+      ip link set wg-"$netns" netns "$netns"
+
+      # we fill this in with `pia-wg.service`
+      mkdir -p /etc/netns/"$netns"
+      touch /etc/netns/"$netns"/resolv.conf
+
+      trap - EXIT
+      '';
+
+    serviceConfig = {
+      Type = "oneshot";
+      RemainAfterExit = true;
+      ExecStop = "${pkgs.iproute2}/bin/ip netns del pia";
+    };
+  };
+
+  # TODO: instead of having a ping loop internally, consider using a timer to send pings & restart the service if needed.
+  systemd.services.pia-wg = {
+    description = "Connect to PIA VPN";
+    requires = [ "pia-netns.service" ];
+    after = [ "pia-netns.service" ];
+    wantedBy = [ "multi-user.target" ];
+
+    serviceConfig = {
+      EnvironmentFile = "/persist/etc/default/pia-wg";
+      StateDirectory = "pia-wg";
+      ExecStart = "${pia-wg-util}/bin/pia-wg-util ''$STATE_DIRECTORY pia ca";
+      # TODO: add ExecStop to disconnect/reset the wireguard interface
     };
   };
 

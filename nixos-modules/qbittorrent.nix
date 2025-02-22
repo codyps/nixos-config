@@ -137,6 +137,7 @@ in
         RemoveIPC = true;
 
         RestrictAddressFamilies = [
+          "AF_NETLINK"
           "AF_UNIX"
           "AF_INET"
           "AF_INET6"

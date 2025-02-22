@@ -760,8 +760,7 @@ in
   # https://github.com/existentialtype/deluge-namespaced-wireguard
   systemd.services.pia-netns = {
     description = "Create a network namespace for PIA VPN";
-    wantedBy = [ "transmission.service" "multi-user.target" ];
-    before = [ "transmission.service" ];
+    wantedBy = [ "multi-user.target" ];
 
     path = [ pkgs.iproute2 ];
 
@@ -807,12 +806,15 @@ in
   };
 
   systemd.services.transmission = {
+    requires = [ "pia-wg.service" ];
+    after = [ "pia-wg.service" ];
+
     serviceConfig = {
       NetworkNamespacePath = "/run/netns/pia";
       # Bind mount resolv.conf into the network namespace
       # https://github.com/chrisbouchard/namespaced-wireguard-vpn/issues/9
       BindReadOnlyPaths = [ "/etc/netns/pia/resolv.conf:/etc/resolv.conf" ];
-      BindPaths = [ "/tank/DATA/cbz" ];
+      BindPaths = [ "/tank/DATA/cbz" "/tank/DATA/bt-downloads" ];
     };
   };
 
@@ -827,17 +829,33 @@ in
   systemd.services."transmission-rpc-proxy" = {
     after = [ "transmission.service" "transmission-rpc-proxy.socket" ];
     requires = [ "transmission.service" "transmission-rpc-proxy.socket" ];
-    unitConfig = {
-      JoinsNamespaceOf = "transmission.service";
-    };
     serviceConfig = {
       User = "transmission";
       Group = "transmission";
-      PrivateIPC = true;
-      PrivateDevices = true;
-      PrivateNetwork = true;
-      PrivateTmp = true;
+
       ExecStart = "${pkgs.systemd}/lib/systemd/systemd-socket-proxyd --exit-idle-time=5m 127.0.0.1:${toString transmissionPort}";
+      NetworkNamespacePath = "/run/netns/pia";
+
+      ProtectSystem = "strict";
+      ProtectHome = true;
+      PrivateDevices = true;
+      PrivateTmp = true;
+      PrivateIPC = true;
+      PrivatePIDs = true;
+      PrivateUsers = true;
+      ProtectHostname = true;
+      ProtectClock = true;
+      ProtectKernelTunables = true;
+      ProtectKernelModules = true;
+      ProtectKernelLogs = true;
+      ProtectControlGroups = true;
+      RestrictAddressFamilies="AF_INET AF_INET6";
+      LockPersonality = true;
+      MemoryDenyWriteExecute = true;
+      RestrictRealtime = true;
+      RestrictSUIDSGID = true;
+      RemoveIPC = true;
+      PrivateMounts = true;
     };
   };
 

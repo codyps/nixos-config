@@ -94,7 +94,6 @@ in
         Restart = "always";
         User = cfg.user;
         Group = cfg.group;
-        UMask = "0002";
         LimitNOFILE = cfg.openFilesLimit;
         StateDirectory = "qbittorrent";
         RuntimeDirectory = [ (baseNameOf rootDir)];
@@ -155,12 +154,12 @@ in
       qbittorrent = {
         group = cfg.group;
         home = cfg.dataDir;
-        createHome = true;
         description = "qBittorrent Daemon user";
+        isSystemUser = true;
       };
     };
 
     users.groups =
-      mkIf (cfg.group == "qbittorrent") { qbittorrent = { gid = null; }; };
+      mkIf (cfg.group == "qbittorrent") { qbittorrent = { }; };
   };
 }

@@ -12,6 +12,7 @@ let
   sonarr-port = 8989;
   radarr-port = 7878;
   readarr-port = 8787;
+  prowlarr-port = 9696;
 
   # NOTE: because `transmission-remote` looks at localhost:9091 by default, if
   # we change this we should wrap `transmission-remote`.
@@ -1044,6 +1045,11 @@ in
     key = "readarr-api-key";
   };
 
+  sops.secrets."prowlarr-api-key" = {
+    sopsFile = ./secrets.yml;
+    key = "prowlarr-api-key";
+  };
+
   sops.templates."recyclarr-secrets.yml" = {
     content = ''
       sonarr_api_key: ${config.sops.placeholder.sonarr-api-key}
@@ -1129,22 +1135,53 @@ in
     restartUnits = [ "readarr.service" ];
     owner = "${config.users.users.readarr.name}";
     content = ''
-    <Config>
-      <BindAddress>127.0.0.1</BindAddress>
-      <Port>${toString readarr-port}</Port>
-      <SslPort>6868</SslPort>
-      <EnableSsl>False</EnableSsl>
-      <LaunchBrowser>True</LaunchBrowser>
-      <ApiKey>${config.sops.placeholder.readarr-api-key}</ApiKey>
-      <AuthenticationMethod>None</AuthenticationMethod>
-      <AuthenticationRequired>Enabled</AuthenticationRequired>
-      <Branch>develop</Branch>
-      <LogLevel>debug</LogLevel>
-      <SslCertPath></SslCertPath>
-      <SslCertPassword></SslCertPassword>
-      <UrlBase></UrlBase>
-      <InstanceName>Readarr</InstanceName>
-    </Config>%
+      <Config>
+        <BindAddress>127.0.0.1</BindAddress>
+        <Port>${toString readarr-port}</Port>
+        <SslPort>6868</SslPort>
+        <EnableSsl>False</EnableSsl>
+        <LaunchBrowser>True</LaunchBrowser>
+        <ApiKey>${config.sops.placeholder.readarr-api-key}</ApiKey>
+        <AuthenticationMethod>None</AuthenticationMethod>
+        <AuthenticationRequired>Enabled</AuthenticationRequired>
+        <Branch>develop</Branch>
+        <LogLevel>debug</LogLevel>
+        <SslCertPath></SslCertPath>
+        <SslCertPassword></SslCertPassword>
+        <UrlBase></UrlBase>
+        <InstanceName>Readarr</InstanceName>
+      </Config>
+    '';
+  };
+
+  systemd.services.prowlarr = {
+    serviceConfig = {
+      ExecStartPre = ''
+        ${pkgs.coreutils}/bin/cp -f ${config.sops.templates."prowlarr-config.xml".path} /var/lib/prowlarr/config.xml
+      '';
+    };
+  };
+
+  sops.templates."prowlarr-config.xml" = {
+    restartUnits = [ "prowlarr.service" ];
+    owner = "${config.users.users.prowlarr.name}";
+    content = ''
+      <Config>
+        <BindAddress>127.0.0.1</BindAddress>
+        <Port>${toString prowlarr-port}</Port>
+        <SslPort>6969</SslPort>
+        <EnableSsl>False</EnableSsl>
+        <LaunchBrowser>True</LaunchBrowser>
+        <ApiKey>${config.sops.placeholder.prowlarr-api-key}</ApiKey>
+        <AuthenticationMethod>Forms</AuthenticationMethod>
+        <AuthenticationRequired>Enabled</AuthenticationRequired>
+        <Branch>master</Branch>
+        <LogLevel>debug</LogLevel>
+        <SslCertPath></SslCertPath>
+        <SslCertPassword></SslCertPassword>
+        <UrlBase></UrlBase>
+        <InstanceName>Prowlarr</InstanceName>
+      </Config>
     '';
   };
 

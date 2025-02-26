@@ -548,7 +548,7 @@ in
 
         @sonarr host sonarr.arnold.einic.org
         route @sonarr {
-          reverse_proxy :8989
+          reverse_proxy :${toString sonarr-port}
         }
 
         @komga host komga.arnold.einic.org
@@ -595,7 +595,7 @@ in
         @radarr host radarr.arnold.einic.org
         route @radarr {
           import /persist/etc/secret/caddy-auth
-          reverse_proxy :7878
+          reverse_proxy :${toString radarr-port}
         }
 
         @sabnzbd host sabnzbd.arnold.einic.org

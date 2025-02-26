@@ -86,17 +86,17 @@ in
       description = "qBittorrent Daemon";
       wantedBy = [ "multi-user.target" ];
       script = ''
-          ${cfg.package}/bin/qbittorrent-nox \
-            --profile=${configDir} \
-            --webui-port=${toString cfg.webui-port}
-        '';
+        ${cfg.package}/bin/qbittorrent-nox \
+          --profile=${configDir} \
+          --webui-port=${toString cfg.webui-port}
+      '';
       serviceConfig = {
         Restart = "always";
         User = cfg.user;
         Group = cfg.group;
         LimitNOFILE = cfg.openFilesLimit;
         StateDirectory = "qbittorrent";
-        RuntimeDirectory = [ (baseNameOf rootDir)];
+        RuntimeDirectory = [ (baseNameOf rootDir) ];
         RuntimeDirectoryMode = "0755";
         UMask = "0066";
 

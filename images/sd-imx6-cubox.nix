@@ -1,15 +1,14 @@
-{
-  config,
-  lib,
-  pkgs,
-  modulesPath,
-  ...
-}: 
-let 
+{ config
+, lib
+, pkgs
+, modulesPath
+, ...
+}:
+let
   uboot = pkgs.buildUBoot {
     defconfig = "mx6cuboxi_defconfig";
-    extraMeta.platforms = ["armv7l-linux"];
-    filesToInstall = ["SPL.bin" "u-boot.img"];
+    extraMeta.platforms = [ "armv7l-linux" ];
+    filesToInstall = [ "SPL.bin" "u-boot.img" ];
   };
 in
 {

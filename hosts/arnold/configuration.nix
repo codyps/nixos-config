@@ -98,6 +98,21 @@ in
     "d /var/lib/private 0700 root root"
   ];
 
+  system.activationScripts = {
+    # FIXME: we're tweaking this _after_ persist-files screws it up, so there's a window where it's wrong. Fix this so there's no gap.
+    "var-lib-private-permissions" = {
+      deps = [ "persist-files" ];
+      text = ''
+        # print permissions for /var/lib/private if there're wrong
+        if [ -e "/var/lib/private" ] && [ "$(stat -c %a /var/lib/private)" != "700" ] ; then
+          echo "/var/lib/private permissions wrong: $(stat -c %a /var/lib/private)"
+        fi
+        mkdir -p /var/lib/private
+        chmod 0700 /var/lib/private
+      '';
+    };
+  };
+
   # FIXME: if we disable this, then everything breaks becasue we don't every load keys. We'll have to insert our own key loading
   boot.zfs.requestEncryptionCredentials = false;
 

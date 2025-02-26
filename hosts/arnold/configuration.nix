@@ -1156,15 +1156,15 @@ in
 
   systemd.services.prowlarr = {
     serviceConfig = {
+      LoadCredential = "config.xml:${config.sops.templates."prowlarr-config.xml".path}";
       ExecStartPre = ''
-        ${pkgs.coreutils}/bin/cp -f ${config.sops.templates."prowlarr-config.xml".path} /var/lib/prowlarr/config.xml
+        ${pkgs.coreutils}/bin/cp -f ${CREDENTIALS_DIRECTORY}/config.xml /var/lib/prowlarr/config.xml
       '';
     };
   };
 
   sops.templates."prowlarr-config.xml" = {
     restartUnits = [ "prowlarr.service" ];
-    owner = "${config.users.users.prowlarr.name}";
     content = ''
       <Config>
         <BindAddress>127.0.0.1</BindAddress>

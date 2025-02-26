@@ -1039,7 +1039,7 @@ in
     key = "sonarr-api-key";
   };
 
-  sops.secrets."readarr-secrets.yml" = {
+  sops.secrets."readarr-api-key" = {
     sopsFile = ./secrets.yml;
     key = "readarr-api-key";
   };

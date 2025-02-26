@@ -11,6 +11,7 @@ let
   # these values
   sonarr-port = 8989;
   radarr-port = 7878;
+  readarr-port = 8787;
 
   # NOTE: because `transmission-remote` looks at localhost:9091 by default, if
   # we change this we should wrap `transmission-remote`.
@@ -1040,6 +1041,12 @@ in
     key = "sonarr-api-key";
   };
 
+  sops.secrets."readarr-secrets.yml" = {
+    restartUnits = [ "readarr.service" ];
+    sopsFile = ./secrets.yml;
+    key = "readarr-api-key";
+  };
+
   sops.templates."recyclarr-secrets.yml" = {
     content = ''
       sonarr_api_key: ${config.sops.placeholder.sonarr-api-key}
@@ -1108,6 +1115,36 @@ in
         <UrlBase></UrlBase>
         <InstanceName>Sonarr</InstanceName>
       </Config>
+    '';
+  };
+
+  systemd.services.readarr = {
+    serviceConfig = {
+      ExecStartPre = ''
+        ${pkgs.coreutils}/bin/cp -f ${config.sops.templates."readarr-config.xml".path} /var/lib/readarr/config.xml
+      '';
+    };
+  };
+
+  sops.templates."readarr-config.xml" = {
+    owner = "${config.users.users.readarr.name}";
+    content = ''
+    <Config>
+      <BindAddress>127.0.0.1</BindAddress>
+      <Port>${toString readarr-port}</Port>
+      <SslPort>6868</SslPort>
+      <EnableSsl>False</EnableSsl>
+      <LaunchBrowser>True</LaunchBrowser>
+      <ApiKey>${config.sops.placeholder.readarr-api-key}</ApiKey>
+      <AuthenticationMethod>None</AuthenticationMethod>
+      <AuthenticationRequired>Enabled</AuthenticationRequired>
+      <Branch>develop</Branch>
+      <LogLevel>debug</LogLevel>
+      <SslCertPath></SslCertPath>
+      <SslCertPassword></SslCertPassword>
+      <UrlBase></UrlBase>
+      <InstanceName>Readarr</InstanceName>
+    </Config>%
     '';
   };
 

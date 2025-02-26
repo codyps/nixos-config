@@ -5,6 +5,8 @@ let
   komgaPort = 10100;
   kavitaPort = 10101;
   komfPort = 10102;
+  sonarr-port = 8989;
+  radarr-port = 7878;
   calibreWebAutomatedPort = 10103;
 
   # NOTE: because `transmission-remote` looks at localhost:9091 by default, if
@@ -1045,10 +1047,10 @@ in
   };
 
   systemd.services.radarr = {
-    unitConfig = {
+    serviceConfig = {
       ExecStartPre = ''
         # TODO: poke the database to configure a user, or poke the API using the API key.
-        ${pkgs.coreutils}/bin/cp -f ${sops.templates."radarr-config.xml".path} /var/lib/radarr/.config/Radarr/config.xml
+        ${pkgs.coreutils}/bin/cp -f ${config.sops.templates."radarr-config.xml".path} /var/lib/radarr/.config/Radarr/config.xml
       '';
     };
   };
@@ -1058,7 +1060,7 @@ in
     content = ''
       <Config>
         <BindAddress>127.0.0.1</BindAddress>
-        <Port>${config.service.radarr.port}</Port>
+        <Port>${toString radarr-port}</Port>
         <SslPort>9898</SslPort>
         <EnableSsl>False</EnableSsl>
         <LaunchBrowser>True</LaunchBrowser>
@@ -1076,10 +1078,10 @@ in
   };
 
   systemd.services.sonarr = {
-    unitConfig = {
+    serviceConfig = {
       ExecStartPre = ''
         # TODO: poke the database to configure a user, or poke the API using the API key.
-        ${pkgs.coreutils}/bin/cp -f ${sops.templates."sonarr-config.xml".path} /var/lib/sonarr/.config/NzbDrone/config.xml
+        ${pkgs.coreutils}/bin/cp -f ${config.sops.templates."sonarr-config.xml".path} /var/lib/sonarr/.config/NzbDrone/config.xml
       '';
     };
   };
@@ -1089,7 +1091,7 @@ in
     content = ''
       <Config>
         <BindAddress>127.0.0.1</BindAddress>
-        <Port>${config.service.sonarr.port}</Port>
+        <Port>${toString sonarr-port}</Port>
         <SslPort>9898</SslPort>
         <EnableSsl>False</EnableSsl>
         <LaunchBrowser>True</LaunchBrowser>

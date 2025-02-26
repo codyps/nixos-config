@@ -413,6 +413,7 @@ in
       z14.1   UUID=4aea7cc3-224f-4ad9-83f4-d687103ad35e /persist/etc/secret/luks1 discard,no-read-workqueue,no-write-workqueue,same-cpu-crypt
       z14.2   UUID=3fc04e0d-251b-4cec-8172-12c603c58284 /persist/etc/secret/luks1 discard,no-read-workqueue,no-write-workqueue,same-cpu-crypt
       z14.3   UUID=e5b69a87-e02c-4b14-be58-6109488e172a /persist/etc/secret/luks1 discard,no-read-workqueue,no-write-workqueue,same-cpu-crypt
+
       i01     UUID=72bf8068-6563-4f66-babc-4e337922b4ed /persist/etc/secret/luks1 discard,no-read-workqueue,no-write-workqueue,same-cpu-crypt
 
       d01     UUID=86625e5f-5a2d-41b2-b337-8243f8c955ab /persist/etc/secret/luks1 discard,no-read-workqueue,no-write-workqueue,same-cpu-crypt
@@ -423,6 +424,8 @@ in
       e02     UUID=8ee85be7-48b5-4e94-aa13-ce7369492e42 /persist/etc/secret/luks1 discard,no-read-workqueue,no-write-workqueue,same-cpu-crypt
       e03     UUID=74428d6e-1588-427e-930b-b2785266155f /persist/etc/secret/luks1 discard,no-read-workqueue,no-write-workqueue,same-cpu-crypt
       e04     UUID=d4f63c65-cefe-4d76-a97c-9f75cc776bed /persist/etc/secret/luks1 discard,no-read-workqueue,no-write-workqueue,same-cpu-crypt
+
+      f01     UUID=bd3095e7-685a-4ae1-9a28-00ce02bbf04f /persist/etc/secret/luks1 discard,no-read-workqueue,no-write-workqueue,same-cpu-crypt
     '';
   };
 

@@ -980,7 +980,7 @@ in
         --replace \
         -e TZ=America/New_York \
         -v /persist/var/lib/private/recyclarr:/config \
-        -v /run/secrets/recyclarr-secrets.yml:/config/secrets.yml:ro \
+        -v ${config.sops.templates."recyclarr-secrets.yml".path}:/config/secrets.yml:ro \
         -v "${./recyclarr/recyclarr.yml}:/config/recyclarr.yml:ro" \
         -v "${./recyclarr/settings.yml}:/config/settings.yml:ro" \
         -l io.containers.autoupdate=registry \
@@ -1030,19 +1030,16 @@ in
   };
 
   sops.secrets."radarr-api-key" = {
-    restartUnits = [ "radarr.service" ];
     sopsFile = ./secrets.yml;
     key = "radarr-api-key";
   };
 
   sops.secrets."sonarr-api-key" = {
-    restartUnits = [ "sonarr.service" ];
     sopsFile = ./secrets.yml;
     key = "sonarr-api-key";
   };
 
   sops.secrets."readarr-secrets.yml" = {
-    restartUnits = [ "readarr.service" ];
     sopsFile = ./secrets.yml;
     key = "readarr-api-key";
   };
@@ -1066,6 +1063,7 @@ in
   };
 
   sops.templates."radarr-config.xml" = {
+    restartUnits = [ "radarr.service" ];
     owner = "${config.users.users.radarr.name}";
     content = ''
       <Config>
@@ -1097,6 +1095,7 @@ in
   };
 
   sops.templates."sonarr-config.xml" = {
+    restartUnits = [ "sonarr.service" ];
     owner = "${config.users.users.sonarr.name}";
     content = ''
       <Config>
@@ -1127,6 +1126,7 @@ in
   };
 
   sops.templates."readarr-config.xml" = {
+    restartUnits = [ "readarr.service" ];
     owner = "${config.users.users.readarr.name}";
     content = ''
     <Config>

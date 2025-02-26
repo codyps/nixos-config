@@ -5,9 +5,12 @@ let
   komgaPort = 10100;
   kavitaPort = 10101;
   komfPort = 10102;
+  calibreWebAutomatedPort = 10103;
+
+  # FIXME: prowlarr has these set internally, we need to tweak prowlarr to use
+  # these values
   sonarr-port = 8989;
   radarr-port = 7878;
-  calibreWebAutomatedPort = 10103;
 
   # NOTE: because `transmission-remote` looks at localhost:9091 by default, if
   # we change this we should wrap `transmission-remote`.

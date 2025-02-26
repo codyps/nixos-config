@@ -588,13 +588,13 @@ in
         @prowlarr host prowlarr.arnold.einic.org
         route @prowlarr {
           import /persist/etc/secret/caddy-auth
-          reverse_proxy :9696
+          reverse_proxy :${toString prowlarr-port}
         }
 
         @readarr host readarr.arnold.einic.org
         route @readarr {
           import /persist/etc/secret/caddy-auth
-          reverse_proxy :8787
+          reverse_proxy :${toString readarr-port}
         }
 
         @radarr host radarr.arnold.einic.org

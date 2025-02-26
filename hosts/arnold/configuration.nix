@@ -1048,8 +1048,8 @@ in
 
   systemd.services.radarr = {
     serviceConfig = {
+      # TODO: poke the database to configure a user, or poke the API using the API key.
       ExecStartPre = ''
-        # TODO: poke the database to configure a user, or poke the API using the API key.
         ${pkgs.coreutils}/bin/cp -f ${config.sops.templates."radarr-config.xml".path} /var/lib/radarr/.config/Radarr/config.xml
       '';
     };
@@ -1079,8 +1079,8 @@ in
 
   systemd.services.sonarr = {
     serviceConfig = {
+      # TODO: poke the database to configure a user, or poke the API using the API key.
       ExecStartPre = ''
-        # TODO: poke the database to configure a user, or poke the API using the API key.
         ${pkgs.coreutils}/bin/cp -f ${config.sops.templates."sonarr-config.xml".path} /var/lib/sonarr/.config/NzbDrone/config.xml
       '';
     };

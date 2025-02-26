@@ -92,7 +92,7 @@ in
     ];
   };
 
-  system.activationScripts."persist-files".deps = [ "var-lib-private-permissions" ];
+  system.activationScripts."persist-files".deps = [ "var-lib-private-permissions" "createPersistentStorageDirs" ];
   system.activationScripts = {
     "var-lib-private-permissions" = {
       deps = [ "specialfs" ];

@@ -93,6 +93,8 @@ in
   };
 
   systemd.tmpfiles.rules = [
+    # XXX: this doesn't seem to work, sometimes we end up with a 0755 /var/lib/private, which then causes services to fail to start.
+    # We might need to tweak directory creation to happen durring system activation instead.
     "d /var/lib/private 0700 root root"
   ];
 
@@ -1158,7 +1160,7 @@ in
     serviceConfig = {
       LoadCredential = "config.xml:${config.sops.templates."prowlarr-config.xml".path}";
       ExecStartPre = ''
-        ${pkgs.coreutils}/bin/cp -f ${CREDENTIALS_DIRECTORY}/config.xml /var/lib/prowlarr/config.xml
+        ${pkgs.coreutils}/bin/cp -f ''${CREDENTIALS_DIRECTORY}/config.xml /var/lib/prowlarr/config.xml
       '';
     };
   };

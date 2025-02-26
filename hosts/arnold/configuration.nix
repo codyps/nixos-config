@@ -92,23 +92,13 @@ in
     ];
   };
 
-  systemd.tmpfiles.rules = [
-    # XXX: this doesn't seem to work, sometimes we end up with a 0755 /var/lib/private, which then causes services to fail to start.
-    # We might need to tweak directory creation to happen durring system activation instead.
-    "d /var/lib/private 0700 root root"
-  ];
-
+  system.activationScripts."persist-files".deps = [ "var-lib-private-permissions" ];
   system.activationScripts = {
-    # FIXME: we're tweaking this _after_ persist-files screws it up, so there's a window where it's wrong. Fix this so there's no gap.
     "var-lib-private-permissions" = {
-      deps = [ "persist-files" ];
+      deps = [ "specialfs" ];
       text = ''
-        # print permissions for /var/lib/private if there're wrong
-        if [ -e "/var/lib/private" ] && [ "$(stat -c %a /var/lib/private)" != "700" ] ; then
-          echo "/var/lib/private permissions wrong: $(stat -c %a /var/lib/private)"
-        fi
-        mkdir -p /var/lib/private
-        chmod 0700 /var/lib/private
+        mkdir -p /persist/var/lib/private
+        chmod 0700 /persist/var/lib/private
       '';
     };
   };

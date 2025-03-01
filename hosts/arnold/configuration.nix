@@ -7,6 +7,13 @@ let
   komfPort = 10102;
   calibreWebAutomatedPort = 10103;
 
+  # FIXME: prowlarr has these set internally, we need to tweak prowlarr to use
+  # these values
+  sonarr-port = 8989;
+  radarr-port = 7878;
+  readarr-port = 8787;
+  prowlarr-port = 9696;
+
   # NOTE: because `transmission-remote` looks at localhost:9091 by default, if
   # we change this we should wrap `transmission-remote`.
   transmissionPort = 9091;
@@ -85,9 +92,16 @@ in
     ];
   };
 
-  systemd.tmpfiles.rules = [
-    "d /var/lib/private 0700 root root"
-  ];
+  system.activationScripts."createPersistentStorageDirs".deps = [ "var-lib-private-permissions" "users" "groups" ];
+  system.activationScripts = {
+    "var-lib-private-permissions" = {
+      deps = [ "specialfs" ];
+      text = ''
+        mkdir -p /persist/var/lib/private
+        chmod 0700 /persist/var/lib/private
+      '';
+    };
+  };
 
   # FIXME: if we disable this, then everything breaks becasue we don't every load keys. We'll have to insert our own key loading
   boot.zfs.requestEncryptionCredentials = false;
@@ -193,14 +207,16 @@ in
   networking.firewall.trustedInterfaces = [ "tailscale0" "podman0" ];
   networking.firewall.allowedTCPPorts = [
     # caddy
-    80 443 
+    80
+    443
     # syncthing
     22000
   ];
 
   networking.firewall.allowedUDPPorts = [
     # jellyfin
-    1900 7359
+    1900
+    7359
     # syncthing
     21027
   ];
@@ -544,7 +560,7 @@ in
 
         @sonarr host sonarr.arnold.einic.org
         route @sonarr {
-          reverse_proxy :8989
+          reverse_proxy :${toString sonarr-port}
         }
 
         @komga host komga.arnold.einic.org
@@ -579,19 +595,19 @@ in
         @prowlarr host prowlarr.arnold.einic.org
         route @prowlarr {
           import /persist/etc/secret/caddy-auth
-          reverse_proxy :9696
+          reverse_proxy :${toString prowlarr-port}
         }
 
         @readarr host readarr.arnold.einic.org
         route @readarr {
           import /persist/etc/secret/caddy-auth
-          reverse_proxy :8787
+          reverse_proxy :${toString readarr-port}
         }
 
         @radarr host radarr.arnold.einic.org
         route @radarr {
           import /persist/etc/secret/caddy-auth
-          reverse_proxy :7878
+          reverse_proxy :${toString radarr-port}
         }
 
         @sabnzbd host sabnzbd.arnold.einic.org
@@ -669,17 +685,17 @@ in
   };
 
   virtualisation.oci-containers.containers.komf = {
-      image = "sndxr/komf:latest";
-      ports = [ "127.0.0.1:${toString komfPort}:${toString komfPort}" ];
-      environment = {
-        KOMF_SERVER_PORT = toString komfPort;
-        KOMF_KOMGA_BASE_URI = "http://host.containers.internal:${toString komgaPort}";
-        KOMF_KAVITA_BASE_URI = "http://host.containers.internal:${toString kavitaPort}";
-        KOMF_LOG_LEVEL = "INFO";
-      };
-      volumes = [
-        "/persist/var/lib/komf:/config"
-      ];
+    image = "sndxr/komf:latest";
+    ports = [ "127.0.0.1:${toString komfPort}:${toString komfPort}" ];
+    environment = {
+      KOMF_SERVER_PORT = toString komfPort;
+      KOMF_KOMGA_BASE_URI = "http://host.containers.internal:${toString komgaPort}";
+      KOMF_KAVITA_BASE_URI = "http://host.containers.internal:${toString kavitaPort}";
+      KOMF_LOG_LEVEL = "INFO";
+    };
+    volumes = [
+      "/persist/var/lib/komf:/config"
+    ];
   };
 
   users.users.calibre-web-automated = {
@@ -879,7 +895,7 @@ in
       touch /etc/netns/"$netns"/resolv.conf
 
       trap - EXIT
-      '';
+    '';
 
     serviceConfig = {
       Type = "oneshot";
@@ -942,7 +958,7 @@ in
     isSystemUser = true;
     group = "recyclarr";
   };
-  users.groups.recyclarr = {};
+  users.groups.recyclarr = { };
 
   # FIXME: use dynamic user.
   systemd.services.recyclarr = {
@@ -960,30 +976,30 @@ in
     # it works pretty well.
     # NOTE: using `--uidmap` breaks podman, so we use `--user` instead.
     script = lib.mkForce ''
-exec podman  \
-  run \
-  --rm \
-  --name=recyclarr \
-  --log-driver=journald \
-  --cidfile=/run/podman-recyclarr.ctr-id \
-  --cgroups=no-conmon \
-  --sdnotify=conmon \
-  -d \
-  --replace \
-  -e TZ=America/New_York \
-  -v /persist/var/lib/private/recyclarr:/config \
-  -v /run/secrets/recyclarr-secrets.yml:/config/secrets.yml:ro \
-  -v "${./recyclarr/recyclarr.yml}:/config/recyclarr.yml:ro" \
-  -v "${./recyclarr/settings.yml}:/config/settings.yml:ro" \
-  -l io.containers.autoupdate=registry \
-  --pull missing \
-  '--security-opt=no-new-privileges' \
-  --user $(id -u recyclarr):$(id -g recyclarr) \
-  ghcr.io/recyclarr/recyclarr \
-  sync \
-  --app-data \
-  /config
-      '';
+      exec podman  \
+        run \
+        --rm \
+        --name=recyclarr \
+        --log-driver=journald \
+        --cidfile=/run/podman-recyclarr.ctr-id \
+        --cgroups=no-conmon \
+        --sdnotify=conmon \
+        -d \
+        --replace \
+        -e TZ=America/New_York \
+        -v /persist/var/lib/private/recyclarr:/config \
+        -v ${config.sops.templates."recyclarr-secrets.yml".path}:/config/secrets.yml:ro \
+        -v "${./recyclarr/recyclarr.yml}:/config/recyclarr.yml:ro" \
+        -v "${./recyclarr/settings.yml}:/config/settings.yml:ro" \
+        -l io.containers.autoupdate=registry \
+        --pull missing \
+        '--security-opt=no-new-privileges' \
+        --user $(id -u recyclarr):$(id -g recyclarr) \
+        ghcr.io/recyclarr/recyclarr \
+        sync \
+        --app-data \
+        /config
+    '';
   };
 
   systemd.timers.recyclarr = {
@@ -996,10 +1012,10 @@ exec podman  \
   };
 
   virtualisation.oci-containers.containers.recyclarr = {
-      autoStart = false;
-      image = "ghcr.io/recyclarr/recyclarr";
-      serviceName = "recyclarr";
-      /*
+    autoStart = false;
+    image = "ghcr.io/recyclarr/recyclarr";
+    serviceName = "recyclarr";
+    /*
       extraOptions = [
         "--security-opt=no-new-privileges"
         "--uidmap=1000:$(id -u ${config.users.users.recyclarr.name})"
@@ -1021,12 +1037,159 @@ exec podman  \
       */
   };
 
-  sops.secrets."recyclarr-secrets.yml" = {
-    restartUnits = [ "recyclarr.service" ];
-    sopsFile = ./recyclarr/secrets.yml;
-    format = "binary";
-    owner = config.users.users.recyclarr.name;
-    group = config.users.users.recyclarr.group;
+  sops.secrets."radarr-api-key" = {
+    sopsFile = ./secrets.yml;
+    key = "radarr-api-key";
+  };
+
+  sops.secrets."sonarr-api-key" = {
+    sopsFile = ./secrets.yml;
+    key = "sonarr-api-key";
+  };
+
+  sops.secrets."readarr-api-key" = {
+    sopsFile = ./secrets.yml;
+    key = "readarr-api-key";
+  };
+
+  sops.secrets."prowlarr-api-key" = {
+    sopsFile = ./secrets.yml;
+    key = "prowlarr-api-key";
+  };
+
+  sops.templates."recyclarr-secrets.yml" = {
+    content = ''
+      sonarr_api_key: ${config.sops.placeholder.sonarr-api-key}
+      radarr_api_key: ${config.sops.placeholder.radarr-api-key}
+    '';
+
+    owner = "${config.users.users.recyclarr.name}";
+  };
+
+  systemd.services.radarr = {
+    serviceConfig = {
+      # TODO: poke the database to configure a user, or poke the API using the API key.
+      ExecStartPre = ''
+        ${pkgs.coreutils}/bin/cp -f ${config.sops.templates."radarr-config.xml".path} /var/lib/radarr/.config/Radarr/config.xml
+      '';
+    };
+  };
+
+  sops.templates."radarr-config.xml" = {
+    restartUnits = [ "radarr.service" ];
+    owner = "${config.users.users.radarr.name}";
+    content = ''
+      <Config>
+        <BindAddress>127.0.0.1</BindAddress>
+        <Port>${toString radarr-port}</Port>
+        <SslPort>9898</SslPort>
+        <EnableSsl>False</EnableSsl>
+        <LaunchBrowser>True</LaunchBrowser>
+        <ApiKey>${config.sops.placeholder.radarr-api-key}</ApiKey>
+        <AuthenticationMethod>Forms</AuthenticationMethod>
+        <AuthenticationRequired>Enabled</AuthenticationRequired>
+        <Branch>master</Branch>
+        <LogLevel>debug</LogLevel>
+        <SslCertPath></SslCertPath>
+        <SslCertPassword></SslCertPassword>
+        <UrlBase></UrlBase>
+        <InstanceName>Radarr</InstanceName>
+      </Config>
+    '';
+  };
+
+  systemd.services.sonarr = {
+    serviceConfig = {
+      # TODO: poke the database to configure a user, or poke the API using the API key.
+      ExecStartPre = ''
+        ${pkgs.coreutils}/bin/cp -f ${config.sops.templates."sonarr-config.xml".path} /var/lib/sonarr/.config/NzbDrone/config.xml
+      '';
+    };
+  };
+
+  sops.templates."sonarr-config.xml" = {
+    restartUnits = [ "sonarr.service" ];
+    owner = "${config.users.users.sonarr.name}";
+    content = ''
+      <Config>
+        <BindAddress>127.0.0.1</BindAddress>
+        <Port>${toString sonarr-port}</Port>
+        <SslPort>9898</SslPort>
+        <EnableSsl>False</EnableSsl>
+        <LaunchBrowser>True</LaunchBrowser>
+        <ApiKey>${config.sops.placeholder.sonarr-api-key}</ApiKey>
+        <AuthenticationMethod>Forms</AuthenticationMethod>
+        <AuthenticationRequired>Enabled</AuthenticationRequired>
+        <Branch>main</Branch>
+        <LogLevel>debug</LogLevel>
+        <SslCertPath></SslCertPath>
+        <SslCertPassword></SslCertPassword>
+        <UrlBase></UrlBase>
+        <InstanceName>Sonarr</InstanceName>
+      </Config>
+    '';
+  };
+
+  systemd.services.readarr = {
+    serviceConfig = {
+      ExecStartPre = ''
+        ${pkgs.coreutils}/bin/cp -f ${config.sops.templates."readarr-config.xml".path} /var/lib/readarr/config.xml
+      '';
+    };
+  };
+
+  sops.templates."readarr-config.xml" = {
+    restartUnits = [ "readarr.service" ];
+    owner = "${config.users.users.readarr.name}";
+    content = ''
+      <Config>
+        <BindAddress>127.0.0.1</BindAddress>
+        <Port>${toString readarr-port}</Port>
+        <SslPort>6868</SslPort>
+        <EnableSsl>False</EnableSsl>
+        <LaunchBrowser>True</LaunchBrowser>
+        <ApiKey>${config.sops.placeholder.readarr-api-key}</ApiKey>
+        <AuthenticationMethod>None</AuthenticationMethod>
+        <AuthenticationRequired>Enabled</AuthenticationRequired>
+        <Branch>develop</Branch>
+        <LogLevel>debug</LogLevel>
+        <SslCertPath></SslCertPath>
+        <SslCertPassword></SslCertPassword>
+        <UrlBase></UrlBase>
+        <InstanceName>Readarr</InstanceName>
+      </Config>
+    '';
+  };
+
+  systemd.services.prowlarr = {
+    serviceConfig = {
+      LoadCredential = "config.xml:${config.sops.templates."prowlarr-config.xml".path}";
+      ExecStartPre = ''
+        ${pkgs.coreutils}/bin/cp -f ''${CREDENTIALS_DIRECTORY}/config.xml /var/lib/prowlarr/config.xml
+      '';
+    };
+  };
+
+  sops.templates."prowlarr-config.xml" = {
+    restartUnits = [ "prowlarr.service" ];
+    content = ''
+      <Config>
+        <BindAddress>127.0.0.1</BindAddress>
+        <Port>${toString prowlarr-port}</Port>
+        <SslPort>6969</SslPort>
+        <EnableSsl>False</EnableSsl>
+        <LaunchBrowser>True</LaunchBrowser>
+        <ApiKey>${config.sops.placeholder.prowlarr-api-key}</ApiKey>
+        <AuthenticationMethod>Forms</AuthenticationMethod>
+        <AuthenticationRequired>Enabled</AuthenticationRequired>
+        <Branch>master</Branch>
+        <LogLevel>debug</LogLevel>
+        <SslCertPath></SslCertPath>
+        <SslCertPassword></SslCertPassword>
+        <UrlBase></UrlBase>
+        <InstanceName>Prowlarr</InstanceName>
+      </Config>
+    '';
   };
 
   system.stateVersion = "24.11";

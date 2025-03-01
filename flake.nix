@@ -36,7 +36,7 @@
 
           # something is using the old name, hack around it.
           utillinux = prev.util-linux;
-          
+
           caddyFull = prev.pkgs.caddy.withPlugins {
             plugins = [
               "github.com/caddy-dns/cloudflare@v0.0.0-20240703190432-89f16b99c18e"

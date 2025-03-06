@@ -339,7 +339,7 @@ in
     # because otherwise podman tries to resovle the user inside the container
     # and fails.
     # FIXME: modify oci-containers.nix instead
-    script = ''
+    script = lib.mkForce ''
 #!${pkgs.bash}/bin/bash
 set -e
 

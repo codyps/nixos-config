@@ -319,18 +319,41 @@ in
       ];
     };
 
-    libation = {
-      image = "docker.io/rmcrackan/libation:latest";
-      volumes = [
-        "/ward/keep/libation/data:/data"
-        "/ward/keep/libation/config:/config"
-      ];
-      environment = {
-        SLEEP_TIME = "2h";
-      };
-      labels = {
-        "io.containers.autoupdate" = "registry";
-      };
+  };
+
+  # FIXME: use dynamic user.
+  users.users.libation = {
+    isSystemUser = true;
+    group = "libation";
+  };
+  users.groups.libation = { };
+
+  systemd.services.libation = {
+    serviceConfig = {
+      ExecStartPre = ''
+        chown -R libation:libation /ward/keep/libation
+      '';
+    };
+
+    # again, we're tweaking the systemd service so we can pick up with uid
+    # because otherwise podman tries to resovle the user inside the container
+    # and fails.
+  };
+
+
+  virtualisation.oci-containers.containers.libation = {
+    serviceName = "libation";
+    image = "docker.io/rmcrackan/libation:latest";
+    user = "libation:libation";
+    volumes = [
+      "/ward/keep/libation/data:/data"
+      "/ward/keep/libation/config:/config"
+    ];
+    environment = {
+      SLEEP_TIME = "2h";
+    };
+    labels = {
+      "io.containers.autoupdate" = "registry";
     };
   };
 

@@ -112,7 +112,26 @@ in
   #  secretKeyFile = "/persist/etc/nix-serve/cache-priv-key.pem";
   #};
 
-  systemd.services.caddy.serviceConfig.EnvironmentFile = "/persist/etc/default/caddy";
+  sops.age.sshKeyPaths = [
+    "/persist/etc/ssh/ssh_host_ed25519_key"
+  ];
+
+  sops.secrets."cloudflare-api-key-einic-org-dns" = {
+    sopsFile = ./secrets.yaml;
+    key = "cloudflare-api-key-einic-org-dns";
+  };
+
+  sops.templates."caddy-env" = {
+    restartUnits = [ "caddy.service" ];
+    content = ''
+      CLOUDFLARE_API_TOKEN=${config.sops.placeholder.cloudflare-api-key-einic-org-dns}
+    '';
+  };
+
+  systemd.services.caddy.serviceConfig.EnvironmentFile = [
+    "${config.sops.templates."caddy-env".path}"
+  ];
+
   services.caddy = {
     enable = true;
     package = pkgs.caddyFull;

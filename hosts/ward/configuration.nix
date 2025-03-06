@@ -331,7 +331,7 @@ in
   systemd.services.libation = {
     serviceConfig = {
       ExecStartPre = ''
-        chown -R libation:libation /ward/keep/libation
+        ${pkgs.coreutils}/bin/chown -R libation:libation /ward/keep/libation
       '';
     };
 

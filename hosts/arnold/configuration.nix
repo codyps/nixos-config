@@ -385,6 +385,8 @@ in
     tctiEnvironment.enable = true;
   };
 
+  environment.etc."zrepl/zrepl.yml".source = ./zrepl.yml;
+
   environment.etc.crypttab = {
     mode = "0600";
     text = ''

@@ -1,0 +1,101 @@
+jobs:
+  - name: sink
+    type: sink
+    root_fs: "tank/backup/zrepl/sink"
+    serve:
+      type: tls
+      listen: ":8888"
+      ca: "/etc/zrepl/ca.crt"
+      cert: "/etc/zrepl/arnold.crt"
+      key: "/etc/zrepl/arnold.key"
+      client_cns:
+        - "franklin"
+        - "gun"
+        - "rufus"
+    recv:
+      properties:
+        inherit:
+          - "mountpoint"
+  - name: local_sink
+    type: sink
+    root_fs: "tank/backup/zrepl/local"
+    serve:
+      type: local
+      listener_name: localsink
+    recv:
+      properties:
+        inherit:
+          - "mountpoint"
+  - name: mainrust_to_tank
+    type: push
+    connect:
+      type: local
+      listener_name: localsink
+      client_identity: arnold
+    filesystems: {
+      "mainrust<": true,
+      "mainrust/enc/root/var/cache<": false,
+      "mainrust/enc/root/var/log<": false,
+      "mainrust/enc/home/y/.cache<": false,
+      "mainrust/enc/home/y/tmp<": false,
+      "mainrust/enc/docker<": false,
+      "mainrust/enc/TMP<": false,
+    }
+    snapshotting:
+      type: periodic
+      prefix: zrepl_
+      interval: 10m
+    pruning:
+      keep_sender:
+        - type: not_replicated
+        - type: last_n
+          count: 10
+      keep_receiver:
+        - type: grid
+          grid: 12x1h(keep=all) | 96x30m | 60x1d | 208x7d
+          regex: "^zrepl_"
+  - name: tank_snap
+    type: snap
+    filesystems: {
+      "tank/DATA/bt-downloads<": false,
+      "tank/DATA/libvirt-images<": false,
+      "tank/DATA/work<": false,
+      "tank/TMP<": false,
+      "tank/DATA/video<": false,
+      "tank/backup/borg<": false,
+      "tank/backup/timemachine3<": false,
+      "tank/backup/timemachine4<": false,
+      "tank/backup/timemachine<": false,
+      "tank/backup/windows/fh<": false,
+      "tank/backup/zsendrecv<": false,
+      "tank/backup/zoop<": false,
+      "tank/backup/zrepl<": false,
+      "tank/backup/zxfer<": false,
+      "tank<": true,
+      "tank": false,
+    }
+    snapshotting:
+      type: periodic
+      prefix: zrepl_
+      interval: 10m
+    pruning:
+      keep:
+        - type: grid
+          grid: 12x1h(keep=all) | 96x30m | 60x1d | 208x7d
+          regex: "^zrepl_"
+
+  - name: tank_snap_short
+    type: snap
+    filesystems: {
+      "tank": true,
+      "tank/DATA/work<": true,
+    }
+    snapshotting:
+      type: periodic
+      prefix: zrepl_
+      interval: 30m
+    pruning:
+      keep:
+        - type: grid
+          grid: 48x30m | 30x1d | 21x7d
+          regex: "^zrepl_"

@@ -128,9 +128,7 @@ in
     '';
   };
 
-  systemd.services.caddy.serviceConfig.EnvironmentFile = [
-    "${config.sops.templates."caddy-env".path}"
-  ];
+  systemd.services.caddy.serviceConfig.EnvironmentFile = "${config.sops.templates."caddy-env".path}";
 
   services.caddy = {
     enable = true;

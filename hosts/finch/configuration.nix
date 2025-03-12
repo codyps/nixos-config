@@ -11,7 +11,7 @@ in
 {
   imports =
     [
-      ../../modules/zfs.nix
+      ../../nixos-modules/all-modules.nix
       ./hardware-configuration.nix
       (modulesPath + "/virtualisation/xen-domU.nix")
     ];
@@ -41,6 +41,7 @@ in
     directories = [
       "/var/log"
       "/var/lib"
+      "/var/db"
     ];
   };
 
@@ -147,12 +148,7 @@ in
 
         @audiobookshelf host audiobookshelf.einic.org
         handle @audiobookshelf {
-          reverse_proxy http://localhost:8917
-        }
-
-        @storyteller host storyteller.einic.org
-        handle @storyteller {
-          reverse_proxy http://localhost:8918
+          reverse_proxy http://127.0.0.1:8917
         }
 
         handle {
@@ -179,7 +175,7 @@ in
         }
 
         handle_path /syncthing/* {
-          reverse_proxy http://localhost:8384 {
+          reverse_proxy http://127.0.0.1:8384 {
               # https://docs.syncthing.net/users/reverseproxy.html
               #header_up Host {upstream_hostport}
               # https://docs.syncthing.net/users/faq.html#why-do-i-get-host-check-error-in-the-gui-api
@@ -202,7 +198,7 @@ in
 
   # NOTE: when a systemd.socket binds `<specific-ip>:443` as a listenStream
   # before caddy tries to bind the wildcard `:443`, caddy fails to obtain a
-  # bind and exists. This broke our "use systemd.socket and a systemd.service
+  # bind and exits. This broke our "use systemd.socket and a systemd.service
   # to forward stuff to a unix socket caddy reads from".
 
   # NOTE: when using systemd.sockets, we don't bind to the interface because
@@ -222,7 +218,7 @@ in
       # fdgram/6
       "[::]:443"
       # fdgram/7
-      #"100.112.195.103:443"
+      "100.112.195.103:443"
     ];
     socketConfig = {
       BindIPv6Only = "both";
@@ -321,7 +317,6 @@ in
 
   services.syncthing = {
     enable = true;
-    user = "syncthing";
     dataDir = "/tank/syncthing";
   };
 
@@ -352,22 +347,22 @@ in
       };
     };
 
-    storyteller = {
-      image = "registry.gitlab.com/smoores/storyteller:latest";
-      volumes = [
-        "/tank/storyteller/data:/data"
-        "/tank/storyteller/secret:/run/secret"
-      ];
-      environment = {
-        STORYTELLER_SECRET_KEY_FILE = "/run/secret/key";
-      };
-      ports = [
-        "127.0.0.1:8918:8001"
-      ];
-      labels = {
-        "io.containers.autoupdate" = "registry";
-      };
-    };
+    #storyteller = {
+    #  image = "registry.gitlab.com/smoores/storyteller:latest";
+    #  volumes = [
+    #    "/tank/storyteller/data:/data"
+    #    "/tank/storyteller/secret:/run/secret"
+    #  ];
+    #  environment = {
+    #    STORYTELLER_SECRET_KEY_FILE = "/run/secret/key";
+    #  };
+    #  ports = [
+    #    "127.0.0.1:8918:8001"
+    #  ];
+    #  labels = {
+    #    "io.containers.autoupdate" = "registry";
+    #  };
+    #};
   };
 
   systemd.services.podman-libation =
@@ -418,6 +413,7 @@ in
   };
 
   services.audiobookshelf = {
+    package = pkgs.audiobookshelf-headless;
     enable = true;
     port = 8917;
   };

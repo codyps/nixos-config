@@ -36,7 +36,7 @@
 
           # something is using the old name, hack around it.
           utillinux = prev.util-linux;
-          
+
           caddyFull = prev.pkgs.caddy.withPlugins {
             plugins = [
               "github.com/caddy-dns/cloudflare@v0.0.0-20240703190432-89f16b99c18e"
@@ -45,6 +45,11 @@
               "github.com/WeidiDeng/caddy-cloudflare-ip@v0.0.0-20231130002422-f53b62aa13cb"
             ];
             hash = "sha256-NZ3Cik3WHB1ad0ImuqU+IMKcg3zJ1AkL1xXpPwa89o4=";
+          };
+
+          # re-import audiobookshelf with ffmpeg-full replaced by ffmpeg-headless
+          audiobookshelf-headless = prev.callPackage (nixpkgs + "/pkgs/by-name/au/audiobookshelf/package.nix") {
+            ffmpeg-full = prev.ffmpeg-headless;
           };
         })
         (import ./nixpkgs/overlays/overlay.nix)
@@ -71,6 +76,15 @@
           };
         in
         {
+          devShell = pkgs.mkShell {
+            nativeBuildInputs = with pkgs; [
+              age
+              gnupg
+              ssh-to-pgp
+              ssh-to-age
+              sops
+            ];
+          };
           formatter = pkgs.nixpkgs-fmt;
         }
       ) //
@@ -127,6 +141,7 @@
             specialArgs = { inherit home-manager self; };
             modules = [
               ethereum-nix.nixosModules.default
+              sops-nix.nixosModules.sops
               ./hosts/arnold/configuration.nix
               ./nixos/common.nix
               impermanence.nixosModules.impermanence
@@ -148,6 +163,7 @@
             specialArgs = { inherit home-manager self; };
             modules = [
               ethereum-nix.nixosModules.default
+              sops-nix.nixosModules.sops
               ./hosts/ward/configuration.nix
               ./nixos/common.nix
               impermanence.nixosModules.impermanence
@@ -187,7 +203,7 @@
             system = "x86_64-linux";
             specialArgs = { inherit home-manager; };
             modules = [
-              ./nixos/constance/configuration.nix
+              ./hosts/constance/configuration.nix
             ];
           };
 

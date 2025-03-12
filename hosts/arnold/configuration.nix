@@ -3,7 +3,21 @@ let
   ssh-auth = (import ../../nixos/ssh-auth.nix);
   authorizedKeys = ssh-auth.authorizedKeys;
   komgaPort = 10100;
+  kavitaPort = 10101;
+  komfPort = 10102;
+  calibreWebAutomatedPort = 10103;
+
+  # FIXME: prowlarr has these set internally, we need to tweak prowlarr to use
+  # these values
+  sonarr-port = 8989;
+  radarr-port = 7878;
+  readarr-port = 8787;
+  prowlarr-port = 9696;
+
+  # NOTE: because `transmission-remote` looks at localhost:9091 by default, if
+  # we change this we should wrap `transmission-remote`.
   transmissionPort = 9091;
+
   pia-wg-util = pkgs.writeShellApplication {
     name = "pia-wg-util";
     text = builtins.readFile ../../scripts/pia-wg-util.sh;
@@ -14,9 +28,8 @@ in
   imports =
     [
       ./hardware-configuration.nix
-      ../../nixos-modules/zfs.nix
+      ../../nixos-modules/all-modules.nix
       ../../modules/tailscale-initrd.nix
-      ../../modules/bind-localhost-only.nix
     ];
 
   boot.loader.efi.efiSysMountPoint = "/boot.d/0";
@@ -25,7 +38,7 @@ in
 
   # hack because nixos doesn't have multi-boot partition support for systemd-boot
   boot.loader.systemd-boot.extraInstallCommands = ''
-    ${pkgs.rsync}/bin/rsync -ahiv --delete /boot.d/0/ /boot.d/1/
+    ${pkgs.rsync}/bin/rsync -ahiq --delete /boot.d/0/ /boot.d/1/
   '';
   # TODO: avoid overwriting the random-seed if we wrote it to the alternate boot partition
   # TODO: tweak systemd-boot-random-seed.service and others to use the other
@@ -34,6 +47,8 @@ in
 
   boot.loader.systemd-boot.enable = true;
   boot.loader.efi.canTouchEfiVariables = true;
+
+  hardware.cpu.intel.updateMicrocode = true;
 
   systemd.watchdog.runtimeTime = "30s";
 
@@ -56,14 +71,44 @@ in
       "/var/lib/audiobookshelf"
       "/var/lib/samba"
       "/var/lib/komga"
+      "/var/lib/kavita"
       "/var/lib/transmission"
+      "/var/lib/jellyfin"
+      "/var/lib/pia-wg"
+      "/var/lib/sabnzbd"
+      "/var/lib/containers"
+      "/var/lib/systemd"
+      "/var/lib/caddy"
+      "/var/lib/readarr"
+      "/var/lib/private/prowlarr"
+      "/var/lib/private/recyclarr"
+      "/var/lib/sonarr"
+      "/var/lib/radarr"
+      "/var/lib/uptimed"
+      "/var/cache/jellyfin"
+      "/var/db"
       "/etc/NetworkManager/system-connections"
       { directory = "/var/lib/colord"; user = "colord"; group = "colord"; mode = "u=rwx,g=rx,o="; }
     ];
   };
 
+  system.activationScripts."createPersistentStorageDirs".deps = [ "var-lib-private-permissions" "users" "groups" ];
+  system.activationScripts = {
+    "var-lib-private-permissions" = {
+      deps = [ "specialfs" ];
+      text = ''
+        mkdir -p /persist/var/lib/private
+        chmod 0700 /persist/var/lib/private
+      '';
+    };
+  };
+
   # FIXME: if we disable this, then everything breaks becasue we don't every load keys. We'll have to insert our own key loading
   boot.zfs.requestEncryptionCredentials = false;
+
+  sops.age.sshKeyPaths = [
+    "/persist/etc/ssh/ssh_host_ed25519_key"
+  ];
 
   boot.initrd = {
     systemd.enable = true;
@@ -159,8 +204,23 @@ in
 
   networking.useDHCP = false;
   networking.networkmanager.enable = false;
-  networking.firewall.trustedInterfaces = [ "tailscale0" ];
-  networking.firewall.allowedTCPPorts = [ 80 443 ];
+  networking.firewall.trustedInterfaces = [ "tailscale0" "podman0" ];
+  networking.firewall.allowedTCPPorts = [
+    # caddy
+    80
+    443
+    # syncthing
+    22000
+  ];
+
+  networking.firewall.allowedUDPPorts = [
+    # jellyfin
+    1900
+    7359
+    # syncthing
+    21027
+  ];
+
   networking.firewall.allowPing = true;
 
   networking.hostName = "arnold";
@@ -243,6 +303,10 @@ in
   services.xserver.desktopManager.gnome.enable = true;
   services.xserver.displayManager.gdm.enable = true;
   services.xserver.displayManager.gdm.autoSuspend = false;
+  systemd.targets.sleep.enable = false;
+  systemd.targets.suspend.enable = false;
+  systemd.targets.hibernate.enable = false;
+  systemd.targets.hybrid-sleep.enable = false;
   security.polkit.extraConfig = ''
     polkit.addRule(function(action, subject) {
         if (action.id == "org.freedesktop.login1.suspend" ||
@@ -254,6 +318,12 @@ in
         }
     });
   '';
+  environment.etc."gdm/greeter.dconf-defaults" = {
+    text = ''
+      [org.gnome.settings-daemon.plugins.power]
+      sleep-inactive-ac-type='nothing'
+    '';
+  };
 
   users.mutableUsers = false;
   users.users.cody = {
@@ -283,6 +353,7 @@ in
     git
     curl
     htop
+    wireguard-tools
   ];
 
   programs.mtr.enable = true;
@@ -314,6 +385,8 @@ in
     tctiEnvironment.enable = true;
   };
 
+  environment.etc."zrepl/zrepl.yml".source = ./zrepl.yml;
+
   environment.etc.crypttab = {
     mode = "0600";
     text = ''
@@ -342,6 +415,22 @@ in
       z14.1   UUID=4aea7cc3-224f-4ad9-83f4-d687103ad35e /persist/etc/secret/luks1 discard,no-read-workqueue,no-write-workqueue,same-cpu-crypt
       z14.2   UUID=3fc04e0d-251b-4cec-8172-12c603c58284 /persist/etc/secret/luks1 discard,no-read-workqueue,no-write-workqueue,same-cpu-crypt
       z14.3   UUID=e5b69a87-e02c-4b14-be58-6109488e172a /persist/etc/secret/luks1 discard,no-read-workqueue,no-write-workqueue,same-cpu-crypt
+
+      i01     UUID=72bf8068-6563-4f66-babc-4e337922b4ed /persist/etc/secret/luks1 discard,no-read-workqueue,no-write-workqueue,same-cpu-crypt
+
+      d01     UUID=86625e5f-5a2d-41b2-b337-8243f8c955ab /persist/etc/secret/luks1 discard,no-read-workqueue,no-write-workqueue,same-cpu-crypt
+      d18     UUID=ca785a06-e592-4883-884f-3604fbd8a3d5 /persist/etc/secret/luks1 discard,no-read-workqueue,no-write-workqueue,same-cpu-crypt
+      d19     UUID=34569f52-2ad7-45b5-bd98-6e3c70999734 /persist/etc/secret/luks1 discard,no-read-workqueue,no-write-workqueue,same-cpu-crypt
+
+      e01     UUID=9da95a7a-61b1-47a6-94ed-223ad5cbbd4a /persist/etc/secret/luks1 discard,no-read-workqueue,no-write-workqueue,same-cpu-crypt
+      e02     UUID=8ee85be7-48b5-4e94-aa13-ce7369492e42 /persist/etc/secret/luks1 discard,no-read-workqueue,no-write-workqueue,same-cpu-crypt
+      e03     UUID=74428d6e-1588-427e-930b-b2785266155f /persist/etc/secret/luks1 discard,no-read-workqueue,no-write-workqueue,same-cpu-crypt
+      e04     UUID=d4f63c65-cefe-4d76-a97c-9f75cc776bed /persist/etc/secret/luks1 discard,no-read-workqueue,no-write-workqueue,same-cpu-crypt
+
+      f01     UUID=bd3095e7-685a-4ae1-9a28-00ce02bbf04f /persist/etc/secret/luks1 discard,no-read-workqueue,no-write-workqueue,same-cpu-crypt
+
+      ru1     UUID=36610bd4-182e-408e-85d8-c13c67ebd9fb /persist/etc/secret/luks1 discard,no-read-workqueue,no-write-workqueue,same-cpu-crypt
+      #rl1     
     '';
   };
 
@@ -450,12 +539,6 @@ in
       # NOTE: nixos can't handle virtualHosts with multiple hosts, so we have to set logFormat manually
       logFormat = "output file /var/log/caddy/arnold.einic.org.log";
       extraConfig = ''
-        @mkv path *.mkv
-        header @mkv {
-          Content-Disposition inline
-          Content-Type video/webm 
-        }
-
         @free-games-claimer host free-games-claimer.arnold.einic.org
         route @free-games-claimer {
           import /persist/etc/secret/caddy-auth
@@ -494,12 +577,17 @@ in
 
         @sonarr host sonarr.arnold.einic.org
         route @sonarr {
-          reverse_proxy :8989
+          reverse_proxy :${toString sonarr-port}
         }
 
         @komga host komga.arnold.einic.org
         route @komga {
           reverse_proxy 127.0.0.1:${toString komgaPort}
+        }
+
+        @kavita host kavita.arnold.einic.org
+        route @kavita {
+          reverse_proxy 127.0.0.1:${toString kavitaPort}
         }
 
         @jellyfin host jellyfin.arnold.einic.org
@@ -510,88 +598,57 @@ in
           }
         }
 
-        @radarr host radarr.arnold.einic.org
-        route @radarr {
-          reverse_proxy :7878
-        }
-
         @transmission host transmission.arnold.einic.org
         route @transmission {
           import /persist/etc/secret/caddy-auth
           reverse_proxy 127.0.0.1:${toString transmissionPort}
         }
 
-        @arnold host arnold.einic.org
-        route @arnold {
-                @secure {
-                        not path /~*
-                        #path /tank/*
-                        #path /games/*
-                        not path /audiobooks
-                        not path /audiobooks/*
-                        not path /switch
-                        not path /switch/*
-                }
-
-                @switch {
-                        path /switch
-                        path /switch/*
-                }
-
-                import /persist/etc/secret/caddy-auth-2
-
-                redir /jackett /jackett/
-                reverse_proxy /jackett/* http://127.0.0.1:9117
-
-                redir /tank /tank/
-                handle_path /tank/* {
-                    file_server browse {
-                        root /tank
-                    }
-                }
-
-                redir /switch /switch/
-                handle_path /switch/* {
-                    file_server browse {
-                        root /tank/DATA/games/console/nintendo-switch
-                    }
-                }
-
-                redir /audiobooks /audiobooks/
-                handle_path /audiobooks/* {
-                    file_server browse {
-                        root /tank/DATA/audiobooks
-                    }
-                }
-
-                redir /games /games/
-                handle_path /games/* {
-                    file_server browse {
-                        root /tank/DATA/games
-                    }
-                }
-
-                @user_html {
-                     path_regexp user '^/~([^/]+)'
-                }
-
-                route @user_html {
-                    uri strip_prefix {re.user.0}
-                    file_server browse {
-                        root /home/{re.user.1}/public_html/
-                    }
-                }
-
-                root * /srv/http
-                templates
-                file_server
+        @calibre-web-automated host calibre-web-automated.arnold.einic.org
+        route @calibre-web-automated {
+          reverse_proxy 127.0.0.1:${toString calibreWebAutomatedPort}
         }
 
+        @prowlarr host prowlarr.arnold.einic.org
+        route @prowlarr {
+          import /persist/etc/secret/caddy-auth
+          reverse_proxy :${toString prowlarr-port}
+        }
+
+        @readarr host readarr.arnold.einic.org
+        route @readarr {
+          import /persist/etc/secret/caddy-auth
+          reverse_proxy :${toString readarr-port}
+        }
+
+        @radarr host radarr.arnold.einic.org
+        route @radarr {
+          import /persist/etc/secret/caddy-auth
+          reverse_proxy :${toString radarr-port}
+        }
+
+        @sabnzbd host sabnzbd.arnold.einic.org
+        route @sabnzbd {
+          import /persist/etc/secret/caddy-auth
+          reverse_proxy :8080
+        }
+
+        @qbittorrent host qbittorrent.arnold.einic.org
+        route @qbittorrent {
+          import /persist/etc/secret/caddy-auth
+          reverse_proxy :${toString config.services.qbittorrent.webui-port}
+        }
+        
         root * /srv/http
 
         encode zstd gzip
       '';
     };
+  };
+
+  services.syncthing = {
+    enable = true;
+    dataDir = "/tank/DATA/syncthing";
   };
 
   services.avahi = {
@@ -640,6 +697,61 @@ in
     };
   };
 
+  systemd.services.podman-komf.serviceConfig = {
+    EnvironmentFile = "/persist/etc/default/komf";
+  };
+
+  virtualisation.oci-containers.containers.komf = {
+    image = "sndxr/komf:latest";
+    ports = [ "127.0.0.1:${toString komfPort}:${toString komfPort}" ];
+    environment = {
+      KOMF_SERVER_PORT = toString komfPort;
+      KOMF_KOMGA_BASE_URI = "http://host.containers.internal:${toString komgaPort}";
+      KOMF_KAVITA_BASE_URI = "http://host.containers.internal:${toString kavitaPort}";
+      KOMF_LOG_LEVEL = "INFO";
+    };
+    volumes = [
+      "/persist/var/lib/komf:/config"
+    ];
+  };
+
+  users.users.calibre-web-automated = {
+    description = "Calibre Web Automated";
+    isSystemUser = true;
+    group = "calibre-web-automated";
+    # FIXME: if we could set environment variables in the container dynamically
+    # (ie: at container creation time) we wouldn't need static uid/gid, but
+    # nixos doesn't support that right now.
+    uid = 988;
+  };
+  users.groups.calibre-web-automated = {
+    gid = 982;
+  };
+
+  virtualisation.oci-containers.containers.calibre-web-automated = {
+    image = "crocodilestick/calibre-web-automated:latest";
+    ports = [ "127.0.0.1:${toString calibreWebAutomatedPort}:8083" ];
+    environment = {
+      TZ = "America/New_York";
+
+      PUID = toString config.users.users.calibre-web-automated.uid;
+      PGID = toString config.users.groups.calibre-web-automated.gid;
+    };
+    volumes = [
+      "/persist/var/lib/calibre-web-automated:/config"
+      "/tank/DATA/calibre-library:/calibre-library"
+      "/tank/TMP/ingest/cwa-book-ingest:/cwa-book-ingest"
+    ];
+  };
+
+  services.kavita = {
+    enable = true;
+    tokenKeyFile = "/persist/etc/kavita/tokenKeyFile";
+    settings = {
+      Port = kavitaPort;
+    };
+  };
+
   services.jellyfin.enable = true;
 
   # FIXME: pick exactly what we require for jellyfin
@@ -649,11 +761,12 @@ in
     extraPackages = with pkgs; [
       intel-media-driver
       intel-vaapi-driver
-      vaapiVdpau
+      vaapiIntel
       libvdpau-va-gl
-      intel-compute-runtime # OpenCL filter support (hardware tonemapping and subtitle burn-in)
+      intel-compute-runtime-legacy1 # OpenCL filter support (hardware tonemapping and subtitle burn-in), Gen 8,9,11
       vpl-gpu-rt # QSV on 11th gen or newer
       intel-media-sdk # QSV up to 11th gen
+      ocl-icd
     ];
   };
 
@@ -664,8 +777,40 @@ in
   zramSwap.enable = true;
   services.uptimed.enable = true;
 
-  services.sabnzbd = {
+  services.qbittorrent = {
     enable = true;
+    webui-port = 10114;
+  };
+
+  systemd.services.qbittorrent = {
+    requires = [ "pia-wg.service" ];
+    after = [ "pia-wg.service" ];
+
+    serviceConfig = {
+      NetworkNamespacePath = "/run/netns/pia";
+
+      BindReadOnlyPaths = [ "/etc/netns/pia/resolv.conf:/etc/resolv.conf" ];
+      BindPaths = [ "/tank/DATA/cbz" "/tank/DATA/bt-downloads" ];
+    };
+  };
+
+  systemd.sockets."qbittorrent-rpc-proxy" = {
+    socketConfig = {
+      ListenStream = "127.0.0.1:${toString config.services.qbittorrent.webui-port}";
+      Accept = "no";
+    };
+    wantedBy = [ "sockets.target" ];
+  };
+
+  systemd.services."qbittorrent-rpc-proxy" = {
+    after = [ "qbittorrent-rpc-proxy.socket" "pia-wg.service" ];
+    requires = [ "qbittorrent-rpc-proxy.socket" "pia-wg.service" ];
+    serviceConfig = {
+      DynamicUser = true;
+
+      ExecStart = "${pkgs.systemd}/lib/systemd/systemd-socket-proxyd --exit-idle-time=5m 127.0.0.1:${toString config.services.qbittorrent.webui-port}";
+      NetworkNamespacePath = "/run/netns/pia";
+    };
   };
 
   # FIXME: this writes configuration into `/var/lib/transmission`, which we
@@ -674,6 +819,7 @@ in
   # alternate fashion
   services.transmission = {
     enable = true;
+    package = pkgs.transmission_4;
     settings = {
       download-dir = "/tank/DATA/bt-downloads/complete";
       incomplete-dir = "/tank/DATA/bt-downloads/incomplete";
@@ -685,14 +831,67 @@ in
     };
   };
 
+  systemd.services.transmission = {
+    requires = [ "pia-wg.service" ];
+    after = [ "pia-wg.service" ];
+
+    serviceConfig = {
+      NetworkNamespacePath = "/run/netns/pia";
+      # Bind mount resolv.conf into the network namespace
+      # https://github.com/chrisbouchard/namespaced-wireguard-vpn/issues/9
+      BindReadOnlyPaths = [ "/etc/netns/pia/resolv.conf:/etc/resolv.conf" ];
+      BindPaths = [ "/tank/DATA/cbz" "/tank/DATA/bt-downloads" ];
+    };
+  };
+
+  systemd.sockets."transmission-rpc-proxy" = {
+    socketConfig = {
+      ListenStream = "127.0.0.1:${toString transmissionPort}";
+      Accept = "no";
+    };
+    wantedBy = [ "sockets.target" ];
+  };
+
+  systemd.services."transmission-rpc-proxy" = {
+    after = [ "transmission-rpc-proxy.socket" "pia-wg.service" ];
+    requires = [ "transmission-rpc-proxy.socket" "pia-wg.service" ];
+    serviceConfig = {
+      DynamicUser = true;
+
+      ExecStart = "${pkgs.systemd}/lib/systemd/systemd-socket-proxyd --exit-idle-time=5m 127.0.0.1:${toString transmissionPort}";
+      NetworkNamespacePath = "/run/netns/pia";
+
+      #ProtectSystem = "strict";
+      #ProtectHome = true;
+      #PrivateDevices = true;
+      #PrivateTmp = true;
+      #PrivateIPC = true;
+      #PrivatePIDs = true;
+      #PrivateUsers = true;
+      #ProtectHostname = true;
+      #ProtectClock = true;
+      #ProtectKernelTunables = true;
+      #ProtectKernelModules = true;
+      #ProtectKernelLogs = true;
+      #ProtectControlGroups = true;
+      #RestrictAddressFamilies="AF_INET AF_INET6";
+      #LockPersonality = true;
+      #MemoryDenyWriteExecute = true;
+      #RestrictRealtime = true;
+      #RestrictSUIDSGID = true;
+      #RemoveIPC = true;
+      #PrivateMounts = true;
+    };
+  };
+
+
   # https://www.cloudnull.io/2019/04/running-services-in-network-name-spaces-with-systemd/
   # https://www.ismailzai.com/blog/creating-wireguard-jails-with-linux-network-namespaces
   # https://github.com/dadevel/wg-netns
   # https://github.com/existentialtype/deluge-namespaced-wireguard
   systemd.services.pia-netns = {
     description = "Create a network namespace for PIA VPN";
-    wantedBy = [ "transmission.service" "multi-user.target" ];
-    before = [ "transmission.service" ];
+    wantedBy = [ "multi-user.target" ];
 
     path = [ pkgs.iproute2 ];
 
@@ -713,7 +912,7 @@ in
       touch /etc/netns/"$netns"/resolv.conf
 
       trap - EXIT
-      '';
+    '';
 
     serviceConfig = {
       Type = "oneshot";
@@ -737,39 +936,277 @@ in
     };
   };
 
-  systemd.services.transmission = {
+  services.locate = {
+    enable = true;
+  };
+
+  services.smartd = {
+    enable = true;
+    defaults.monitored = "-a -o on -s (S/../.././02|L/../../7/04)";
+  };
+
+  services.sabnzbd = {
+    # TODO: generate/track config file here instead of using the default
+    enable = true;
+    configFile = "/persist/etc/sabnzbd/sabnzbd.ini";
+  };
+
+  services.prowlarr = {
+    # TODO: set port here
+    enable = true;
+  };
+
+  services.readarr = {
+    # TODO: set port here
+    enable = true;
+  };
+
+  services.sonarr = {
+    enable = true;
+  };
+
+  services.radarr = {
+    enable = true;
+  };
+
+  # FIXME: use dynamic user.
+  users.users.recyclarr = {
+    description = "Recyclarr";
+    isSystemUser = true;
+    group = "recyclarr";
+  };
+  users.groups.recyclarr = { };
+
+  # FIXME: use dynamic user.
+  systemd.services.recyclarr = {
     serviceConfig = {
-      NetworkNamespacePath = "/run/netns/pia";
-      # Bind mount resolv.conf into the network namespace
-      # https://github.com/chrisbouchard/namespaced-wireguard-vpn/issues/9
-      BindReadOnlyPaths = [ "/etc/netns/pia/resolv.conf:/etc/resolv.conf" ];
-      BindPaths = [ "/tank/DATA/cbz" ];
+      #User = "${config.users.users.recyclarr.name}";
+      #Group = "${config.users.users.recyclarr.group}";
+      Type = lib.mkForce "oneshot";
+      Restart = lib.mkForce "on-failure";
+    };
+
+    # NOTE: oci-containers doesn't let us pass arbitrary shell substituions so we
+    # can't get runtime values for the user/group. So we poke the script
+    # manually.
+    # This means that we're ignoring the upstream generation of the script, but
+    # it works pretty well.
+    # NOTE: using `--uidmap` breaks podman, so we use `--user` instead.
+    script = lib.mkForce ''
+      exec podman  \
+        run \
+        --rm \
+        --name=recyclarr \
+        --log-driver=journald \
+        --cidfile=/run/podman-recyclarr.ctr-id \
+        --cgroups=no-conmon \
+        --sdnotify=conmon \
+        -d \
+        --replace \
+        -e TZ=America/New_York \
+        -v /persist/var/lib/private/recyclarr:/config \
+        -v ${config.sops.templates."recyclarr-secrets.yml".path}:/config/secrets.yml:ro \
+        -v "${./recyclarr/recyclarr.yml}:/config/recyclarr.yml:ro" \
+        -v "${./recyclarr/settings.yml}:/config/settings.yml:ro" \
+        -l io.containers.autoupdate=registry \
+        --pull missing \
+        '--security-opt=no-new-privileges' \
+        --user $(id -u recyclarr):$(id -g recyclarr) \
+        ghcr.io/recyclarr/recyclarr \
+        sync \
+        --app-data \
+        /config
+    '';
+  };
+
+  systemd.timers.recyclarr = {
+    timerConfig = {
+      Persistent = true;
+      OnCalendar = "daily";
+      AccuracySec = "1h";
+      RandomizedDelaySec = "1h";
     };
   };
 
-  systemd.sockets."transmission-rpc-proxy" = {
-    socketConfig = {
-      ListenStream = "127.0.0.1:${toString transmissionPort}";
-      Accept = "no";
-    };
-    wantedBy = [ "sockets.target" ];
+  virtualisation.oci-containers.containers.recyclarr = {
+    autoStart = false;
+    image = "ghcr.io/recyclarr/recyclarr";
+    serviceName = "recyclarr";
+    /*
+      extraOptions = [
+        "--security-opt=no-new-privileges"
+        "--uidmap=1000:$(id -u ${config.users.users.recyclarr.name})"
+        "--gidmap=1000:$(id -g ${config.users.users.recyclarr.name})"
+      ];
+      cmd = [ "sync" "--app-data" "/config" ];
+      environment = {
+        TZ = "America/New_York";
+      };
+      volumes = [
+        "/persist/var/lib/private/recyclarr:/config"
+        "/run/secrets/recyclarr-secrets.yml:/config/secrets.yml:ro"
+        "${./recyclarr/recyclarr.yml}:/config/recyclarr.yml:ro"
+        "${./recyclarr/settings.yml}:/config/settings.yml:ro"
+      ];
+      labels = {
+        "io.containers.autoupdate" = "registry";
+      };
+      */
   };
 
-  systemd.services."transmission-rpc-proxy" = {
-    after = [ "transmission.service" "transmission-rpc-proxy.socket" ];
-    requires = [ "transmission.service" "transmission-rpc-proxy.socket" ];
-    unitConfig = {
-      JoinsNamespaceOf = "transmission.service";
-    };
+  sops.secrets."radarr-api-key" = {
+    sopsFile = ./secrets.yml;
+    key = "radarr-api-key";
+  };
+
+  sops.secrets."sonarr-api-key" = {
+    sopsFile = ./secrets.yml;
+    key = "sonarr-api-key";
+  };
+
+  sops.secrets."readarr-api-key" = {
+    sopsFile = ./secrets.yml;
+    key = "readarr-api-key";
+  };
+
+  sops.secrets."prowlarr-api-key" = {
+    sopsFile = ./secrets.yml;
+    key = "prowlarr-api-key";
+  };
+
+  sops.templates."recyclarr-secrets.yml" = {
+    content = ''
+      sonarr_api_key: ${config.sops.placeholder.sonarr-api-key}
+      radarr_api_key: ${config.sops.placeholder.radarr-api-key}
+    '';
+
+    owner = "${config.users.users.recyclarr.name}";
+  };
+
+  systemd.services.radarr = {
     serviceConfig = {
-      User = "transmission";
-      Group = "transmission";
-      PrivateIPC = true;
-      PrivateDevices = true;
-      PrivateNetwork = true;
-      PrivateTmp = true;
-      ExecStart = "${pkgs.systemd}/lib/systemd/systemd-socket-proxyd --exit-idle-time=5m 127.0.0.1:${toString transmissionPort}";
+      # TODO: poke the database to configure a user, or poke the API using the API key.
+      ExecStartPre = ''
+        ${pkgs.coreutils}/bin/cp -f ${config.sops.templates."radarr-config.xml".path} /var/lib/radarr/.config/Radarr/config.xml
+      '';
     };
+  };
+
+  sops.templates."radarr-config.xml" = {
+    restartUnits = [ "radarr.service" ];
+    owner = "${config.users.users.radarr.name}";
+    content = ''
+      <Config>
+        <BindAddress>127.0.0.1</BindAddress>
+        <Port>${toString radarr-port}</Port>
+        <SslPort>9898</SslPort>
+        <EnableSsl>False</EnableSsl>
+        <LaunchBrowser>True</LaunchBrowser>
+        <ApiKey>${config.sops.placeholder.radarr-api-key}</ApiKey>
+        <AuthenticationMethod>Forms</AuthenticationMethod>
+        <AuthenticationRequired>Enabled</AuthenticationRequired>
+        <Branch>master</Branch>
+        <LogLevel>debug</LogLevel>
+        <SslCertPath></SslCertPath>
+        <SslCertPassword></SslCertPassword>
+        <UrlBase></UrlBase>
+        <InstanceName>Radarr</InstanceName>
+      </Config>
+    '';
+  };
+
+  systemd.services.sonarr = {
+    serviceConfig = {
+      # TODO: poke the database to configure a user, or poke the API using the API key.
+      ExecStartPre = ''
+        ${pkgs.coreutils}/bin/cp -f ${config.sops.templates."sonarr-config.xml".path} /var/lib/sonarr/.config/NzbDrone/config.xml
+      '';
+    };
+  };
+
+  sops.templates."sonarr-config.xml" = {
+    restartUnits = [ "sonarr.service" ];
+    owner = "${config.users.users.sonarr.name}";
+    content = ''
+      <Config>
+        <BindAddress>127.0.0.1</BindAddress>
+        <Port>${toString sonarr-port}</Port>
+        <SslPort>9898</SslPort>
+        <EnableSsl>False</EnableSsl>
+        <LaunchBrowser>True</LaunchBrowser>
+        <ApiKey>${config.sops.placeholder.sonarr-api-key}</ApiKey>
+        <AuthenticationMethod>Forms</AuthenticationMethod>
+        <AuthenticationRequired>Enabled</AuthenticationRequired>
+        <Branch>main</Branch>
+        <LogLevel>debug</LogLevel>
+        <SslCertPath></SslCertPath>
+        <SslCertPassword></SslCertPassword>
+        <UrlBase></UrlBase>
+        <InstanceName>Sonarr</InstanceName>
+      </Config>
+    '';
+  };
+
+  systemd.services.readarr = {
+    serviceConfig = {
+      ExecStartPre = ''
+        ${pkgs.coreutils}/bin/cp -f ${config.sops.templates."readarr-config.xml".path} /var/lib/readarr/config.xml
+      '';
+    };
+  };
+
+  sops.templates."readarr-config.xml" = {
+    restartUnits = [ "readarr.service" ];
+    owner = "${config.users.users.readarr.name}";
+    content = ''
+      <Config>
+        <BindAddress>127.0.0.1</BindAddress>
+        <Port>${toString readarr-port}</Port>
+        <SslPort>6868</SslPort>
+        <EnableSsl>False</EnableSsl>
+        <LaunchBrowser>True</LaunchBrowser>
+        <ApiKey>${config.sops.placeholder.readarr-api-key}</ApiKey>
+        <AuthenticationMethod>None</AuthenticationMethod>
+        <AuthenticationRequired>Enabled</AuthenticationRequired>
+        <Branch>develop</Branch>
+        <LogLevel>debug</LogLevel>
+        <SslCertPath></SslCertPath>
+        <SslCertPassword></SslCertPassword>
+        <UrlBase></UrlBase>
+        <InstanceName>Readarr</InstanceName>
+      </Config>
+    '';
+  };
+
+  systemd.services.prowlarr = {
+    serviceConfig = {
+      LoadCredential = "config.xml:${config.sops.templates."prowlarr-config.xml".path}";
+      ExecStartPre = ''
+        ${pkgs.coreutils}/bin/cp -f ''${CREDENTIALS_DIRECTORY}/config.xml /var/lib/prowlarr/config.xml
+      '';
+    };
+  };
+
+  sops.templates."prowlarr-config.xml" = {
+    restartUnits = [ "prowlarr.service" ];
+    content = ''
+      <Config>
+        <BindAddress>127.0.0.1</BindAddress>
+        <Port>${toString prowlarr-port}</Port>
+        <SslPort>6969</SslPort>
+        <EnableSsl>False</EnableSsl>
+        <LaunchBrowser>True</LaunchBrowser>
+        <ApiKey>${config.sops.placeholder.prowlarr-api-key}</ApiKey>
+        <AuthenticationMethod>Forms</AuthenticationMethod>
+        <AuthenticationRequired>Enabled</AuthenticationRequired>
+        <Branch>master</Branch>
+        <LogLevel>debug</LogLevel>
+        <SslCertPath></SslCertPath>
+        <SslCertPassword></SslCertPassword>
+        <UrlBase></UrlBase>
+        <InstanceName>Prowlarr</InstanceName>
+      </Config>
+    '';
   };
 
   system.stateVersion = "24.11";

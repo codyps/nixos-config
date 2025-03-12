@@ -116,7 +116,26 @@ in
   #  secretKeyFile = "/persist/etc/nix-serve/cache-priv-key.pem";
   #};
 
-  systemd.services.caddy.serviceConfig.EnvironmentFile = "/persist/etc/default/caddy";
+  sops.age.sshKeyPaths = [
+    "/persist/etc/ssh/ssh_host_ed25519_key"
+  ];
+
+  sops.secrets."cloudflare-api-key-einic-org-dns" = {
+    sopsFile = ./secrets.yaml;
+    key = "cloudflare-api-key-einic-org-dns";
+  };
+
+  sops.templates."caddy-env" = {
+    restartUnits = [ "caddy.service" ];
+    content = ''
+      CLOUDFLARE_API_TOKEN=${config.sops.placeholder.cloudflare-api-key-einic-org-dns}
+    '';
+  };
+
+  systemd.services.caddy.serviceConfig.EnvironmentFile = [
+    "${config.sops.templates."caddy-env".path}"
+  ];
+
   services.caddy = {
     enable = true;
     package = pkgs.caddyFull;
@@ -304,18 +323,64 @@ in
       ];
     };
 
-    libation = {
-      image = "docker.io/rmcrackan/libation:latest";
-      volumes = [
-        "/ward/keep/libation/data:/data"
-        "/ward/keep/libation/config:/config"
-      ];
-      environment = {
-        SLEEP_TIME = "2h";
-      };
-      labels = {
-        "io.containers.autoupdate" = "registry";
-      };
+  };
+
+  # FIXME: use dynamic user.
+  users.users.libation = {
+    isSystemUser = true;
+    group = "libation";
+  };
+  users.groups.libation = { };
+
+  systemd.services.libation = {
+    serviceConfig = {
+      ExecStartPre = ''
+        ${pkgs.coreutils}/bin/chown -R libation:libation /ward/keep/libation
+      '';
+    };
+
+    # again, we're tweaking the systemd service so we can pick up with uid
+    # because otherwise podman tries to resovle the user inside the container
+    # and fails.
+    # FIXME: modify oci-containers.nix instead
+    script = lib.mkForce ''
+#!${pkgs.bash}/bin/bash
+set -e
+
+exec ${pkgs.podman}/bin/podman  \
+  run \
+  --rm \
+  --name=libation \
+  --log-driver=journald \
+  --cidfile=/run/libation/ctr-id \
+  --cgroups=enabled \
+  --sdnotify=conmon \
+  -d \
+  --replace \
+  -e SLEEP_TIME=2h \
+  --user $(id -u libation):$(id -g libation) \
+  -v /ward/keep/libation/data:/data \
+  -v /ward/keep/libation/config:/config \
+  -l io.containers.autoupdate=registry \
+  --pull missing \
+  docker.io/rmcrackan/libation:latest
+      '';
+  };
+
+
+  virtualisation.oci-containers.containers.libation = {
+    serviceName = "libation";
+    image = "docker.io/rmcrackan/libation:latest";
+    user = "libation:libation";
+    volumes = [
+      "/ward/keep/libation/data:/data"
+      "/ward/keep/libation/config:/config"
+    ];
+    environment = {
+      SLEEP_TIME = "2h";
+    };
+    labels = {
+      "io.containers.autoupdate" = "registry";
     };
   };
 

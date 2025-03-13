@@ -83,7 +83,19 @@
               ssh-to-pgp
               ssh-to-age
               sops
+              gh
             ];
+
+            shellHook = ''
+              if [ -z "$NIX_GITHUB_TOKEN" ]; then
+                gh auth status || gh auth login
+                NIX_GITHUB_TOKEN="$(gh auth token)"
+                export NIX_GITHUB_TOKEN
+              fi
+
+              NIX_CONFIG="access-tokens = github.com=$NIX_GITHUB_TOKEN"
+              export NIX_CONFIG
+            '';
           };
           formatter = pkgs.nixpkgs-fmt;
         }

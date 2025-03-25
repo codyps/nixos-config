@@ -709,7 +709,9 @@ in
 
   systemd.sockets."komf-proxy" = {
     socketConfig = {
-      ListenStream = "0.0.0.0:${toString komfPort}";
+      ListenStream = "100.101.134.122:${toString komfPort}";
+      FreeBind = true;
+      ReusePort = true;
       BindToDevice = "tailscale0";
       Accept = "no";
     };

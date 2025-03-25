@@ -39,6 +39,10 @@ in
     ];
   };
 
+  services.openssh.settings = {
+    StreamLocalBindUnlink = "yes";
+  };
+
   boot.initrd = {
     systemd.enable = true;
 

@@ -717,8 +717,8 @@ in
   };
 
   systemd.services."komf-proxy" = {
-    after = [ "komf-proxy.socket" "pia-wg.service" ];
-    requires = [ "komf-proxy.socket" "pia-wg.service" ];
+    after = [ "komf-proxy.socket" ];
+    requires = [ "komf-proxy.socket" ];
     serviceConfig = {
       DynamicUser = true;
 

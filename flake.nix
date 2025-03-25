@@ -39,12 +39,12 @@
 
           caddyFull = prev.pkgs.caddy.withPlugins {
             plugins = [
-              "github.com/caddy-dns/cloudflare@v0.0.0-20240703190432-89f16b99c18e"
+              "github.com/caddy-dns/cloudflare@1fb64108d4debf196b19d7398e763cb78c8a0f41"
               "github.com/caddyserver/cache-handler@v0.14.0"
               "github.com/darkweak/storages/badger/caddy@v0.0.10"
               "github.com/WeidiDeng/caddy-cloudflare-ip@v0.0.0-20231130002422-f53b62aa13cb"
             ];
-            hash = "sha256-NZ3Cik3WHB1ad0ImuqU+IMKcg3zJ1AkL1xXpPwa89o4=";
+            hash = "sha256-7TJycTMSwYtCumxVWgJ0qIMpC8QcDz8ACnyshbi0NaQ=";
           };
 
           # re-import audiobookshelf with ffmpeg-full replaced by ffmpeg-headless

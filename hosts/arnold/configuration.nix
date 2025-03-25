@@ -647,7 +647,7 @@ in
     enable = true;
     openFirewall = true;
     nssmdns4 = true;
-    allowInterfaces = [ "bond0" ];
+    allowInterfaces = [ "bond1" ];
     publish = {
       enable = true;
       addresses = true;
@@ -705,6 +705,25 @@ in
     volumes = [
       "/persist/var/lib/komf:/config"
     ];
+  };
+
+  systemd.sockets."komf-proxy" = {
+    socketConfig = {
+      ListenStream = "[::]:${toString komfPort}";
+      BindToDevice = "bond1";
+      Accept = "no";
+    };
+    wantedBy = [ "sockets.target" ];
+  };
+
+  systemd.services."komf-proxy" = {
+    after = [ "komf-proxy.socket" "pia-wg.service" ];
+    requires = [ "komf-proxy.socket" "pia-wg.service" ];
+    serviceConfig = {
+      DynamicUser = true;
+
+      ExecStart = "${pkgs.systemd}/lib/systemd/systemd-socket-proxyd --exit-idle-time=5m 127.0.0.1:${toString komfPort}";
+    };
   };
 
   users.users.calibre-web-automated = {

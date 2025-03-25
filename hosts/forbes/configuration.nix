@@ -93,7 +93,7 @@
 
   home-manager.useGlobalPkgs = true;
   home-manager.useUserPackages = true;
-  home-manager.users.cody = import ../../home-manager/home.nix;
+  home-manager.users.cody.imports = [ ../../home-manager/home.nix ];
 
   # List packages installed in system profile. To search, run:
   # $ nix search wget

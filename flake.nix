@@ -169,6 +169,19 @@
             ];
           };
 
+          # x220
+          forbes = nixpkgs.lib.nixosSystem {
+            system = "x86_64-linux";
+            specialArgs = { inherit home-manager; };
+            modules = [
+	      ./nixos/common.nix
+              ./hosts/forbes/configuration.nix
+              {
+                nixpkgs = nixpkgsConfig;
+              }
+            ];
+          };
+
           # router
           ward = nixosSystem {
             system = "x86_64-linux";
@@ -216,15 +229,6 @@
             specialArgs = { inherit home-manager; };
             modules = [
               ./hosts/constance/configuration.nix
-            ];
-          };
-
-          # x220
-          forbes = nixpkgs.lib.nixosSystem {
-            system = "x86_64-linux";
-            specialArgs = { inherit home-manager; };
-            modules = [
-              ./nixos/forbes/configuration.nix
             ];
           };
 

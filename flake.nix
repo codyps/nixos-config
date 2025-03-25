@@ -172,7 +172,7 @@
           # x220
           forbes = nixpkgs.lib.nixosSystem {
             system = "x86_64-linux";
-            specialArgs = { inherit home-manager; };
+            specialArgs = { inherit home-manager self; };
             modules = [
 	      ./nixos/common.nix
               ./hosts/forbes/configuration.nix

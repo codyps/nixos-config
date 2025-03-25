@@ -686,6 +686,9 @@ in
       server = {
         port = komgaPort;
       };
+      cors = {
+        allowedOrigins = [ "http://arnold.little-moth.ts.net:10102/" ];
+      };
     };
   };
 

@@ -709,8 +709,8 @@ in
 
   systemd.sockets."komf-proxy" = {
     socketConfig = {
-      ListenStream = "[::]:${toString komfPort}";
-      BindToDevice = "bond1";
+      ListenStream = "0.0.0.0:${toString komfPort}";
+      BindToDevice = "tailscale0";
       Accept = "no";
     };
     wantedBy = [ "sockets.target" ];

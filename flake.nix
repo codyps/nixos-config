@@ -39,7 +39,7 @@
 
           caddyFull = prev.pkgs.caddy.withPlugins {
             plugins = [
-              "github.com/caddy-dns/cloudflare@1fb64108d4debf196b19d7398e763cb78c8a0f41"
+              "github.com/caddy-dns/cloudflare@v0.0.0-20250228175314-1fb64108d4de"
               "github.com/caddyserver/cache-handler@v0.14.0"
               "github.com/darkweak/storages/badger/caddy@v0.0.10"
               "github.com/WeidiDeng/caddy-cloudflare-ip@v0.0.0-20231130002422-f53b62aa13cb"

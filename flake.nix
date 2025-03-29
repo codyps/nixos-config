@@ -242,7 +242,7 @@
             specialArgs = { inherit home-manager self; };
             modules = [
               ./nixos/common.nix
-              ./nixos/maclay/configuration.nix
+              ./hosts/maclay/configuration.nix
               home-manager.nixosModules.home-manager
               {
                 nixpkgs = nixpkgsConfig;

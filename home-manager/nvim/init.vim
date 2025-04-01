@@ -33,12 +33,12 @@ command! MakeTags !ctags -R .
 command DiffOrig vert new | set buftype=nofile | read ++edit # | 0d_
 	\ | diffthis | wincmd p | diffthis
 
-let g:netrw_banner=0
-let g:netrw_browse_split=4
-let g:netrw_altv=1
-let g:netrw_liststyle=3
+"let g:netrw_banner=0
+"let g:netrw_browse_split=4
+"let g:netrw_altv=1
+"let g:netrw_liststyle=3
 "let g:netrw_list_hide=netrw_gitignore#Hide()
-let g:netrw_list_hide.=',\(^\|\s\s\)\zs\.\S\+'
+"let g:netrw_list_hide.=',\(^\|\s\s\)\zs\.\S\+'
 
 set encoding=utf-8
 "let g:ycm_server_python_interpreter = 'python3'

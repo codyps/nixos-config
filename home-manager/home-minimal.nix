@@ -134,7 +134,7 @@ in
         auto = "256";
       };
       credential = {
-        helper = "!${pkgs.pass-git-helper}/bin/pass-git-helper $0";
+        #helper = "!${pkgs.pass-git-helper}/bin/pass-git-helper $0";
         useHttpPath = true;
       };
 

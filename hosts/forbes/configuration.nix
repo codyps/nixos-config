@@ -80,7 +80,7 @@
       firefox
       yubikey-personalization
       yubikey-personalization-gui
-      yubikey-manager-qt
+      yubioath-flutter
       yubikey-manager
     ];
   };

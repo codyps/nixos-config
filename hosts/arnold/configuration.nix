@@ -13,6 +13,8 @@ let
   radarr-port = 7878;
   readarr-port = 8787;
   prowlarr-port = 9696;
+  jellyseer-port = 8990;
+  jellyfin-port = 8096;
 
   # NOTE: because `transmission-remote` looks at localhost:9091 by default, if
   # we change this we should wrap `transmission-remote`.
@@ -539,24 +541,6 @@ in
           }
         }
 
-        @rslsync host rslsync.arnold.einic.org
-        route @rslsync {
-          import /persist/etc/secret/caddy-auth
-          reverse_proxy :8389
-        }
-
-        @minio-console host minio-console.arnold.einic.org
-        route @minio-console {
-          import /persist/etc/secret/caddy-auth
-          reverse_proxy :9198
-        }
-
-        @minio host minio.arnold.einic.org
-        route @minio {
-          import /persist/etc/secret/caddy-auth
-          reverse_proxy :9199
-        }
-
         @syncthing host syncthing.arnold.einic.org
         route @syncthing {
           import /persist/etc/secret/caddy-auth
@@ -584,10 +568,15 @@ in
 
         @jellyfin host jellyfin.arnold.einic.org
         route @jellyfin {
-          reverse_proxy :8096 {
+          reverse_proxy :${toString jellyfin-port} {
             # https://github.com/jellyfin/jellyfin/issues/5575
             header_up +Host "localhost"
           }
+        }
+
+        @jellyseer host jellyseer.arnold.einic.org
+        route @jellyseer {
+          reverse_proxy :${toString jellyseer-port}
         }
 
         @transmission host transmission.arnold.einic.org
@@ -768,7 +757,20 @@ in
     };
   };
 
+  # FIXME: use jellyfin-port
   services.jellyfin.enable = true;
+
+  virtualisation.oci-containers.containers.jellyseer = {
+    image = "ghcr.io/fallenbagel/jellyseerr:latest";
+    ports = [ "127.0.0.1:${toString jellyseer-port}:${toString jellyseer-port}" ];
+    environment = {
+      TZ = "America/New_York";
+      PORT = "${toString jellyseer-port}";
+    };
+    volumes = [
+      "/persist/var/lib/jellyseer:/config"
+    ];
+  };
 
   # FIXME: pick exactly what we require for jellyfin
   # https:/graphics.wiki/wiki/Jellyfin

@@ -248,7 +248,7 @@
               ./nixos/common.nix
               ./hosts/maclay/configuration.nix
               home-manager.nixosModules.home-manager
-              { pkgs, ... }: {
+              { pkgs ... }: {
                 nixpkgs = nixpkgsConfig;
                 home-manager.useGlobalPkgs = true;
                 home-manager.useUserPackages = true;

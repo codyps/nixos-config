@@ -350,6 +350,7 @@
               nix.settings.use-case-hack = false;
               nix.extraOptions = ''
                 #upgrade-nix-store-path-url = "https://install.determinate.systems/nix-upgrade/stable/universal";
+                !include /Users/cody/.config/nix-auth.conf
               '';
 
               # FIXME: included because we don't include `nixos/common.nix` here.

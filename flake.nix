@@ -49,19 +49,19 @@
 
           # NOTE: tweaking the hash because we get mismatches
           vimPlugins = prev.vimPlugins // {
-          coc-nvim = prev.vimUtils.buildVimPlugin {
-            pname = "coc.nvim";
-            version = "2025-04-21";
-            src = prev.fetchFromGitHub {
-              owner = "neoclide";
-              repo = "coc.nvim";
-              rev = "22130a1eccf1b59992d7e236218696790edba8d2";
-              hash = "sha256-IwhW5EMGK9F/uEubb5WJ76Nft9WausfG3kUgCk0KIpo=";
+            coc-nvim = prev.vimUtils.buildVimPlugin {
+              pname = "coc.nvim";
+              version = "2025-04-21";
+              src = prev.fetchFromGitHub {
+                owner = "neoclide";
+                repo = "coc.nvim";
+                rev = "22130a1eccf1b59992d7e236218696790edba8d2";
+                hash = "sha256-IwhW5EMGK9F/uEubb5WJ76Nft9WausfG3kUgCk0KIpo=";
+              };
+              meta.homepage = "https://github.com/neoclide/coc.nvim/";
+              meta.hydraPlatforms = [ ];
             };
-            meta.homepage = "https://github.com/neoclide/coc.nvim/";
-            meta.hydraPlatforms = [ ];
           };
-        };
 
 
           # re-import audiobookshelf with ffmpeg-full replaced by ffmpeg-headless
@@ -191,7 +191,7 @@
             system = "x86_64-linux";
             specialArgs = { inherit home-manager self; };
             modules = [
-	      ./nixos/common.nix
+              ./nixos/common.nix
               ./hosts/forbes/configuration.nix
               {
                 nixpkgs = nixpkgsConfig;
@@ -367,7 +367,8 @@
                 home = "/Users/codyschafer";
               };
               nixpkgs = nixpkgsConfig // {
-                hostPlatform = "aarch64-darwin"; };
+                hostPlatform = "aarch64-darwin";
+              };
               nix.settings.use-case-hack = false;
               nix.extraOptions = ''
                 bash-prompt-prefix = (nix:$name)\040

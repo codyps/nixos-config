@@ -342,27 +342,27 @@ in
     # and fails.
     # FIXME: modify oci-containers.nix instead
     script = lib.mkForce ''
-#!${pkgs.bash}/bin/bash
-set -e
+      #!${pkgs.bash}/bin/bash
+      set -e
 
-exec ${pkgs.podman}/bin/podman  \
-  run \
-  --rm \
-  --name=libation \
-  --log-driver=journald \
-  --cidfile=/run/libation/ctr-id \
-  --cgroups=enabled \
-  --sdnotify=conmon \
-  -d \
-  --replace \
-  -e SLEEP_TIME=2h \
-  --user $(id -u libation):$(id -g libation) \
-  -v /ward/keep/libation/data:/data \
-  -v /ward/keep/libation/config:/config \
-  -l io.containers.autoupdate=registry \
-  --pull missing \
-  docker.io/rmcrackan/libation:latest
-      '';
+      exec ${pkgs.podman}/bin/podman  \
+        run \
+        --rm \
+        --name=libation \
+        --log-driver=journald \
+        --cidfile=/run/libation/ctr-id \
+        --cgroups=enabled \
+        --sdnotify=conmon \
+        -d \
+        --replace \
+        -e SLEEP_TIME=2h \
+        --user $(id -u libation):$(id -g libation) \
+        -v /ward/keep/libation/data:/data \
+        -v /ward/keep/libation/config:/config \
+        -l io.containers.autoupdate=registry \
+        --pull missing \
+        docker.io/rmcrackan/libation:latest
+    '';
   };
 
 

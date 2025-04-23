@@ -91,9 +91,6 @@ in
         preloadindex = true;
         precomposeUnicode = true;
       };
-      credential."https://dev.azure.com" = {
-        useHttpPath = true;
-      };
       pull = {
         ff = "only";
       };
@@ -133,10 +130,13 @@ in
       gc = {
         auto = "256";
       };
-      credential = {
-        #helper = "!${pkgs.pass-git-helper}/bin/pass-git-helper $0";
-        useHttpPath = true;
-      };
+      #credential = {
+      #  #helper = "!${pkgs.pass-git-helper}/bin/pass-git-helper $0";
+      #  useHttpPath = true;
+      #};
+      #credential."https://dev.azure.com" = {
+      #  useHttpPath = true;
+      #};
 
       #url."ssh://git@gitlab.com/".insteadOf = "https://gitlab.com/";
 
@@ -178,6 +178,7 @@ in
       rust-vim
       securemodelines
       vim-airline
+      vim-elixir
       vim-lastplace
       vim-nix
       vim-rooter

@@ -48,14 +48,21 @@
           };
 
           # NOTE: tweaking the hash because we get mismatches
-          coc-nvim.overrideAttrs = (oldAttrs: {
+          vimPlugins = prev.vimPlugins // {
+          coc-nvim = prev.vimUtils.buildVimPlugin {
+            pname = "coc.nvim";
+            version = "2025-04-21";
             src = prev.fetchFromGitHub {
               owner = "neoclide";
               repo = "coc.nvim";
-              rev = "993a4a273bf0415296a1a8d512466b183670568a";
-              hash = "sha256-QBMtiIAFUlB27KachU12OYb2tfjakje0s2CtYtVsv/4=";
+              rev = "22130a1eccf1b59992d7e236218696790edba8d2";
+              hash = "sha256-IwhW5EMGK9F/uEubb5WJ76Nft9WausfG3kUgCk0KIpo=";
             };
-          });
+            meta.homepage = "https://github.com/neoclide/coc.nvim/";
+            meta.hydraPlatforms = [ ];
+          };
+        };
+
 
           # re-import audiobookshelf with ffmpeg-full replaced by ffmpeg-headless
           audiobookshelf-headless = prev.callPackage (nixpkgs + "/pkgs/by-name/au/audiobookshelf/package.nix") {
@@ -359,7 +366,8 @@
                 name = "codyschafer";
                 home = "/Users/codyschafer";
               };
-              nixpkgs.hostPlatform = "aarch64-darwin";
+              nixpkgs = nixpkgsConfig // {
+                hostPlatform = "aarch64-darwin"; };
               nix.settings.use-case-hack = false;
               nix.extraOptions = ''
                 bash-prompt-prefix = (nix:$name)\040
@@ -382,7 +390,6 @@
             })
             home-manager.darwinModules.home-manager
             {
-              nixpkgs = nixpkgsConfig;
               home-manager.useGlobalPkgs = true;
               home-manager.useUserPackages = true;
               home-manager.users.codyschafer = {

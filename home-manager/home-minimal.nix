@@ -171,7 +171,6 @@ in
       coc-yaml
       copilot-vim
       ctrlp-vim
-      dadbod-vim
       fzf-vim
       fzfWrapper
       kotlin-vim
@@ -179,6 +178,7 @@ in
       rust-vim
       securemodelines
       vim-airline
+      vim-dadbod
       vim-elixir
       vim-lastplace
       vim-nix

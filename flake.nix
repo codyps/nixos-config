@@ -47,6 +47,15 @@
             hash = "sha256-7TJycTMSwYtCumxVWgJ0qIMpC8QcDz8ACnyshbi0NaQ=";
           };
 
+          coc-nvim.overrideAttrs = (oldAttrs: {
+            src = prev.fetchFromGitHub {
+              owner = "neoclide";
+              repo = "coc.nvim";
+              rev = "993a4a273bf0415296a1a8d512466b183670568a";
+              sha256 = "0nrsxl9faaq5rlvfsbwqpil7gczf2lz65jil4nj8kwmfi113rw37";
+            };
+          });
+
           # re-import audiobookshelf with ffmpeg-full replaced by ffmpeg-headless
           audiobookshelf-headless = prev.callPackage (nixpkgs + "/pkgs/by-name/au/audiobookshelf/package.nix") {
             ffmpeg-full = prev.ffmpeg-headless;

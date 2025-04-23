@@ -26,7 +26,7 @@ in
       size = 20000;
       share = false;
     };
-    initExtra = (builtins.readFile ../config/.zshrc);
+    initContent = (builtins.readFile ../config/.zshrc);
   };
 
   programs.bash = {
@@ -171,6 +171,7 @@ in
       coc-yaml
       copilot-vim
       ctrlp-vim
+      dadbod-vim
       fzf-vim
       fzfWrapper
       kotlin-vim

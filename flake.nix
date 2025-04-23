@@ -49,18 +49,28 @@
 
           # NOTE: tweaking the hash because we get mismatches
           vimPlugins = prev.vimPlugins // {
-            coc-nvim = prev.vimUtils.buildVimPlugin {
-              pname = "coc.nvim";
-              version = "2025-04-21";
+            coc-nvim = prev.vimPlugins.coc-nvim.overrideAttrs (oldAttrs: {
               src = prev.fetchFromGitHub {
                 owner = "neoclide";
                 repo = "coc.nvim";
-                rev = "22130a1eccf1b59992d7e236218696790edba8d2";
-                hash = "sha256-IwhW5EMGK9F/uEubb5WJ76Nft9WausfG3kUgCk0KIpo=";
+                rev = "993a4a273bf0415296a1a8d512466b183670568a";
+                hash = "sha256-Z/A8Qoiu8omkJTTKYj4V7rN3aLyYL+02zQUr5RLtOls=";
               };
-              meta.homepage = "https://github.com/neoclide/coc.nvim/";
-              meta.hydraPlatforms = [ ];
-            };
+            });
+            #coc-nvim = prev.vimUtils.buildVimPlugin {
+            #  pname = "coc.nvim";
+            #  version = "2025-04-21";
+            #  src = prev.fetchFromGitHub {
+            #    owner = "neoclide";
+            #    repo = "coc.nvim";
+            #    #rev = "22130a1eccf1b59992d7e236218696790edba8d2";
+            #    #hash = "sha256-IwhW5EMGK9F/uEubb5WJ76Nft9WausfG3kUgCk0KIpo=";
+            #    rev = "993a4a273bf0415296a1a8d512466b183670568a";
+            #    hash = "";
+            #  };
+            #  meta.homepage = "https://github.com/neoclide/coc.nvim/";
+            #  meta.hydraPlatforms = [ ];
+            #};
           };
 
 

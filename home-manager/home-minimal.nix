@@ -104,7 +104,6 @@ in
         ui = "auto";
       };
       alias = {
-        post = "!sh -c '${pkgs.git}/bin/git format-patch --stdout $1 | ${pkgs.ix}/bin/ix' -";
         ci = "commit -v";
         st = "status";
         co = "checkout";

@@ -258,14 +258,17 @@
               ./nixos/common.nix
               ./hosts/maclay/configuration.nix
               home-manager.nixosModules.home-manager
-              {
+              ({ pkgs, ... }: {
                 nixpkgs = nixpkgsConfig;
                 home-manager.useGlobalPkgs = true;
                 home-manager.useUserPackages = true;
                 home-manager.users.cody.imports = [
                   ./home-manager/home.nix
                 ];
-              }
+                home-manager.users.cody.home.packages = [
+                  pkgs.nerdctl
+                ];
+              })
             ];
           };
 

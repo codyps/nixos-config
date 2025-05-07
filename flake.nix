@@ -39,12 +39,12 @@
 
           caddyFull = prev.pkgs.caddy.withPlugins {
             plugins = [
-              "github.com/caddy-dns/cloudflare@35fb8474f57d7476329f75d63eebafb95a93022f"
+              "github.com/caddy-dns/cloudflare@v0.2.2-0.20250506153119-35fb8474f57d"
               "github.com/caddyserver/cache-handler@v0.14.0"
               "github.com/darkweak/storages/badger/caddy@v0.0.10"
               "github.com/WeidiDeng/caddy-cloudflare-ip@v0.0.0-20231130002422-f53b62aa13cb"
             ];
-            hash = "sha256-vNYPLs0NK8P4fKArDpLlWwGnn8gUAFlaFoN+D2/IO1I=";
+            hash = "sha256-5MXWCXQjE25tLrTYC74A1V9KtI9sojNv6vAb8iLkVjM=";
           };
 
           # NOTE: tweaking the hash because we get mismatches

@@ -623,7 +623,10 @@ in
         @switch host switch.arnold.einic.org
         route @switch {
           import ${config.sops.secrets.switch-caddy-auth.path}
-          file_server /tank/DATA/games/console/nintendo-switch
+          file_server {
+            root /tank/DATA/games/console/nintendo-switch 
+            browse
+          }
         }
         
         root * /srv/http
@@ -1080,6 +1083,7 @@ in
 
   sops.secrets."switch-caddy-auth" = {
     sopsFile = ./switch-caddy-auth;
+    owner = "${config.users.users.caddy.name}";
     format = "binary";
     reloadUnits = [ "caddy.service" ];
   };

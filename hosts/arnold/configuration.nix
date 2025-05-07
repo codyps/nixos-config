@@ -619,6 +619,12 @@ in
           import /persist/etc/secret/caddy-auth
           reverse_proxy :${toString config.services.qbittorrent.webui-port}
         }
+
+        @switch host switch.arnold.einic.org
+        route @switch {
+          import ${config.sops.secrets.switch-caddy-auth.path}
+          file_server /tank/DATA/games/console/nintendo-switch
+        }
         
         root * /srv/http
 
@@ -1072,24 +1078,34 @@ in
       */
   };
 
+  sops.secrets."switch-caddy-auth" = {
+    sopsFile = ./switch-caddy-auth;
+    format = "binary";
+    reloadUnits = [ "caddy.service" ];
+  };
+
   sops.secrets."radarr-api-key" = {
     sopsFile = ./secrets.yml;
     key = "radarr-api-key";
+    restartUnits = [ "radarr.service" ];
   };
 
   sops.secrets."sonarr-api-key" = {
     sopsFile = ./secrets.yml;
     key = "sonarr-api-key";
+    restartUnits = [ "sonarr.service" ];
   };
 
   sops.secrets."readarr-api-key" = {
     sopsFile = ./secrets.yml;
     key = "readarr-api-key";
+    restartUnits = [ "readarr.service" ];
   };
 
   sops.secrets."prowlarr-api-key" = {
     sopsFile = ./secrets.yml;
     key = "prowlarr-api-key";
+    restartUnits = [ "prowlarr.service" ];
   };
 
   sops.templates."recyclarr-secrets.yml" = {
@@ -1099,6 +1115,7 @@ in
     '';
 
     owner = "${config.users.users.recyclarr.name}";
+    restartUnits = [ "recyclarr.service" ];
   };
 
   systemd.services.radarr = {

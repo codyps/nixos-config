@@ -26,7 +26,7 @@ in
       size = 20000;
       share = false;
     };
-    initExtra = (builtins.readFile ../config/.zshrc);
+    initContent = (builtins.readFile ../config/.zshrc);
   };
 
   programs.bash = {
@@ -91,9 +91,6 @@ in
         preloadindex = true;
         precomposeUnicode = true;
       };
-      credential."https://dev.azure.com" = {
-        useHttpPath = true;
-      };
       pull = {
         ff = "only";
       };
@@ -107,7 +104,6 @@ in
         ui = "auto";
       };
       alias = {
-        post = "!sh -c '${pkgs.git}/bin/git format-patch --stdout $1 | ${pkgs.ix}/bin/ix' -";
         ci = "commit -v";
         st = "status";
         co = "checkout";
@@ -133,10 +129,13 @@ in
       gc = {
         auto = "256";
       };
-      credential = {
-        #helper = "!${pkgs.pass-git-helper}/bin/pass-git-helper $0";
-        useHttpPath = true;
-      };
+      #credential = {
+      #  #helper = "!${pkgs.pass-git-helper}/bin/pass-git-helper $0";
+      #  useHttpPath = true;
+      #};
+      #credential."https://dev.azure.com" = {
+      #  useHttpPath = true;
+      #};
 
       #url."ssh://git@gitlab.com/".insteadOf = "https://gitlab.com/";
 
@@ -178,6 +177,8 @@ in
       rust-vim
       securemodelines
       vim-airline
+      vim-dadbod
+      vim-elixir
       vim-lastplace
       vim-nix
       vim-rooter

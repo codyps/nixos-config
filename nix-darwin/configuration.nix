@@ -37,6 +37,7 @@ in
     max-jobs = "auto";
     extra-nix-path = "nixpkgs=flake:nixpkgs";
     trusted-users = [ "root" "@admin" ];
+    download-buffer-size = 524288000;
   };
 
   nix.settings.substituters = [ "https://nix-community.cachix.org" ];

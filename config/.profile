@@ -98,6 +98,8 @@ export RUSTC_WRAPPER="sccache"
 export PATH="$HOME/.local/bin:$PATH"
 export PATH="$HOME/.local/bin/ccache.d:$PATH"
 
+export ERL_AFLAGS="-kernel shell_history enabled"
+
 pdf-unencrypt () {
     : "Usage: <file>
 Uses ghostscript to rewrite the file without encryption."

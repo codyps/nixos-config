@@ -630,6 +630,12 @@ in
             browse
           }
         }
+
+        @i2pd host i2pd.arnold.einic.org
+        route @i2pd {
+          import /persist/etc/secret/caddy-auth
+          reverse_proxy :${toString config.services.i2pd.proto.http.port}
+        }
         
         root * /srv/http
 

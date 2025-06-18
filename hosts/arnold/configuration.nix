@@ -383,6 +383,7 @@ in
   services.tailscale.enable = true;
 
   services.i2pd.enable = true;
+  services.i2pd.proto.http.enable = true;
 
   security.tpm2 = {
     enable = true;

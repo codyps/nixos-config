@@ -384,7 +384,7 @@ in
 
   services.i2pd.enable = true;
   services.i2pd.proto.http.enable = true;
-  services.i2pd.proto.http.host = "i2pd.arnold.einic.org";
+  services.i2pd.proto.http.hostname = "i2pd.arnold.einic.org";
 
   security.tpm2 = {
     enable = true;

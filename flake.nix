@@ -347,10 +347,11 @@
                 home = "/Users/cody";
               };
               nixpkgs.hostPlatform = "x86_64-darwin";
+              nix.enable = false;
               nix.settings.use-case-hack = false;
-              nix.extraOptions = ''
-                #upgrade-nix-store-path-url = "https://install.determinate.systems/nix-upgrade/stable/universal";
-              '';
+              #nix.extraOptions = ''
+              #  #upgrade-nix-store-path-url = "https://install.determinate.systems/nix-upgrade/stable/universal";
+              #'';
 
               # FIXME: included because we don't include `nixos/common.nix` here.
               #p.nix.buildMachines.ward.enable = true;
@@ -370,6 +371,7 @@
                 ];
               };
             }
+            ./hosts/u3/darwin.nix
           ];
         };
 

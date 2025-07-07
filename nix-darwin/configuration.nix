@@ -31,7 +31,7 @@ in
   # Auto upgrade nix package and the daemon service.
   # nix.package = pkgs.nix;
 
-  nix.enable = true;
+  #nix.enable = true;
   nix.settings = {
     experimental-features = "nix-command flakes";
     max-jobs = "auto";
@@ -50,7 +50,7 @@ in
 
   # FIXME: customize so this does the right thing for x86_64 and aarch64
   nix.linux-builder = {
-    enable = true;
+    #enable = true;
     # FIXME: qemu-x86_64 SIGSEV, so removed extra system
     # > qemu-x86_64: QEMU internal SIGSEGV {code=MAPERR, addr=0x20}
     #systems =

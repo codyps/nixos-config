@@ -37,6 +37,7 @@ in
     max-jobs = "auto";
     extra-nix-path = "nixpkgs=flake:nixpkgs";
     trusted-users = [ "root" "@admin" ];
+    netrc-file = "/etc/nix/netrc";
     download-buffer-size = 524288000;
   };
 

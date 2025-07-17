@@ -141,7 +141,7 @@ in
 
       sendemail = {
         confirm = "auto";
-        smtpserver = "${pkgs.msmtp}/bin/msmtp";
+        #smtpserver = "${pkgs.msmtp}/bin/msmtp";
         #smtpserveroption = "--read-envelope-from";
         chainreplyto = false;
         aliasfiletype = "mutt";

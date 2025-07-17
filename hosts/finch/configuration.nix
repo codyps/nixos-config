@@ -11,7 +11,7 @@ in
 {
   imports =
     [
-      ../../modules/zfs.nix
+      ../../nixos-modules/all-modules.nix
       ./hardware-configuration.nix
       (modulesPath + "/virtualisation/xen-domU.nix")
     ];
@@ -34,10 +34,6 @@ in
     rollback-target = "rpool/local/root@blank";
   };
 
-  swapDevices = [{
-    device = "/dev/rpool/local/swap";
-  }];
-
   fileSystems."/persist".neededForBoot = true;
 
   environment.persistence."/persist" = {
@@ -45,6 +41,7 @@ in
     directories = [
       "/var/log"
       "/var/lib"
+      "/var/db"
     ];
   };
 
@@ -119,15 +116,7 @@ in
 
   services.caddy = {
     enable = true;
-    package = (pkgs.callPackage ../../nixpkgs/overlays/pkgs/caddy/package.nix { }).withPlugins {
-      caddyModules = [
-        { repo = "github.com/caddy-dns/cloudflare"; version = "89f16b99c18ef49c8bb470a82f895bce01cbaece"; }
-        { repo = "github.com/caddyserver/cache-handler"; version = "283ea9b5bf192ff9c98f0b848c7117367655893f"; } # v0.14.0
-        { repo = "github.com/darkweak/storages/badger/caddy"; version = "0d6842b38ab6937af5a60adcf54d8955b5bbe6fc"; } # v0.0.10
-        { repo = "github.com/WeidiDeng/caddy-cloudflare-ip"; version = "f53b62aa13cb7ad79c8b47aacc3f2f03989b67e5"; } # head of main
-      ];
-      vendorHash = "sha256-Z80OP4fMele2kITxJkKKHGe/jbhCIAl43rp+FEYnvoE=";
-    };
+    package = pkgs.caddyFull;
 
     globalConfig = ''
       cache
@@ -159,12 +148,7 @@ in
 
         @audiobookshelf host audiobookshelf.einic.org
         handle @audiobookshelf {
-          reverse_proxy http://localhost:8917
-        }
-
-        @storyteller host storyteller.einic.org
-        handle @storyteller {
-          reverse_proxy http://localhost:8918
+          reverse_proxy http://127.0.0.1:8917
         }
 
         handle {
@@ -174,7 +158,7 @@ in
 
     };
 
-    virtualHosts."https://finch.little-moth.ts.net" = {
+    virtualHosts."finch.little-moth.ts.net" = {
       extraConfig = ''
         bind fd/5 {
           protocols h1 h2
@@ -191,7 +175,7 @@ in
         }
 
         handle_path /syncthing/* {
-          reverse_proxy http://localhost:8384 {
+          reverse_proxy http://127.0.0.1:8384 {
               # https://docs.syncthing.net/users/reverseproxy.html
               #header_up Host {upstream_hostport}
               # https://docs.syncthing.net/users/faq.html#why-do-i-get-host-check-error-in-the-gui-api
@@ -214,7 +198,7 @@ in
 
   # NOTE: when a systemd.socket binds `<specific-ip>:443` as a listenStream
   # before caddy tries to bind the wildcard `:443`, caddy fails to obtain a
-  # bind and exists. This broke our "use systemd.socket and a systemd.service
+  # bind and exits. This broke our "use systemd.socket and a systemd.service
   # to forward stuff to a unix socket caddy reads from".
 
   # NOTE: when using systemd.sockets, we don't bind to the interface because
@@ -241,8 +225,8 @@ in
       FreeBind = true;
       ReusePort = true;
     };
+    requiredBy = [ "caddy.service" ];
     wantedBy = [ "sockets.target" ];
-    requiredBy = [ "caddy.socket" ];
   };
 
   networking.hostId = "8425e349";
@@ -333,7 +317,6 @@ in
 
   services.syncthing = {
     enable = true;
-    user = "syncthing";
     dataDir = "/tank/syncthing";
   };
 
@@ -364,22 +347,22 @@ in
       };
     };
 
-    storyteller = {
-      image = "registry.gitlab.com/smoores/storyteller:latest";
-      volumes = [
-        "/tank/storyteller/data:/data"
-        "/tank/storyteller/secret:/run/secret"
-      ];
-      environment = {
-        STORYTELLER_SECRET_KEY_FILE = "/run/secret/key";
-      };
-      ports = [
-        "127.0.0.1:8918:8001"
-      ];
-      labels = {
-        "io.containers.autoupdate" = "registry";
-      };
-    };
+    #storyteller = {
+    #  image = "registry.gitlab.com/smoores/storyteller:latest";
+    #  volumes = [
+    #    "/tank/storyteller/data:/data"
+    #    "/tank/storyteller/secret:/run/secret"
+    #  ];
+    #  environment = {
+    #    STORYTELLER_SECRET_KEY_FILE = "/run/secret/key";
+    #  };
+    #  ports = [
+    #    "127.0.0.1:8918:8001"
+    #  ];
+    #  labels = {
+    #    "io.containers.autoupdate" = "registry";
+    #  };
+    #};
   };
 
   systemd.services.podman-libation =
@@ -392,7 +375,8 @@ in
     in
     {
       serviceConfig = {
-        type = "oneshot";
+        Type = lib.mkForce "oneshot";
+        Restart = lib.mkForce "on-failure";
       };
       after = mounts;
       requires = mounts;
@@ -429,9 +413,12 @@ in
   };
 
   services.audiobookshelf = {
+    package = pkgs.audiobookshelf-headless;
     enable = true;
     port = 8917;
   };
+
+  zramSwap.enable = true;
 
   # This value determines the NixOS release from which the default
   # settings for stateful data, like file locations and database versions

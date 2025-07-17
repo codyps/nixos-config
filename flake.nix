@@ -36,6 +36,48 @@
 
           # something is using the old name, hack around it.
           utillinux = prev.util-linux;
+
+          caddyFull = prev.pkgs.caddy.withPlugins {
+            plugins = [
+              "github.com/caddy-dns/cloudflare@v0.2.2-0.20250506153119-35fb8474f57d"
+              "github.com/caddyserver/cache-handler@v0.14.0"
+              "github.com/darkweak/storages/badger/caddy@v0.0.10"
+              "github.com/WeidiDeng/caddy-cloudflare-ip@v0.0.0-20231130002422-f53b62aa13cb"
+            ];
+            hash = "sha256-LNiAwi9pnjHxwp5m2EyU3m9hbOegN66Bz0H8MSNQhXQ=";
+          };
+
+          # NOTE: tweaking the hash because we get mismatches
+          vimPlugins = prev.vimPlugins // {
+            coc-nvim = prev.vimPlugins.coc-nvim.overrideAttrs (oldAttrs: {
+              src = prev.fetchFromGitHub {
+                owner = "neoclide";
+                repo = "coc.nvim";
+                rev = "993a4a273bf0415296a1a8d512466b183670568a";
+                hash = "sha256-Z/A8Qoiu8omkJTTKYj4V7rN3aLyYL+02zQUr5RLtOls=";
+              };
+            });
+            #coc-nvim = prev.vimUtils.buildVimPlugin {
+            #  pname = "coc.nvim";
+            #  version = "2025-04-21";
+            #  src = prev.fetchFromGitHub {
+            #    owner = "neoclide";
+            #    repo = "coc.nvim";
+            #    #rev = "22130a1eccf1b59992d7e236218696790edba8d2";
+            #    #hash = "sha256-IwhW5EMGK9F/uEubb5WJ76Nft9WausfG3kUgCk0KIpo=";
+            #    rev = "993a4a273bf0415296a1a8d512466b183670568a";
+            #    hash = "";
+            #  };
+            #  meta.homepage = "https://github.com/neoclide/coc.nvim/";
+            #  meta.hydraPlatforms = [ ];
+            #};
+          };
+
+
+          # re-import audiobookshelf with ffmpeg-full replaced by ffmpeg-headless
+          audiobookshelf-headless = prev.callPackage (nixpkgs + "/pkgs/by-name/au/audiobookshelf/package.nix") {
+            ffmpeg-full = prev.ffmpeg-headless;
+          };
         })
         (import ./nixpkgs/overlays/overlay.nix)
         ethereum-nix.overlays.default
@@ -46,6 +88,8 @@
         config.allowUnfreePredicate = pkg: builtins.elem (getName pkg) [
           "vscode"
           "copilot.vim"
+          # sabnzbd (consider substituting)
+          "unrar"
         ];
         inherit overlays;
       };
@@ -59,6 +103,27 @@
           };
         in
         {
+          devShell = pkgs.mkShell {
+            nativeBuildInputs = with pkgs; [
+              age
+              gnupg
+              ssh-to-pgp
+              ssh-to-age
+              sops
+              gh
+            ];
+
+            shellHook = ''
+              if [ -z "$NIX_GITHUB_TOKEN" ]; then
+                gh auth status || gh auth login
+                NIX_GITHUB_TOKEN="$(gh auth token)"
+                export NIX_GITHUB_TOKEN
+              fi
+
+              NIX_CONFIG="access-tokens = github.com=$NIX_GITHUB_TOKEN"
+              export NIX_CONFIG
+            '';
+          };
           formatter = pkgs.nixpkgs-fmt;
         }
       ) //
@@ -115,6 +180,7 @@
             specialArgs = { inherit home-manager self; };
             modules = [
               ethereum-nix.nixosModules.default
+              sops-nix.nixosModules.sops
               ./hosts/arnold/configuration.nix
               ./nixos/common.nix
               impermanence.nixosModules.impermanence
@@ -130,12 +196,26 @@
             ];
           };
 
+          # x220
+          forbes = nixpkgs.lib.nixosSystem {
+            system = "x86_64-linux";
+            specialArgs = { inherit home-manager self; };
+            modules = [
+              ./nixos/common.nix
+              ./hosts/forbes/configuration.nix
+              {
+                nixpkgs = nixpkgsConfig;
+              }
+            ];
+          };
+
           # router
           ward = nixosSystem {
             system = "x86_64-linux";
             specialArgs = { inherit home-manager self; };
             modules = [
               ethereum-nix.nixosModules.default
+              sops-nix.nixosModules.sops
               ./hosts/ward/configuration.nix
               ./nixos/common.nix
               impermanence.nixosModules.impermanence
@@ -175,16 +255,7 @@
             system = "x86_64-linux";
             specialArgs = { inherit home-manager; };
             modules = [
-              ./nixos/constance/configuration.nix
-            ];
-          };
-
-          # x220
-          forbes = nixpkgs.lib.nixosSystem {
-            system = "x86_64-linux";
-            specialArgs = { inherit home-manager; };
-            modules = [
-              ./nixos/forbes/configuration.nix
+              ./hosts/constance/configuration.nix
             ];
           };
 
@@ -202,16 +273,19 @@
             specialArgs = { inherit home-manager self; };
             modules = [
               ./nixos/common.nix
-              ./nixos/maclay/configuration.nix
+              ./hosts/maclay/configuration.nix
               home-manager.nixosModules.home-manager
-              {
+              ({ pkgs, ... }: {
                 nixpkgs = nixpkgsConfig;
                 home-manager.useGlobalPkgs = true;
                 home-manager.useUserPackages = true;
                 home-manager.users.cody.imports = [
                   ./home-manager/home.nix
                 ];
-              }
+                home-manager.users.cody.home.packages = [
+                  pkgs.nerdctl
+                ];
+              })
             ];
           };
 
@@ -274,11 +348,11 @@
               '';
 
               # FIXME: included because we don't include `nixos/common.nix` here.
-              p.nix.buildMachines.ward.enable = true;
-              p.nix.buildMachines.ward.sshKey = "/etc/nix/keys/nix_ed25519";
+              #p.nix.buildMachines.ward.enable = true;
+              #p.nix.buildMachines.ward.sshKey = "/etc/nix/keys/nix_ed25519";
             })
             ./nix-darwin/configuration.nix
-            ./modules/build-machines.nix
+            #./modules/build-machines.nix
             home-manager.darwinModules.home-manager
             {
               nixpkgs = nixpkgsConfig;
@@ -302,7 +376,9 @@
                 name = "codyschafer";
                 home = "/Users/codyschafer";
               };
-              nixpkgs.hostPlatform = "aarch64-darwin";
+              nixpkgs = nixpkgsConfig // {
+                hostPlatform = "aarch64-darwin";
+              };
               nix.settings.use-case-hack = false;
               nix.extraOptions = ''
                 bash-prompt-prefix = (nix:$name)\040
@@ -325,7 +401,6 @@
             })
             home-manager.darwinModules.home-manager
             {
-              nixpkgs = nixpkgsConfig;
               home-manager.useGlobalPkgs = true;
               home-manager.useUserPackages = true;
               home-manager.users.codyschafer = {

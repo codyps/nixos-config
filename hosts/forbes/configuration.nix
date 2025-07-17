@@ -57,8 +57,8 @@
 
 
   # Enable the GNOME Desktop Environment.
-  services.xserver.displayManager.gdm.enable = true;
-  services.xserver.desktopManager.gnome.enable = true;
+  services.displayManager.gdm.enable = true;
+  services.desktopManager.gnome.enable = true;
 
 
   # Configure keymap in X11
@@ -67,10 +67,6 @@
 
   # Enable CUPS to print documents.
   # services.printing.enable = true;
-
-  # Enable sound.
-  sound.enable = true;
-  # hardware.pulseaudio.enable = true;
 
   # Enable touchpad support (enabled default in most desktopManager).
   services.libinput.enable = true;
@@ -84,7 +80,7 @@
       firefox
       yubikey-personalization
       yubikey-personalization-gui
-      yubikey-manager-qt
+      yubioath-flutter
       yubikey-manager
     ];
   };
@@ -93,7 +89,7 @@
 
   home-manager.useGlobalPkgs = true;
   home-manager.useUserPackages = true;
-  home-manager.users.cody = import ../../home-manager/home.nix;
+  home-manager.users.cody.imports = [ ../../home-manager/home.nix ];
 
   # List packages installed in system profile. To search, run:
   # $ nix search wget

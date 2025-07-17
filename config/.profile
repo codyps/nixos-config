@@ -86,7 +86,7 @@ export DOCKER_BUILDKIT=1
 alias vim=nvim
 alias vi=nvim
 alias k=kubectl
-alias cargo='targo wrap-cargo'
+#alias cargo='targo wrap-cargo'
 
 if [ -e "/Applications/Tailscale.app/Contents/MacOS/Tailscale" ]; then
 	alias tailscale="/Applications/Tailscale.app/Contents/MacOS/Tailscale"
@@ -97,6 +97,8 @@ export RUSTC_WRAPPER="sccache"
 #export CMAKE="cmake-ccache"
 export PATH="$HOME/.local/bin:$PATH"
 export PATH="$HOME/.local/bin/ccache.d:$PATH"
+
+export ERL_AFLAGS="-kernel shell_history enabled"
 
 pdf-unencrypt () {
     : "Usage: <file>

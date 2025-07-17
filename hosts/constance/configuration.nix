@@ -27,14 +27,10 @@ in
 
   # Bootloader.
   boot.loader.grub.enable = true;
-  boot.loader.grub.device = "/dev/disk/by-id/wwn-0x500a0751e6d4d4a7";
+  boot.loader.grub.device = "/dev/sda";
   boot.loader.grub.useOSProber = true;
 
-  nix.settings = {
-    experimental-features = [ "nix-command" "flakes" ];
-    trusted-users = [ "root" "@wheel" ];
-    builders-use-substitutes = true;
-  };
+  nix.settings.experimental-features = [ "nix-command" "flakes" ];
 
   networking.hostName = "constance"; # Define your hostname.
   # networking.wireless.enable = true;  # Enables wireless support via wpa_supplicant.
@@ -44,6 +40,10 @@ in
   system.autoUpgrade.enable = true;
   services.tailscale.enable = true;
   services.homed.enable = true;
+
+  # Configure network proxy if necessary
+  # networking.proxy.default = "http://user:password@proxy:port/";
+  # networking.proxy.noProxy = "127.0.0.1,localhost,internal.domain";
 
   # Enable networking
   networking.networkmanager.enable = true;
@@ -71,7 +71,6 @@ in
 
   # Enable the Pantheon Desktop Environment.
   services.xserver.displayManager.lightdm.enable = true;
-  services.xserver.displayManager.lightdm.greeters.pantheon.enable = true;
   services.xserver.desktopManager.pantheon.enable = true;
   services.gvfs.enable = true;
 
@@ -88,8 +87,7 @@ in
   services.blueman.enable = true;
 
   # Enable sound with pipewire.
-  sound.enable = true;
-  hardware.pulseaudio.enable = false;
+  services.pulseaudio.enable = false;
   security.rtkit.enable = true;
   security.sudo.wheelNeedsPassword = false;
   services.pipewire = {
@@ -105,11 +103,14 @@ in
     #media-session.enable = true;
   };
 
+  programs.zsh.enable = true;
+
   # Enable touchpad support (enabled default in most desktopManager).
   # services.xserver.libinput.enable = true;
 
   users.defaultUserShell = pkgs.zsh;
 
+  # Define a user account. Don't forget to set a password with ‘passwd’.
   users.users.cody2 = {
     isNormalUser = true;
     description = "Cody 2";
@@ -125,14 +126,13 @@ in
 
   programs.neovim.enable = true;
   programs.neovim.defaultEditor = true;
-  programs.zsh.enable = true;
 
   # List packages installed in system profile. To search, run:
   # $ nix search wget
   environment.systemPackages = with pkgs; [
     neovim
     cifs-utils
-    #zsh
+    zsh
   ];
 
   # Some programs need SUID wrappers, can be configured further or are
@@ -171,28 +171,10 @@ in
   };
 
   services.xserver.videoDrivers = [
-    #"radeon"
-    "intel"
     "modesetting"
-    "fbdev"
   ];
 
-  services.geth.holesky = {
-    enable = true;
-    ipc.enable = true;
-    network = "holesky";
-    authrpc.jwtsecret = execution_jwt_path;
-  };
-
-  services.lighthouse = {
-    beacon = {
-      enable = true;
-      execution.jwtPath = execution_jwt_path;
-      extraArgs = "--checkpoint-sync-url 'https://checkpoint-sync.holesky.ethpandaops.io/'";
-    };
-    validator.enable = true;
-    network = "holesky";
-  };
+  zramSwap.enable = true;
 
   # This value determines the NixOS release from which the default
   # settings for stateful data, like file locations and database versions

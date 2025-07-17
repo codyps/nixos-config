@@ -26,18 +26,18 @@ in
     cargo-generate
     tokei
     rust-bindgen
-    xsv
   ];
 
   # Auto upgrade nix package and the daemon service.
-  services.nix-daemon.enable = true;
   # nix.package = pkgs.nix;
 
+  nix.enable = true;
   nix.settings = {
     experimental-features = "nix-command flakes";
     max-jobs = "auto";
     extra-nix-path = "nixpkgs=flake:nixpkgs";
     trusted-users = [ "root" "@admin" ];
+    download-buffer-size = 524288000;
   };
 
   nix.settings.substituters = [ "https://nix-community.cachix.org" ];

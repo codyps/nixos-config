@@ -7,7 +7,7 @@ in
   imports =
     [
       ./hardware-configuration.nix
-      ../../modules/zfs.nix
+      ../../nixos-modules/all-modules.nix
     ];
 
   boot.kernelParams = [ "ip=dhcp" ];
@@ -37,6 +37,10 @@ in
       "/etc/NetworkManager/system-connections"
       { directory = "/var/lib/colord"; user = "colord"; group = "colord"; mode = "u=rwx,g=rx,o="; }
     ];
+  };
+
+  services.openssh.settings = {
+    StreamLocalBindUnlink = "yes";
   };
 
   boot.initrd = {
@@ -84,7 +88,6 @@ in
     buildMachinesFiles = [ ];
     # you will probably also want, otherwise *everything* will be built from scratch
     useSubstitutes = true;
-    listenHost = "localhost";
   };
 
   services.harmonia = {
@@ -113,18 +116,27 @@ in
   #  secretKeyFile = "/persist/etc/nix-serve/cache-priv-key.pem";
   #};
 
-  systemd.services.caddy.serviceConfig.EnvironmentFile = "/persist/etc/default/caddy";
+  sops.age.sshKeyPaths = [
+    "/persist/etc/ssh/ssh_host_ed25519_key"
+  ];
+
+  sops.secrets."cloudflare-api-key-einic-org-dns" = {
+    sopsFile = ./secrets.yaml;
+    key = "cloudflare-api-key-einic-org-dns";
+  };
+
+  sops.templates."caddy-env" = {
+    restartUnits = [ "caddy.service" ];
+    content = ''
+      CLOUDFLARE_API_TOKEN=${config.sops.placeholder.cloudflare-api-key-einic-org-dns}
+    '';
+  };
+
+  systemd.services.caddy.serviceConfig.EnvironmentFile = "${config.sops.templates."caddy-env".path}";
+
   services.caddy = {
     enable = true;
-    package = (pkgs.callPackage ../../nixpkgs/overlays/pkgs/caddy/package.nix { }).withPlugins {
-      caddyModules = [
-        { repo = "github.com/caddy-dns/cloudflare"; version = "89f16b99c18ef49c8bb470a82f895bce01cbaece"; }
-        { repo = "github.com/caddyserver/cache-handler"; version = "283ea9b5bf192ff9c98f0b848c7117367655893f"; } # v0.14.0
-        { repo = "github.com/darkweak/storages/badger/caddy"; version = "0d6842b38ab6937af5a60adcf54d8955b5bbe6fc"; } # v0.0.10
-        { repo = "github.com/WeidiDeng/caddy-cloudflare-ip"; version = "f53b62aa13cb7ad79c8b47aacc3f2f03989b67e5"; } # head of main
-      ];
-      vendorHash = "sha256-1uMji7GX7VpKr/VM0XG/mh4v1jW8sW2xaiBS1ZwAUMM=";
-    };
+    package = pkgs.caddyFull;
 
     globalConfig = ''
       cache
@@ -141,6 +153,12 @@ in
 
     virtualHosts."*.einic.org" = {
       extraConfig = ''
+
+        @arnold host arnold.einic.org *.arnold.einic.org
+        handle @arnold {
+          reverse_proxy https://192.168.6.10
+        }
+
         @audiobooks host audiobooks.einic.org
         handle @audiobooks {
           root /ward/keep/libation/data/Books
@@ -194,8 +212,11 @@ in
       '';
     };
 
-    virtualHosts."*.ward.ts.einic.org" = {
+    # NOTE: merged these because we have the same listenaddress and it seemed to fail with 2 seperate ones with the same address
+    virtualHosts."ward.little-moth.ts.net, *.ward.ts.einic.org" = {
       listenAddresses = [ "100.115.212.42" ];
+      # NOTE: nixos can't handle virtualHosts with multiple hosts, so we have to set logFormat manually
+      logFormat = "output file /var/log/caddy/ward.ts.einic.org.log";
       extraConfig = ''
         root /srv
 
@@ -217,66 +238,58 @@ in
           reverse_proxy http://localhost:8000
         }
 
-        handle {
-          abort
-        }
-      '';
-    };
+        @tsnet host ward.little-moth.ts.net
+        handle @tsnet {
+          redir /nix-cache /nix-cache/ 301
+          handle_path /nix-cache/* {
+            cache {
+              badger {
+                path /ward/keep/nix-cache
+              }
 
-    virtualHosts."ward.little-moth.ts.net" = {
-      listenAddresses = [ "100.115.212.42" ];
-      extraConfig = ''
-        root /srv
+              key {
+                disable_host
+                disable_scheme
+              }
 
-        redir /nix-cache /nix-cache/ 301
-        handle_path /nix-cache/* {
-          cache {
-            badger {
-              path /ward/keep/nix-cache
+              ttl 30000h
+              default_cache_control no-store
             }
+            reverse_proxy https://cache.nixos.org {
+              header_up Host {upstream_hostport}
 
-            key {
-              disable_host
-              disable_scheme
-            }
-
-            ttl 30000h
-            default_cache_control no-store
-          }
-          reverse_proxy https://cache.nixos.org {
-            header_up Host {upstream_hostport}
-
-            @ok status 200 302
-            handle_response @ok {
-              header Cache-Control "public, immutable"
-              copy_response
+              @ok status 200 302
+              handle_response @ok {
+                header Cache-Control "public, immutable"
+                copy_response
+              }
             }
           }
-        }
 
-        redir /harmonia /harmonia/ 301
-        handle_path /harmonia/* {
-          reverse_proxy http://localhost:8916 {
+          redir /harmonia /harmonia/ 301
+          handle_path /harmonia/* {
+            reverse_proxy http://localhost:8916 {
+            }
           }
-        }
 
-        redir /hydra /hydra/ 301
-        handle_path /hydra/* {
-          reverse_proxy http://localhost:${toString config.services.hydra.port} {
-            header_up Host {upstream_hostport}
-            header_up X-Request-Base /hydra
+          redir /hydra /hydra/ 301
+          handle_path /hydra/* {
+            reverse_proxy http://localhost:${toString config.services.hydra.port} {
+              header_up Host {upstream_hostport}
+              header_up X-Request-Base /hydra
+            }
           }
-        }
 
-        redir /audiobooks /audiobooks/ 301
-        handle_path /audiobooks/* {
-          root /ward/keep/libation/data/Books
-          file_server browse
-        }
+          redir /audiobooks /audiobooks/ 301
+          handle_path /audiobooks/* {
+            root /ward/keep/libation/data/Books
+            file_server browse
+          }
 
-        redir /grafana /grafana/ 301
-        handle_path /grafana/* {
-          reverse_proxy http://${toString config.services.grafana.settings.server.http_addr}:${toString config.services.grafana.settings.server.http_port}
+          redir /grafana /grafana/ 301
+          handle_path /grafana/* {
+            reverse_proxy http://${toString config.services.grafana.settings.server.http_addr}:${toString config.services.grafana.settings.server.http_port}
+          }
         }
 
         # return 404 for all other requests
@@ -289,7 +302,7 @@ in
 
   virtualisation.oci-containers.containers = {
     archivebox = {
-      image = "docker.io/archivebox/archivebox:latest";
+      image = "docker.io/archivebox/archivebox:dev";
       ports = [ "127.0.0.1:8000:8000" ];
       volumes = [
         "/ward/keep/archivebox:/data"
@@ -297,26 +310,75 @@ in
       labels = {
         "io.containers.autoupdate" = "registry";
       };
+      environment = {
+        CSRF_TRUSTED_ORIGINS = "https://archivebox.ward.ts.einic.org";
+      };
       extraOptions = [
         "--pids-limit=-1"
         "--cpus=4"
         "--cpu-shares=512"
-        "--memory-reservation=32G"
+        "--memory=32G"
       ];
     };
 
-    libation = {
-      image = "docker.io/rmcrackan/libation:latest";
-      volumes = [
-        "/ward/keep/libation/data:/data"
-        "/ward/keep/libation/config:/config"
-      ];
-      environment = {
-        SLEEP_TIME = "2h";
-      };
-      labels = {
-        "io.containers.autoupdate" = "registry";
-      };
+  };
+
+  # FIXME: use dynamic user.
+  users.users.libation = {
+    isSystemUser = true;
+    group = "libation";
+  };
+  users.groups.libation = { };
+
+  systemd.services.libation = {
+    serviceConfig = {
+      ExecStartPre = ''
+        ${pkgs.coreutils}/bin/chown -R libation:libation /ward/keep/libation
+      '';
+    };
+
+    # again, we're tweaking the systemd service so we can pick up with uid
+    # because otherwise podman tries to resovle the user inside the container
+    # and fails.
+    # FIXME: modify oci-containers.nix instead
+    script = lib.mkForce ''
+      #!${pkgs.bash}/bin/bash
+      set -e
+
+      exec ${pkgs.podman}/bin/podman  \
+        run \
+        --rm \
+        --name=libation \
+        --log-driver=journald \
+        --cidfile=/run/libation/ctr-id \
+        --cgroups=enabled \
+        --sdnotify=conmon \
+        -d \
+        --replace \
+        -e SLEEP_TIME=2h \
+        --user $(id -u libation):$(id -g libation) \
+        -v /ward/keep/libation/data:/data \
+        -v /ward/keep/libation/config:/config \
+        -l io.containers.autoupdate=registry \
+        --pull missing \
+        docker.io/rmcrackan/libation:latest
+    '';
+  };
+
+
+  virtualisation.oci-containers.containers.libation = {
+    serviceName = "libation";
+    image = "docker.io/rmcrackan/libation:latest";
+    user = "libation:libation";
+    volumes = [
+      "/ward/keep/libation/data:/data"
+      "/ward/keep/libation/config:/config"
+    ];
+    environment = {
+      SLEEP_TIME = "2h";
+    };
+    labels = {
+      "io.containers.autoupdate" = "registry";
     };
   };
 
@@ -352,9 +414,16 @@ in
 
   systemd.network = {
     enable = true;
-    networks."10-enp2s0.network" = {
+    networks."10-enp3s0.network" = {
       networkConfig.DHCP = "ipv4";
-      matchConfig.Name = "enp2s0";
+      matchConfig.Name = "enp3s0";
+      # prioritize the local network directly instead of using tailscale
+      routingPolicyRules = [
+        {
+          To = "192.168.6.0/24";
+          Priority = 2500;
+        }
+      ];
     };
     wait-online.anyInterface = true;
   };
@@ -394,6 +463,10 @@ in
   services.xserver.desktopManager.gnome.enable = true;
   services.xserver.displayManager.gdm.enable = true;
   services.xserver.displayManager.gdm.autoSuspend = false;
+  systemd.targets.sleep.enable = false;
+  systemd.targets.suspend.enable = false;
+  systemd.targets.hibernate.enable = false;
+  systemd.targets.hybrid-sleep.enable = false;
   security.polkit.extraConfig = ''
     polkit.addRule(function(action, subject) {
         if (action.id == "org.freedesktop.login1.suspend" ||
@@ -406,6 +479,13 @@ in
     });
   '';
 
+  environment.etc."gdm/greeter.dconf-defaults" = {
+    text = ''
+      [org/gnome/settings-daemon/plugins/power]
+      sleep-inactive-ac-type='nothing'
+      sleep-inactive-ac-timeout=0
+    '';
+  };
 
 
   # Configure keymap in X11
@@ -466,11 +546,24 @@ in
       }
     ];
   };
+
   services.tailscale.enable = true;
 
-  #system.copySystemConfiguration = true;
+  services.avahi = {
+    enable = true;
+    openFirewall = true;
+    nssmdns4 = true;
+    publish = {
+      enable = true;
+      addresses = true;
+      domain = true;
+      hinfo = true;
+      userServices = true;
+      workstation = true;
+    };
+  };
+
+  zramSwap.enable = true;
 
   system.stateVersion = "23.11";
 }
-
-

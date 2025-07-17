@@ -36,7 +36,6 @@
     pkgs.tokei
     pkgs.universal-ctags
     pkgs.watch
-    pkgs.xsv
     pkgs.yt-dlp
 
     pkgs.kubeswitch

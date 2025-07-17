@@ -24,6 +24,12 @@
   networking.networkmanager.enable = true;
   systemd.services.NetworkManager-wait-online.enable = false;
 
+  services.fstrim.enable = true;
+
+  fileSystems."/".options = [
+    "discard"
+  ];
+
   # Set your time zone.
   time.timeZone = "America/New_York";
 

@@ -91,6 +91,10 @@
           # sabnzbd (consider substituting)
           "unrar"
         ];
+        config.permittedInsecurePackages = [
+          "intel-media-sdk-23.2.2"
+        ];
+
         inherit overlays;
       };
     in

@@ -3,7 +3,7 @@
 { config, lib, pkgs, ... }:
 with lib;
 let
-  cfg = config.services.qbittorrent;
+  cfg = config.services.qbittorrent-alt;
   configDir = "${cfg.dataDir}/.config";
   openFilesLimit = 4096;
   rootDir = "/run/qbittorrent";
@@ -11,7 +11,7 @@ let
   inherit (lib) mkOption types mkIf mkDefault;
 in
 {
-  options.services.qbittorrent = {
+  options.services.qbittorrent-alt = {
     enable = mkOption {
       type = types.bool;
       default = false;

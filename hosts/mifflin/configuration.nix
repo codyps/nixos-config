@@ -97,7 +97,9 @@
   };
 
   nixpkgs.config.allowUnfree = true;
-  hardware.enableAllFirmware = true;
+  #hardware.enableAllFirmware = true;
+  hardware.enableRedistributableFirmware = true;
+  hardware.wirelessRegulatoryDatabase = true;
 
   environment.systemPackages = with pkgs; [
     neovim

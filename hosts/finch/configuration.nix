@@ -18,7 +18,9 @@ in
 
   services.logrotate.checkConfig = false;
 
-  system.autoUpgrade.enable = lib.mkForce true;
+  system.autoUpgrade.enable = lib.mkForce false;
+  nix.optimise.automatic = lib.mkForce false;
+  nix.gc.automatic = lib.mkForce false;
 
   boot.zfs.extraPools = [ "tank" ];
 

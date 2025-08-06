@@ -53,7 +53,7 @@
 
   # Enable the KDE Plasma Desktop Environment.
   services.displayManager.sddm.enable = true;
-  services.xserver.desktopManager.plasma5.enable = true;
+  services.xserver.desktopManager.plasma6.enable = true;
 
   # Enable automatic login for the user.
   services.displayManager.autoLogin.enable = true;
@@ -97,7 +97,7 @@
   };
 
   nixpkgs.config.allowUnfree = true;
-  #hardware.enableAllFirmware = true;
+  hardware.enableAllFirmware = true;
   hardware.enableRedistributableFirmware = true;
   hardware.wirelessRegulatoryDatabase = true;
 

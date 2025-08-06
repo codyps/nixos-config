@@ -100,6 +100,9 @@
   hardware.enableAllFirmware = true;
   hardware.enableRedistributableFirmware = true;
   hardware.wirelessRegulatoryDatabase = true;
+  hardware.firmware = with pkgs; [
+    linux-firmware
+  ];
 
   environment.systemPackages = with pkgs; [
     neovim

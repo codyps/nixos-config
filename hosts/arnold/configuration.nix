@@ -797,15 +797,13 @@ in
   hardware.graphics = {
     enable = true;
     extraPackages = with pkgs; [
-      intel-media-driver
-      intel-vaapi-driver
       vaapiIntel
       libvdpau-va-gl
-      vpl-gpu-rt # QSV on 11th gen or newer
       ocl-icd
 
       intel-media-driver
       libva-vdpau-driver
+      intel-vaapi-driver
       intel-compute-runtime-legacy1
     ];
   };

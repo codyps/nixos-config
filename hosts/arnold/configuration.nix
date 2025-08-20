@@ -52,7 +52,7 @@ in
 
   hardware.cpu.intel.updateMicrocode = true;
 
-  systemd.watchdog.runtimeTime = "30s";
+  systemd.settings.Manager.RuntimeWatchdogSec = "30s";
 
   fileSystems."/persist".neededForBoot = true;
 

@@ -428,6 +428,7 @@ in
       f01     UUID=bd3095e7-685a-4ae1-9a28-00ce02bbf04f /persist/etc/secret/luks1 discard,no-read-workqueue,no-write-workqueue,same-cpu-crypt
 
       ru1     UUID=36610bd4-182e-408e-85d8-c13c67ebd9fb /persist/etc/secret/luks1 discard,no-read-workqueue,no-write-workqueue,same-cpu-crypt
+      pair1   UUID=9c8e2760-6dd6-486d-b11a-41d90206f557 /persist/etc/secret/luks1 discard,no-read-workqueue,no-write-workqueue,same-cpu-crypt
       #rl1     
     '';
   };

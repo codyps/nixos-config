@@ -365,7 +365,7 @@ in
     before = [ "samba-smbd.service" ];
     wantedBy = [ "samba-smbd.service" ];
     serviceConfig = {
-      ExecStart = "bash -c '${pkgs.samba}/bin/smbpasswd -a -s timemachine < ${config.sops.secrets.timemachine-pass.path}'";
+      ExecStart = "${pkgs.bash}/bin/bash -c '${pkgs.samba}/bin/smbpasswd -a -s timemachine < ${config.sops.secrets.timemachine-pass.path}'";
     };
   };
 

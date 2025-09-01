@@ -533,6 +533,8 @@ in
       };
     };
   };
+  
+  programs.gnupg.agent.pinentryPackage = pkgs.pinentry-curses;
 
   systemd.services.caddy = {
     serviceConfig = {

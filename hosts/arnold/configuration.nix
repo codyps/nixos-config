@@ -353,9 +353,13 @@ in
   users.users.timemachine = {
     hashedPasswordFile = "${config.sops.secrets.timemachine-pass.path}";
     openssh.authorizedKeys.keys = authorizedKeys;
+    isNormalUser = true;
     group = "timemachine";
+    useDefaultShell = false;
+    home = "/var/empty";
+    createHome = false;
   };
- users.groups.timemachine = {};
+  users.groups.timemachine = {};
 
   systemd.services.smbpasswd-timemachine = {
     before = [ "samba-smbd.service" ];

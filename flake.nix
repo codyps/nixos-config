@@ -44,7 +44,7 @@
               "github.com/darkweak/storages/badger/caddy@v0.0.10"
               "github.com/WeidiDeng/caddy-cloudflare-ip@v0.0.0-20231130002422-f53b62aa13cb"
             ];
-            hash = "sha256-Z0VZ3n60eY9Ve2z8HrKX/+DLNPDm8HqB8MAvJnyW8AA=";
+            hash = "sha256-RzdS4SOT59zSE21N5F3npx3wM4LCGCpz6+WGBDZ05bY=";
           };
 
           # NOTE: tweaking the hash because we get mismatches

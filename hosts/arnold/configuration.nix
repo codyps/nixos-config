@@ -365,13 +365,14 @@ in
     before = [ "samba-smbd.service" ];
     wantedBy = [ "samba-smbd.service" ];
     serviceConfig = {
-      ExecStart = "${pkgs.bash}/bin/bash -c '${pkgs.samba}/bin/smbpasswd -a -s timemachine < ${config.sops.secrets.timemachine-pass.path}'";
+      ExecStart = "${pkgs.bash}/bin/bash -c '(s=${config.sops.secrets.timemachine-pass.path}; cat $s; echo; cat $s; echo) | smbpasswd -a -s timemachine";
     };
   };
 
   sops.secrets."timemachine-pass" = {
     sopsFile = ./secrets.yml;
     key = "timemachine-pass";
+    restartUnits = [ "smbpasswd-timemachine.service" ];
   };
 
   environment.systemPackages = with pkgs; [
@@ -494,6 +495,8 @@ in
         "create mask" = "0664";
         "directory mask" = "0775";
         "mdns name" = "mdns";
+
+        "host msdfs" = "no";
       };
       "windows-fh" = {
         "ea support" = "No";
@@ -519,6 +522,8 @@ in
       "timemachine" = {
         "path" = "/tank/backup/timemachine4";
         "valid users" = "cody timemachine";
+        "force user" = "timemachine";
+        "force group" = "timemachine";
 
         "ea support" = "No";
         "posix locking" = "No";

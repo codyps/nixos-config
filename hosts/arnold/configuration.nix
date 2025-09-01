@@ -350,6 +350,17 @@ in
     isNormalUser = true;
   };
 
+  users.users.timemachine = {
+    hashedPasswordFile = "${config.sops.secrets.timemachine-pass.path}";
+    openssh.authorizedKeys.keys = authorizedKeys;
+    isNormalUser = true;
+  };
+
+  sops.secrets."timemachine-pass" = {
+    sopsFile = ./secrets.yml;
+    key = "timemachine-pass";
+  };
+
   environment.systemPackages = with pkgs; [
     neovim
     linuxPackages.perf
@@ -494,7 +505,7 @@ in
       };
       "timemachine" = {
         "path" = "/tank/backup/timemachine4";
-        "valid users" = "cody";
+        "valid users" = "cody timemachine";
 
         "ea support" = "No";
         "posix locking" = "No";

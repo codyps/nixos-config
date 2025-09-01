@@ -359,7 +359,7 @@ in
     home = "/var/empty";
     createHome = false;
   };
-  users.groups.timemachine = {};
+  users.groups.timemachine = { };
 
   systemd.services.smbpasswd-timemachine = {
     before = [ "samba-smbd.service" ];
@@ -533,7 +533,7 @@ in
       };
     };
   };
-  
+
   programs.gnupg.agent.pinentryPackage = pkgs.pinentry-curses;
 
   systemd.services.caddy = {

@@ -79,7 +79,6 @@
     packages = with pkgs; [
       firefox
       yubikey-personalization
-      yubikey-personalization-gui
       yubioath-flutter
       yubikey-manager
     ];

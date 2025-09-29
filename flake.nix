@@ -240,7 +240,7 @@
             system = "x86_64-linux";
             specialArgs = { inherit home-manager nixos-wsl nixos-vscode-server self; };
             modules = [
-              ./nixos/findley/configuration.nix
+              ./hosts/findley/configuration.nix
               ./nixos/common.nix
               home-manager.nixosModules.home-manager
               {

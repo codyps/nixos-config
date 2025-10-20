@@ -60,8 +60,6 @@ in
   ];
 
   programs.git = {
-    userName = "Cody P Schafer";
-    userEmail = "dev@codyps.com";
 
     enable = true;
     includes = [
@@ -85,11 +83,15 @@ in
       key = "881CEAC38C98647F6F660956794D748B8B8BF912";
     };
 
-    extraConfig = {
+    settings = {
       core = {
         fscache = true;
         preloadindex = true;
         precomposeUnicode = true;
+      };
+      user = {
+        name = "Cody P Schafer";
+        email = "dev@codyps.com";
       };
       pull = {
         ff = "only";

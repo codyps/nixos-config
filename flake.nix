@@ -322,6 +322,7 @@
                 home = "/Users/x";
               };
               nixpkgs.hostPlatform = "x86_64-darwin";
+              ids.gids.nixbld = 350;
             })
             ./nix-darwin/configuration.nix
             home-manager.darwinModules.home-manager

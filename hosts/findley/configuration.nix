@@ -61,7 +61,6 @@
 
   programs.nix-ld = {
     enable = true;
-    package = pkgs.nix-ld-rs;
   };
 
   virtualisation.docker.rootless.enable = true;

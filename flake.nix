@@ -1,6 +1,6 @@
 {
   inputs = {
-    nixpkgs.url = "nixpkgs/nixos-unstable";
+    nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
     nixos-wsl.url = "github:nix-community/NixOS-WSL/main";
     nixos-wsl.inputs.nixpkgs.follows = "nixpkgs";
     nixos-vscode-server.url = "github:nix-community/nixos-vscode-server";
@@ -349,6 +349,7 @@
               nixpkgs.hostPlatform = "x86_64-darwin";
               nix.enable = false;
               nix.settings.use-case-hack = false;
+              system.primaryUser = "cody";
               #nix.extraOptions = ''
               #  #upgrade-nix-store-path-url = "https://install.determinate.systems/nix-upgrade/stable/universal";
               #'';

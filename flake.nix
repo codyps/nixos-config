@@ -37,13 +37,6 @@
           # something is using the old name, hack around it.
           utillinux = prev.util-linux;
 
-          # bats is broken by https://github.com/nixos/nixpkgs/issues/449970
-          bash-preexec = prev.bash-preexec.overrideAttrs (oldAttrs: {
-            doCheck = false;
-            # Remove bats (bash auto test system)
-            nativeBuildInputs = [];
-          });
-
           caddyFull = prev.pkgs.caddy.withPlugins {
             plugins = [
               "github.com/caddy-dns/cloudflare@v0.2.2-0.20250506153119-35fb8474f57d"

@@ -22,6 +22,7 @@
     pkgs.htop
     pkgs.krew
     pkgs.kubectl
+    pkgs.kubectl-df-pv
     pkgs.nodejs
     pkgs.openssh
     pkgs.rclone

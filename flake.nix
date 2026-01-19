@@ -341,13 +341,14 @@
         darwinConfigurations."u3" = nix-darwin.lib.darwinSystem {
           specialArgs = { inherit self; };
           modules = [
-            ({ ... }: {
+            ({ pkgs, ... }: {
               users.users.cody = {
                 name = "cody";
                 home = "/Users/cody";
               };
               nixpkgs.hostPlatform = "x86_64-darwin";
-              nix.enable = false;
+              nix.enable = true;
+              nix.package = pkgs.lix;
               nix.settings.use-case-hack = false;
               system.primaryUser = "cody";
               #nix.extraOptions = ''

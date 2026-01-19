@@ -38,7 +38,8 @@ in
     extra-nix-path = "nixpkgs=flake:nixpkgs";
     trusted-users = [ "root" "@admin" ];
     netrc-file = "/etc/nix/netrc";
-    download-buffer-size = 524288000;
+    # chokes on u3
+    #download-buffer-size = 524288000;
   };
 
   nix.settings.substituters = [ "https://nix-community.cachix.org" ];

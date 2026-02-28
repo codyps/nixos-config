@@ -164,7 +164,6 @@ in
       #cargo-limit
       #jenkinsfile-vim-syntax
       #v-vim
-      coc-go
       coc-nvim
       coc-rust-analyzer
       coc-sh

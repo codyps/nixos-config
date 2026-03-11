@@ -172,7 +172,7 @@ in
       copilot-vim
       ctrlp-vim
       fzf-vim
-      fzfWrapper
+      fzf-wrapper
       kotlin-vim
       pest-vim
       rust-vim

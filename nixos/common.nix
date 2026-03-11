@@ -68,5 +68,5 @@ in
   # wait-online is busted all the time without this, especially when using tailscale
   systemd.network.wait-online.anyInterface = true;
 
-  system.extraSystemBuilderCmds = "ln -s ${./.} $out/full-config";
+  system.systemBuilderCommands = "ln -s ${./.} $out/full-config";
 }

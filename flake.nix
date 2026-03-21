@@ -80,6 +80,7 @@
         config.permittedInsecurePackages = [
           "intel-media-sdk-23.2.2"
         ];
+        config.allowDeprecardx86_64Darwin = true;
 
         inherit overlays;
       };
@@ -90,7 +91,7 @@
           pkgs = import nixpkgs {
             inherit system;
             inherit overlays;
-            config.allowDeprecatedx86_64Darwin = true;
+            config.allowDeprecardx86_64Darwin = true;
           };
         in
         {

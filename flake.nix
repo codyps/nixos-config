@@ -11,9 +11,9 @@
     nix-darwin.inputs.nixpkgs.follows = "nixpkgs";
     home-manager.url = "github:nix-community/home-manager";
     home-manager.inputs.nixpkgs.follows = "nixpkgs";
-    targo.url = "github:codyps/targo";
-    targo.inputs.nixpkgs.follows = "nixpkgs";
-    targo.inputs.flake-utils.follows = "flake-utils";
+    #targo.url = "github:codyps/targo";
+    #targo.inputs.nixpkgs.follows = "nixpkgs";
+    #targo.inputs.flake-utils.follows = "flake-utils";
     impermanence.url = "github:nix-community/impermanence";
     sops-nix.url = "github:Mic92/sops-nix";
     #thereum-nix = {
@@ -28,11 +28,11 @@
     extra-trusted-public-keys = [ "nix-community.cachix.org-1:mB9FSh9qf2dCimDSUo8Zy7bkq5CX+/rkCWyvRCYg3Fs=" ];
   };
 
-  outputs = { self, nixpkgs, flake-utils, targo, nix-darwin, home-manager, nixos-wsl, nixos-vscode-server, impermanence, sops-nix }:
+  outputs = { self, nixpkgs, flake-utils, nix-darwin, home-manager, nixos-wsl, nixos-vscode-server, impermanence, sops-nix }:
     let
       overlays = [
         (final: prev: {
-          targo = targo.packages.${prev.system}.default;
+          #targo = targo.packages.${prev.system}.default;
 
           # something is using the old name, hack around it.
           utillinux = prev.util-linux;
@@ -57,20 +57,6 @@
                 hash = "sha256-Z/A8Qoiu8omkJTTKYj4V7rN3aLyYL+02zQUr5RLtOls=";
               };
             });
-            #coc-nvim = prev.vimUtils.buildVimPlugin {
-            #  pname = "coc.nvim";
-            #  version = "2025-04-21";
-            #  src = prev.fetchFromGitHub {
-            #    owner = "neoclide";
-            #    repo = "coc.nvim";
-            #    #rev = "22130a1eccf1b59992d7e236218696790edba8d2";
-            #    #hash = "sha256-IwhW5EMGK9F/uEubb5WJ76Nft9WausfG3kUgCk0KIpo=";
-            #    rev = "993a4a273bf0415296a1a8d512466b183670568a";
-            #    hash = "";
-            #  };
-            #  meta.homepage = "https://github.com/neoclide/coc.nvim/";
-            #  meta.hydraPlatforms = [ ];
-            #};
           };
 
 

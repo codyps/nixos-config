@@ -216,8 +216,7 @@
         "nixos-vscode-server": "nixos-vscode-server",
         "nixos-wsl": "nixos-wsl",
         "nixpkgs": "nixpkgs_2",
-        "sops-nix": "sops-nix",
-        "targo": "targo"
+        "sops-nix": "sops-nix"
       }
     },
     "sops-nix": {
@@ -250,29 +249,6 @@
       "original": {
         "owner": "nix-systems",
         "repo": "default",
-        "type": "github"
-      }
-    },
-    "targo": {
-      "inputs": {
-        "flake-utils": [
-          "flake-utils"
-        ],
-        "nixpkgs": [
-          "nixpkgs"
-        ]
-      },
-      "locked": {
-        "lastModified": 1695276322,
-        "narHash": "sha256-4Q1h3C5j+lxBNBZRqPmHE4nkOFutq589QPpsTracaGA=",
-        "owner": "codyps",
-        "repo": "targo",
-        "rev": "c6f3c81ade98a01b335744b3542177bac3c9fc8c",
-        "type": "github"
-      },
-      "original": {
-        "owner": "codyps",
-        "repo": "targo",
         "type": "github"
       }
     }

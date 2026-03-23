@@ -104,6 +104,7 @@
           pkgs = import nixpkgs {
             inherit system;
             inherit overlays;
+            config.allowDeprecatedx86_64Darwin = true;
           };
         in
         {

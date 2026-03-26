@@ -2,8 +2,8 @@
   homebrew = {
     enable = true;
 
-    taps = [];
+    taps = [ ];
     #brews = [ "meshtastic" ];
-    casks = [];
-  }; 
+    casks = [ ];
+  };
 }

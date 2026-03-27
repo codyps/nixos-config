@@ -30,7 +30,7 @@ in
 
     # cursor only invokes `~/.zshenv`, so we put things that need to be in the environment there, and things that should only be in interactive shells in `~/.zshrc`
     envExtra =
-      if programs.direnv.enable then
+      if config.programs.direnv.enable then
         ''
           eval "$(${pkgs.direnv}/bin/direnv hook zsh)"
         ''

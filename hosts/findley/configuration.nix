@@ -19,9 +19,12 @@
   wsl = {
     enable = true;
     defaultUser = "nixos";
-    wslConf.automount.root = "/mnt";
-    wslConf.interop.appendWindowsPath = false;
-    wslConf.network.generateHosts = false;
+    wslConf = {
+      automount.root = "/mnt";
+      interop.appendWindowsPath = false;
+      network.generateHosts = false;
+      boot.initTimeout = 40000;
+    };
     startMenuLaunchers = true;
 
     # Enable integration with Docker Desktop (needs to be installed)

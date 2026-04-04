@@ -423,15 +423,23 @@
         {
 
           # chromeos
-          homeConfigurations."cody@peyton" = home-manager.lib.homeManagerConfiguration {
+          homeConfigurations."cody@penguin" = home-manager.lib.homeManagerConfiguration {
             inherit pkgs;
 
             modules = [
               ({ ... }: {
                 home.username = "cody";
                 home.homeDirectory = "/home/cody";
+
               })
               ./home-manager/home.nix
+              ({ lib, ... }: {
+                programs.git.signing = {
+                  format = lib.mkForce "ssh";
+                  key = lib.mkForce "~/.ssh/id_ed25519";
+                  signByDefault = lib.mkForce true;
+                };
+              })
             ];
           };
 

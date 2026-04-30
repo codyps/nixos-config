@@ -88,6 +88,7 @@ in
     ];
 
     signing = {
+      format = "openpgp";
       signByDefault = true;
       key = "881CEAC38C98647F6F660956794D748B8B8BF912";
     };

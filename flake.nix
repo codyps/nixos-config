@@ -423,6 +423,12 @@
         {
 
           # chromeos
+          # system setup:
+          # 1. `apt update && apt install git`
+          # 2. do a nixos multi-user install
+          # 3. add `experimental-features = nix-command flake` to /etc/nix/nix.conf
+          # 4. modify /etc/ssh/ssh_config to kill the warning about gssapiauthentication
+          # 5. ssh-keygen -t ed25519
           homeConfigurations."cody@penguin" = home-manager.lib.homeManagerConfiguration {
             inherit pkgs;
 
@@ -430,7 +436,6 @@
               ({ ... }: {
                 home.username = "cody";
                 home.homeDirectory = "/home/cody";
-
               })
               ./home-manager/home.nix
               ({ lib, ... }: {
@@ -439,6 +444,12 @@
                   key = lib.mkForce "~/.ssh/id_ed25519";
                   signByDefault = lib.mkForce true;
                 };
+                xdg.configFile."containers/registries.conf".text = ''
+                unqualified-search-registries = ["docker.io"]
+                '';
+
+                # try to get gpu working
+                targets.genericLinux.enable = true;
               })
             ];
           };

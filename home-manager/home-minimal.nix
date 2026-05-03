@@ -185,7 +185,7 @@ in
       kotlin-vim
       pest-vim
       rust-vim
-      securemodelines
+      #securemodelines
       vim-airline
       vim-dadbod
       vim-elixir

@@ -1,6 +1,6 @@
 
 call plug#begin()
-Plug 'ciaranm/securemodelines'
+"Plug 'ciaranm/securemodelines'
 "Plug 'editorconfig/editorconfig-vim'
 Plug 'justinmk/vim-sneak'
 Plug 'farmergreg/vim-lastplace'

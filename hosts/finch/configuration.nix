@@ -320,6 +320,7 @@ in
   services.syncthing = {
     enable = true;
     dataDir = "/tank/syncthing";
+    overrideDevices = false;
     settings = {
       devices = {
         "u3" = { id = "SYFXMYB-T4PKQ3E-IQHWO7R-LDHJ7LL-P7BTPBR-NRDS6CG-3NB7W72-ZCATPAW"; };

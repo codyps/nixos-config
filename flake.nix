@@ -159,7 +159,7 @@
                 home-manager.useGlobalPkgs = true;
                 home-manager.useUserPackages = true;
                 home-manager.users.cody.imports = [
-                  ./home-manager/home-minimal.nix
+                  ./home-manager/home-supermin.nix
                 ];
               }
             ];

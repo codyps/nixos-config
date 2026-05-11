@@ -320,6 +320,11 @@ in
   services.syncthing = {
     enable = true;
     dataDir = "/tank/syncthing";
+    settings = {
+      devices = {
+        "u3" = { id = "SYFXMYB-T4PKQ3E-IQHWO7R-LDHJ7LL-P7BTPBR-NRDS6CG-3NB7W72-ZCATPAW" };
+      };
+    };
   };
 
   networking.firewall.enable = true;
@@ -333,21 +338,21 @@ in
 
   services.tailscale.permitCertUid = "caddy";
 
-  virtualisation.oci-containers.containers = {
-    libation = {
-      image = "docker.io/rmcrackan/libation:latest";
-      autoStart = false;
-      volumes = [
-        "/tank/libation/data:/data"
-        "/tank/libation/config:/config"
-        "/tank/libation/tmp:/tmp"
-        #"/var/lib/libation/data:/data"
-        #"/var/lib/libation/config:/config"
-      ];
-      labels = {
-        "io.containers.autoupdate" = "registry";
-      };
-    };
+  #virtualisation.oci-containers.containers = {
+    #libation = {
+    #  image = "docker.io/rmcrackan/libation:latest";
+    #  autoStart = false;
+    #  volumes = [
+    #    "/tank/libation/data:/data"
+    #    "/tank/libation/config:/config"
+    #    "/tank/libation/tmp:/tmp"
+    #    #"/var/lib/libation/data:/data"
+    #    #"/var/lib/libation/config:/config"
+    #  ];
+    #  labels = {
+    #    "io.containers.autoupdate" = "registry";
+    #  };
+    #};
 
     #storyteller = {
     #  image = "registry.gitlab.com/smoores/storyteller:latest";
@@ -365,34 +370,34 @@ in
     #    "io.containers.autoupdate" = "registry";
     #  };
     #};
-  };
+  #};
 
-  systemd.services.podman-libation =
-    let
-      mounts = [
-        "tank-libation.mount"
-        "tank-books-kindle.mount"
-        "tank-books-personal.mount"
-      ];
-    in
-    {
-      serviceConfig = {
-        Type = lib.mkForce "oneshot";
-        Restart = lib.mkForce "on-failure";
-      };
-      after = mounts;
-      requires = mounts;
-    };
+  #systemd.services.podman-libation =
+  #  let
+  #    mounts = [
+  #      "tank-libation.mount"
+  #      "tank-books-kindle.mount"
+  #      "tank-books-personal.mount"
+  #    ];
+  #  in
+  #  {
+  #    serviceConfig = {
+  #      Type = lib.mkForce "oneshot";
+  #      Restart = lib.mkForce "on-failure";
+  #    };
+  #    after = mounts;
+  #    requires = mounts;
+  #  };
 
-  systemd.timers.podman-libation = {
-    wantedBy = [ "timers.target" ];
-    timerConfig = {
-      Persistent = true;
-      OnCalendar = "hourly";
-      AccuracySec = "30m";
-      RandomizedDelaySec = "20m";
-    };
-  };
+  #systemd.timers.podman-libation = {
+  #  wantedBy = [ "timers.target" ];
+  #  timerConfig = {
+  #    Persistent = true;
+  #    OnCalendar = "hourly";
+  #    AccuracySec = "30m";
+  #    RandomizedDelaySec = "20m";
+  #  };
+  #};
 
   # oci-containers can't handle running as a user. See:
   # https://github.com/NixOS/nixpkgs/issues/259770
@@ -408,17 +413,17 @@ in
   #};
   #users.groups.libation = {};
 
-  virtualisation.podman = {
-    enable = true;
-    autoPrune.enable = true;
-    defaultNetwork.settings.dns_enabled = true;
-  };
+  #virtualisation.podman = {
+  #  enable = true;
+  #  autoPrune.enable = true;
+  #  defaultNetwork.settings.dns_enabled = true;
+  #};
 
-  services.audiobookshelf = {
-    package = pkgs.audiobookshelf-headless;
-    enable = true;
-    port = 8917;
-  };
+  #services.audiobookshelf = {
+  #  package = pkgs.audiobookshelf-headless;
+  #  enable = true;
+  #  port = 8917;
+  #};
 
   zramSwap.enable = true;
 

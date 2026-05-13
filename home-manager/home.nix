@@ -7,6 +7,7 @@
   home.packages = [
     #pkgs.cargo-outdated
     #pkgs.ncdu
+    pkgs.nixd
     pkgs.atuin
     pkgs.bazelisk
     pkgs.cargo-generate

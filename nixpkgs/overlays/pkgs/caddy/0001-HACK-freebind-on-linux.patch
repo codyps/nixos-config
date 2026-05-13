@@ -1,0 +1,204 @@
+From 1a3b80848ab5e803d5f875eecaa28cbc37427a19 Mon Sep 17 00:00:00 2001
+From: Cody P Schafer <dev@codyps.com>
+Date: Sat, 28 Dec 2024 00:34:28 -0500
+Subject: [PATCH] HACK: freebind on linux
+
+---
+ listen_unix.go                    | 19 -----------------
+ listen_unix_generic.go            | 27 ++++++++++++++++++++++++
+ listen_unix_linux.go              | 34 +++++++++++++++++++++++++++++++
+ modules/caddyhttp/app.go          |  8 +++++++-
+ modules/caddyhttp/listen.go       | 13 ++++++++++++
+ modules/caddyhttp/listen_linux.go | 22 ++++++++++++++++++++
+ 6 files changed, 103 insertions(+), 20 deletions(-)
+ create mode 100644 listen_unix_generic.go
+ create mode 100644 listen_unix_linux.go
+ create mode 100644 modules/caddyhttp/listen.go
+ create mode 100644 modules/caddyhttp/listen_linux.go
+
+diff --git a/listen_unix.go b/listen_unix.go
+index d6ae0cb8..4aa9c553 100644
+--- a/listen_unix.go
++++ b/listen_unix.go
+@@ -32,9 +32,6 @@ import (
+ 	"sync"
+ 	"sync/atomic"
+ 	"syscall"
+-
+-	"go.uber.org/zap"
+-	"golang.org/x/sys/unix"
+ )
+ 
+ // reuseUnixSocket copies and reuses the unix domain socket (UDS) if we already
+@@ -197,22 +194,6 @@ func listenReusable(ctx context.Context, lnKey string, network, address string,
+ 	return ln, err
+ }
+ 
+-// reusePort sets SO_REUSEPORT. Ineffective for unix sockets.
+-func reusePort(network, address string, conn syscall.RawConn) error {
+-	if IsUnixNetwork(network) {
+-		return nil
+-	}
+-	return conn.Control(func(descriptor uintptr) {
+-		if err := unix.SetsockoptInt(int(descriptor), unix.SOL_SOCKET, unixSOREUSEPORT, 1); err != nil {
+-			Log().Error("setting SO_REUSEPORT",
+-				zap.String("network", network),
+-				zap.String("address", address),
+-				zap.Uintptr("descriptor", descriptor),
+-				zap.Error(err))
+-		}
+-	})
+-}
+-
+ type unixListener struct {
+ 	*net.UnixListener
+ 	mapKey string
+diff --git a/listen_unix_generic.go b/listen_unix_generic.go
+new file mode 100644
+index 00000000..7e410bd9
+--- /dev/null
++++ b/listen_unix_generic.go
+@@ -0,0 +1,27 @@
++//go:build unix && !solaris && !linux
++
++package caddy
++
++import (
++	"syscall"
++
++	"go.uber.org/zap"
++	"golang.org/x/sys/unix"
++)
++
++// reusePort sets SO_REUSEPORT. Ineffective for unix sockets.
++func reusePort(network, address string, conn syscall.RawConn) error {
++	if IsUnixNetwork(network) {
++		return nil
++	}
++	return conn.Control(func(descriptor uintptr) {
++		if err := unix.SetsockoptInt(int(descriptor), unix.SOL_SOCKET, unixSOREUSEPORT, 1); err != nil {
++			Log().Error("setting SO_REUSEPORT",
++				zap.String("network", network),
++				zap.String("address", address),
++				zap.Uintptr("descriptor", descriptor),
++				zap.Error(err))
++		}
++	})
++}
++
+diff --git a/listen_unix_linux.go b/listen_unix_linux.go
+new file mode 100644
+index 00000000..d57cc95c
+--- /dev/null
++++ b/listen_unix_linux.go
+@@ -0,0 +1,34 @@
++//go:build linux
++package caddy
++
++import (
++	"syscall"
++
++	"go.uber.org/zap"
++	"golang.org/x/sys/unix"
++)
++
++// reusePort sets SO_REUSEPORT. Ineffective for unix sockets.
++func reusePort(network, address string, conn syscall.RawConn) error {
++	if IsUnixNetwork(network) {
++		return nil
++	}
++	return conn.Control(func(descriptor uintptr) {
++		if err := unix.SetsockoptInt(int(descriptor), unix.SOL_SOCKET, unixSOREUSEPORT, 1); err != nil {
++			Log().Error("setting SO_REUSEPORT",
++				zap.String("network", network),
++				zap.String("address", address),
++				zap.Uintptr("descriptor", descriptor),
++				zap.Error(err))
++		}
++
++		if err := unix.SetsockoptInt(int(descriptor), unix.SOL_IP, syscall.IP_FREEBIND, 1); err != nil {
++			Log().Error("setting SO_FREEBIND",
++				zap.String("network", network),
++				zap.String("address", address),
++				zap.Uintptr("descriptor", descriptor),
++				zap.Error(err))
++		}
++	})
++}
++
+diff --git a/modules/caddyhttp/app.go b/modules/caddyhttp/app.go
+index 850d3aa8..8481d8a2 100644
+--- a/modules/caddyhttp/app.go
++++ b/modules/caddyhttp/app.go
+@@ -24,6 +24,7 @@ import (
+ 	"net/http"
+ 	"strconv"
+ 	"sync"
++	"syscall"
+ 	"time"
+ 
+ 	"go.uber.org/zap"
+@@ -546,7 +547,12 @@ func (app *App) Start() error {
+ 
+ 				if h1ok || h2ok && useTLS || h2cok {
+ 					// create the listener for this socket
+-					lnAny, err := listenAddr.Listen(app.ctx, portOffset, net.ListenConfig{KeepAlive: time.Duration(srv.KeepAliveInterval)})
++					lnAny, err := listenAddr.Listen(app.ctx, portOffset, net.ListenConfig{
++						Control: func(network string, address string, c syscall.RawConn) error {
++							return freeBind(app.logger, network, address, c)
++						},
++						KeepAlive: time.Duration(srv.KeepAliveInterval),
++					})
+ 					if err != nil {
+ 						return fmt.Errorf("listening on %s: %v", listenAddr.At(portOffset), err)
+ 					}
+diff --git a/modules/caddyhttp/listen.go b/modules/caddyhttp/listen.go
+new file mode 100644
+index 00000000..27a5ba85
+--- /dev/null
++++ b/modules/caddyhttp/listen.go
+@@ -0,0 +1,13 @@
++//go:build !linux
++
++package caddyhttp
++
++import (
++	"syscall"
++
++	"go.uber.org/zap"
++)
++
++func freeBind(logger *zap.Logger, network, address string, c syscall.RawConn) error {
++	return nil
++}
+diff --git a/modules/caddyhttp/listen_linux.go b/modules/caddyhttp/listen_linux.go
+new file mode 100644
+index 00000000..938adb8d
+--- /dev/null
++++ b/modules/caddyhttp/listen_linux.go
+@@ -0,0 +1,22 @@
++//go:build linux
++
++package caddyhttp
++
++import (
++	"syscall"
++
++	"go.uber.org/zap"
++	"golang.org/x/sys/unix"
++)
++
++func freeBind(logger *zap.Logger, network, address string, conn syscall.RawConn) error {
++	return conn.Control(func(descriptor uintptr) {
++		if err := unix.SetsockoptInt(int(descriptor), unix.SOL_IP, syscall.IP_FREEBIND, 1); err != nil {
++			logger.Error("setting SO_FREEBIND",
++				zap.String("network", network),
++				zap.String("address", address),
++				zap.Uintptr("descriptor", descriptor),
++				zap.Error(err))
++		}
++	})
++}
+-- 
+2.47.0
+

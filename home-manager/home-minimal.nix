@@ -28,14 +28,16 @@ in
     };
     initContent = (builtins.readFile ../config/.zshrc);
 
-    # cursor only invokes `~/.zshenv`, so we put things that need to be in the environment there, and things that should only be in interactive shells in `~/.zshrc`
-    envExtra =
-      if config.programs.direnv.enable then
-        ''
-          eval "$(${pkgs.direnv}/bin/direnv hook zsh)"
-        ''
-      else
-        "";
+    # https://github.com/anthropics/claude-code/issues/2110
+    #envExtra =
+    #  if config.programs.direnv.enable then
+    #    ''
+    #      if [ -n "$CLAUDECODE" ]; then
+    #        eval "$(DIRENV_LOG_FORMAT= zsh ${pkgs.direnv}/bin/direnv export zsh)"
+    #      fi
+    #    ''
+    #  else
+    #    "";
   };
 
   programs.bash = {
@@ -48,7 +50,11 @@ in
     initExtra = (builtins.readFile ../config/.bashrc);
 
     # goes in `~/.profile`, `~/.bash_profile` is empty
-    profileExtra = (builtins.readFile ../config/.profile);
+    profileExtra = (builtins.readFile ../config/.profile) + ''
+      if [ -n "$CLAUDECODE" ]; then
+        eval "$(${pkgs.direnv}/bin/direnv export bash)"
+      fi
+    '';
   };
 
   # The home.packages option allows you to install Nix packages into your

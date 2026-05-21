@@ -11,6 +11,9 @@
     nix-darwin.inputs.nixpkgs.follows = "nixpkgs";
     home-manager.url = "github:nix-community/home-manager";
     home-manager.inputs.nixpkgs.follows = "nixpkgs";
+    disko.url = "github:nix-community/disko";
+    disko.inputs.nixpkgs.follows = "nixpkgs";
+
     #targo.url = "github:codyps/targo";
     #targo.inputs.nixpkgs.follows = "nixpkgs";
     #targo.inputs.flake-utils.follows = "flake-utils";
@@ -28,7 +31,7 @@
     extra-trusted-public-keys = [ "nix-community.cachix.org-1:mB9FSh9qf2dCimDSUo8Zy7bkq5CX+/rkCWyvRCYg3Fs=" ];
   };
 
-  outputs = { self, nixpkgs, flake-utils, nix-darwin, home-manager, nixos-wsl, nixos-vscode-server, impermanence, sops-nix }:
+  outputs = { self, nixpkgs, flake-utils, nix-darwin, home-manager, nixos-wsl, nixos-vscode-server, impermanence, sops-nix, disko }:
     let
       overlays = [
         (final: prev: {
@@ -152,6 +155,27 @@
             modules = [
               sops-nix.nixosModules.sops
               ./hosts/finch/configuration.nix
+              ./nixos/common.nix
+              impermanence.nixosModules.impermanence
+              home-manager.nixosModules.home-manager
+              {
+                nixpkgs = nixpkgsConfig;
+                home-manager.useGlobalPkgs = true;
+                home-manager.useUserPackages = true;
+                home-manager.users.cody.imports = [
+                  ./home-manager/home-supermin.nix
+                ];
+              }
+            ];
+          };
+
+          robin = nixosSystem {
+            system = "x86_64-linux";
+            specialArgs = { inherit self; };
+            modules = [
+              sops-nix.nixosModules.sops
+              disko.nixosModules.disko
+              ./hosts/robin/configuration.nix
               ./nixos/common.nix
               impermanence.nixosModules.impermanence
               home-manager.nixosModules.home-manager

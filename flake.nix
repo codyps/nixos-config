@@ -50,19 +50,6 @@
             hash = "sha256-NYAmZIpeQy34YWDTNbKaKy6tzsb96xq+cVgPh2oHSzw=";
           };
 
-          # NOTE: tweaking the hash because we get mismatches
-          vimPlugins = prev.vimPlugins // {
-            coc-nvim = prev.vimPlugins.coc-nvim.overrideAttrs (oldAttrs: {
-              src = prev.fetchFromGitHub {
-                owner = "neoclide";
-                repo = "coc.nvim";
-                rev = "993a4a273bf0415296a1a8d512466b183670568a";
-                hash = "sha256-Z/A8Qoiu8omkJTTKYj4V7rN3aLyYL+02zQUr5RLtOls=";
-              };
-            });
-          };
-
-
           # re-import audiobookshelf with ffmpeg-full replaced by ffmpeg-headless
           audiobookshelf-headless = prev.callPackage (nixpkgs + "/pkgs/by-name/au/audiobookshelf/package.nix") {
             ffmpeg-full = prev.ffmpeg-headless;

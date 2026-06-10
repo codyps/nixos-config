@@ -396,6 +396,20 @@
               '';
             })
             ./nix-darwin/configuration.nix
+            ({ pkgs, ... }: {
+              environment.systemPackages = with pkgs; [
+                mkcert
+                nss.tools
+              ];
+
+              services.dnsmasq = {
+                enable = true;
+                addresses = {
+                  ".test" = "192.168.6.137";
+                };
+                bind = "127.0.0.111";
+              };
+            })
             ({ ... }: {
               nix.buildMachines = [{
                 sshUser = "nix-ssh";

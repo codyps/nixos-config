@@ -45,7 +45,7 @@
     (pkgs.wrapHelm pkgs.kubernetes-helm {
       plugins = with pkgs.kubernetes-helmPlugins; [
         helm-diff
-        helm-values-schema-json
+        helm-schema
       ];
     })
   ];

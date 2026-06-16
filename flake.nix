@@ -400,6 +400,7 @@
               environment.systemPackages = with pkgs; [
                 mkcert
                 nss.tools
+                helm-docs
               ];
 
               services.dnsmasq = {

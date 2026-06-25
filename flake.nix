@@ -372,6 +372,7 @@
                   ./nix-darwin/home.nix
                   ./home-manager/home.nix
                 ];
+
               };
             }
             ./hosts/u3/darwin.nix
@@ -401,6 +402,18 @@
                 mkcert
                 nss.tools
                 helm-docs
+                kubeswitch
+                kubectx
+                krew
+                kubectl
+                kubectl-df-pv
+                (wrapHelm kubernetes-helm {
+                  plugins = with kubernetes-helmPlugins; [
+                    helm-diff
+                    helm-schema
+                    helm-docs
+                  ];
+                })
               ];
 
               services.dnsmasq = {
@@ -433,6 +446,9 @@
                   ./nix-darwin/home.nix
                   ./home-manager/home.nix
                 ];
+                programs.direnv.config = {
+                  whitelist = { prefix = ["/Volumes/dev/rivian/"]; };
+                };
               };
             }
           ];

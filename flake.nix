@@ -66,6 +66,7 @@
           "copilot.vim"
           # sabnzbd (consider substituting)
           "unrar"
+          "claude-code"
         ];
         config.permittedInsecurePackages = [
           "intel-media-sdk-23.2.2"

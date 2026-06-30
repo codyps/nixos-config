@@ -67,6 +67,7 @@
           # sabnzbd (consider substituting)
           "unrar"
           "claude-code"
+          "1password-cli"
         ];
         config.permittedInsecurePackages = [
           "intel-media-sdk-23.2.2"

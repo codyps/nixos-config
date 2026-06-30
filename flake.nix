@@ -438,7 +438,7 @@
               }];
             })
             home-manager.darwinModules.home-manager
-            {
+            ({pkgs, ...}: {
               home-manager.useGlobalPkgs = true;
               home-manager.useUserPackages = true;
               home-manager.users.codyschafer = {
@@ -452,11 +452,15 @@
                             IdentityAgent "~/Library/Group Containers/2BUA8C4S2C.com.1password/t/agent.sock"
                   '';
                 };
+                home.packages = with pkgs; [
+                  _1password-cli
+                ];
+                programs.claude-code.enable = true;
                 programs.direnv.config = {
                   whitelist = { prefix = ["/Volumes/dev/rivian/"]; };
                 };
               };
-            }
+            })
           ];
         };
 

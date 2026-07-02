@@ -28,16 +28,20 @@ in
     };
     initContent = (builtins.readFile ../config/.zshrc);
 
+    envExtra = ''
+      if [ -x /opt/homebrew/bin/brew ]; then
+        eval $(/opt/homebrew/bin/brew shellenv)
+      fi
+      '' +
     # https://github.com/anthropics/claude-code/issues/2110
-    #envExtra =
-    #  if config.programs.direnv.enable then
-    #    ''
-    #      if [ -n "$CLAUDECODE" ]; then
-    #        eval "$(DIRENV_LOG_FORMAT= zsh ${pkgs.direnv}/bin/direnv export zsh)"
-    #      fi
-    #    ''
-    #  else
-    #    "";
+      (if config.programs.direnv.enable then
+        ''
+          if [ -n "$CLAUDECODE" ]; then
+            eval "$(DIRENV_LOG_FORMAT= zsh ${pkgs.direnv}/bin/direnv export zsh)"
+          fi
+        ''
+      else
+        "");
   };
 
   programs.bash = {

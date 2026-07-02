@@ -385,6 +385,7 @@
           specialArgs = { inherit self; };
           modules = [
             ({ ... }: {
+              system.primaryUser = "codyschafer";
               users.users.codyschafer = {
                 name = "codyschafer";
                 home = "/Users/codyschafer";
@@ -424,6 +425,22 @@
                   ".test" = "192.168.6.137";
                 };
                 bind = "127.0.0.111";
+              };
+
+              homebrew = {
+                enable = true;
+                casks = [
+                  "rivian/rvt/rvt"
+                ];
+                taps = [
+                  {
+                    name = "rivian/rvt";
+                    clone_target = "ssh://git@gitlab.rivianvw.io/co/vehicle-and-fleet-applications/sdk-and-libraries/homebrew-rvt";
+                    force_auto_update = true;
+                    trusted = true;
+                  }
+                ];
+                enableZshIntegration = true;
               };
             })
             ({ ... }: {

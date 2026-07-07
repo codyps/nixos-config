@@ -123,6 +123,7 @@
     neovim
     wget
     curl
+    codex
   ];
 
   environment.enableAllTerminfo = true;

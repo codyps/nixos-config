@@ -36,28 +36,29 @@
   outputs = { self, nixpkgs, flake-utils, nix-darwin, home-manager, nixos-wsl, nixos-vscode-server, impermanence, sops-nix, disko }:
     let
       overlays = [
-        (final: prev: 
-        let caddy = prev.callPackage (nixpkgs + "/pkgs/by-name/ca/caddy/package.nix") {
-          inherit caddy;
-        };
+        (final: prev:
+          let
+            caddy = prev.callPackage (nixpkgs + "/pkgs/by-name/ca/caddy/package.nix") {
+              inherit caddy;
+            };
           in
-        {
-          inherit caddy;
-          caddyFull = caddy.withPlugins {
-            plugins = [
-              "github.com/caddy-dns/cloudflare@v0.2.2-0.20250506153119-35fb8474f57d"
-              "github.com/caddyserver/cache-handler@v0.14.0"
-              "github.com/darkweak/storages/badger/caddy@v0.0.10"
-              "github.com/WeidiDeng/caddy-cloudflare-ip@v0.0.0-20231130002422-f53b62aa13cb"
-            ];
-            hash = "sha256-sWGf5lod1CmipDuCKbFrOz87p+ADoK4chHYTdlALe8g=";
-          };
+          {
+            inherit caddy;
+            caddyFull = caddy.withPlugins {
+              plugins = [
+                "github.com/caddy-dns/cloudflare@v0.2.2-0.20250506153119-35fb8474f57d"
+                "github.com/caddyserver/cache-handler@v0.14.0"
+                "github.com/darkweak/storages/badger/caddy@v0.0.10"
+                "github.com/WeidiDeng/caddy-cloudflare-ip@v0.0.0-20231130002422-f53b62aa13cb"
+              ];
+              hash = "sha256-sWGf5lod1CmipDuCKbFrOz87p+ADoK4chHYTdlALe8g=";
+            };
 
-          # re-import audiobookshelf with ffmpeg-full replaced by ffmpeg-headless
-          audiobookshelf-headless = prev.callPackage (nixpkgs + "/pkgs/by-name/au/audiobookshelf/package.nix") {
-            ffmpeg-full = prev.ffmpeg-headless;
-          };
-        })
+            # re-import audiobookshelf with ffmpeg-full replaced by ffmpeg-headless
+            audiobookshelf-headless = prev.callPackage (nixpkgs + "/pkgs/by-name/au/audiobookshelf/package.nix") {
+              ffmpeg-full = prev.ffmpeg-headless;
+            };
+          })
         (import ./nixpkgs/overlays/overlay.nix)
         #ethereum-nix.overlays.default
       ];
@@ -175,7 +176,7 @@
               {
                 users.users.nixosvmtest.isSystemUser = true;
                 users.users.nixosvmtest.initialPassword = "test";
-                users.groups.nixosvmtest = {};
+                users.groups.nixosvmtest = { };
                 users.users.nixosvmtest.group = "nixosvmtest";
               }
               {
@@ -468,7 +469,7 @@
               }];
             })
             home-manager.darwinModules.home-manager
-            ({pkgs, ...}: {
+            ({ pkgs, ... }: {
               home-manager.useGlobalPkgs = true;
               home-manager.useUserPackages = true;
               home-manager.users.codyschafer = {
@@ -487,7 +488,7 @@
                 ];
                 programs.claude-code.enable = true;
                 programs.direnv.config = {
-                  whitelist = { prefix = ["/Volumes/dev/rivian/"]; };
+                  whitelist = { prefix = [ "/Volumes/dev/rivian/" ]; };
                 };
               };
             })
@@ -528,7 +529,7 @@
                   signByDefault = lib.mkForce true;
                 };
                 xdg.configFile."containers/registries.conf".text = ''
-                unqualified-search-registries = ["docker.io"]
+                  unqualified-search-registries = ["docker.io"]
                 '';
 
                 # try to get gpu working

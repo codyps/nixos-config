@@ -340,37 +340,37 @@ in
   services.tailscale.permitCertUid = "caddy";
 
   #virtualisation.oci-containers.containers = {
-    #libation = {
-    #  image = "docker.io/rmcrackan/libation:latest";
-    #  autoStart = false;
-    #  volumes = [
-    #    "/tank/libation/data:/data"
-    #    "/tank/libation/config:/config"
-    #    "/tank/libation/tmp:/tmp"
-    #    #"/var/lib/libation/data:/data"
-    #    #"/var/lib/libation/config:/config"
-    #  ];
-    #  labels = {
-    #    "io.containers.autoupdate" = "registry";
-    #  };
-    #};
+  #libation = {
+  #  image = "docker.io/rmcrackan/libation:latest";
+  #  autoStart = false;
+  #  volumes = [
+  #    "/tank/libation/data:/data"
+  #    "/tank/libation/config:/config"
+  #    "/tank/libation/tmp:/tmp"
+  #    #"/var/lib/libation/data:/data"
+  #    #"/var/lib/libation/config:/config"
+  #  ];
+  #  labels = {
+  #    "io.containers.autoupdate" = "registry";
+  #  };
+  #};
 
-    #storyteller = {
-    #  image = "registry.gitlab.com/smoores/storyteller:latest";
-    #  volumes = [
-    #    "/tank/storyteller/data:/data"
-    #    "/tank/storyteller/secret:/run/secret"
-    #  ];
-    #  environment = {
-    #    STORYTELLER_SECRET_KEY_FILE = "/run/secret/key";
-    #  };
-    #  ports = [
-    #    "127.0.0.1:8918:8001"
-    #  ];
-    #  labels = {
-    #    "io.containers.autoupdate" = "registry";
-    #  };
-    #};
+  #storyteller = {
+  #  image = "registry.gitlab.com/smoores/storyteller:latest";
+  #  volumes = [
+  #    "/tank/storyteller/data:/data"
+  #    "/tank/storyteller/secret:/run/secret"
+  #  ];
+  #  environment = {
+  #    STORYTELLER_SECRET_KEY_FILE = "/run/secret/key";
+  #  };
+  #  ports = [
+  #    "127.0.0.1:8918:8001"
+  #  ];
+  #  labels = {
+  #    "io.containers.autoupdate" = "registry";
+  #  };
+  #};
   #};
 
   #systemd.services.podman-libation =

@@ -91,7 +91,8 @@ in
       "*~"
       ".DS_Store"
       ".direnv"
-      ".vim/"
+      ".vim"
+      ".claude"
     ];
 
     signing = {

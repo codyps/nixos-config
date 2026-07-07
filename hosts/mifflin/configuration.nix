@@ -20,6 +20,10 @@
       protocol = "ssh-ng";
       keys = [
         "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAILO6B2Cx3SVmD65J9sJsmxhjZq/AGprzpRMcrqbCuu6Y cody@u3.bed.einic.org"
+        # the specific key we generated to use nix sshServe with mifflin. Used
+        # for u3 to auth against mifflin. private key is in mifflin-ssh-key
+        # secret.
+        "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIO+hVIhEd4iH8FtsvKilbAxhvjgUAoT1PpfhM+AsQAb/ cody@mifflin"
       ];
     };
   };

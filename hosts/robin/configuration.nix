@@ -24,7 +24,7 @@ in
   boot.zfs.devNodes = "/dev/disk/by-partuuid";
 
   # https://discourse.nixos.org/t/zfs-rollback-not-working-using-boot-initrd-systemd/37195/3
-  boot.initrd.systemd.enable = lib.mkDefault true;
+  boot.initrd.systemd.enable = true;
 
   p.zfs.root-impermenance = {
     enable = true;
@@ -43,63 +43,6 @@ in
   };
 
   environment.shells = with pkgs; [ zsh ];
-
-  /*
-    services.harmonia = {
-    enable = false;
-    signKeyPath = "/persist/var/lib/secrets/harmonia.secret";
-    # let's not bind to the wildcard address.
-    settings = {
-      bind = "[::1]:5000";
-    };
-    };
-  */
-
-  /*
-    services.atticd = {
-    # Replace with absolute path to your credentials file
-    credentialsFile = "/persist/etc/atticd.env";
-
-    settings = {
-      listen = "[::]:8080";
-
-      # Data chunking
-      #
-      # Warning: If you change any of the values here, it will be
-      # difficult to reuse existing chunks for newly-uploaded NARs
-      # since the cutpoints will be different. As a result, the
-      # deduplication ratio will suffer for a while after the change.
-      chunking = {
-        # The minimum NAR size to trigger chunking
-        #
-        # If 0, chunking is disabled entirely for newly-uploaded NARs.
-        # If 1, all NARs are chunked.
-        nar-size-threshold = 64 * 1024; # 64 KiB
-
-        # The preferred minimum size of a chunk, in bytes
-        min-size = 16 * 1024; # 16 KiB
-
-        # The preferred average size of a chunk, in bytes
-        avg-size = 64 * 1024; # 64 KiB
-
-        # The preferred maximum size of a chunk, in bytes
-        max-size = 256 * 1024; # 256 KiB
-      };
-    };
-    };
-  */
-
-  /*
-    services.hydra = {
-    enable = false;
-    hydraURL = "https://hydra.finch.einic.org/";
-    notificationSender = "hydra@localhost";
-    buildMachinesFiles = [];
-    useSubstitutes = true;
-    listenHost = "localhost";
-    };
-  */
-
 
   systemd.services.caddy = let
     mounts = [ "var-lib-libation.mount" "var-lib-syncthing.mount" ];
@@ -132,13 +75,6 @@ in
 
     virtualHosts."*.einic.org" = {
       extraConfig = ''
-        bind fd/4 {
-          protocols h1 h2
-        }
-        bind fdgram/6 {
-          protocols h3
-        }
-
         @audiobooks host audiobooks.einic.org
         handle @audiobooks {
           root /var/lib/libation/data/
@@ -154,109 +90,23 @@ in
           abort
         }
       '';
-
-    };
-
-    virtualHosts."finch.little-moth.ts.net" = {
-      extraConfig = ''
-        bind fd/5 {
-          protocols h1 h2
-        }
-        bind fdgram/7 {
-          protocols h3
-        }
-
-        file_server /roms/* {
-          root /var/lib/syncthing/Roms
-          browse {
-             reveal_symlinks
-          }
-        }
-
-        handle_path /syncthing/* {
-          reverse_proxy http://127.0.0.1:8384 {
-              # https://docs.syncthing.net/users/reverseproxy.html
-              #header_up Host {upstream_hostport}
-              # https://docs.syncthing.net/users/faq.html#why-do-i-get-host-check-error-in-the-gui-api
-              header_up +Host "localhost"
-          }
-        }
-
-        handle {
-          abort
-        }
-      '';
     };
   };
 
-  # NOTE: when caddy is given an IP address to bind, it doesn't specify the
-  # `FREEBIND` socket option, so we're required to have that IP address
-  # assigned to a local interface before caddy starts. There isn't a good way
-  # to do that, and requiring it would break caddy if tailscale failed for some
-  # reason (undesirable).
-
-  # NOTE: when a systemd.socket binds `<specific-ip>:443` as a listenStream
-  # before caddy tries to bind the wildcard `:443`, caddy fails to obtain a
-  # bind and exits. This broke our "use systemd.socket and a systemd.service
-  # to forward stuff to a unix socket caddy reads from".
-
-  # NOTE: when using systemd.sockets, we don't bind to the interface because
-  # using multiple systemd.socket units doesn't specify the ordering for the
-  # file descriptors, and caddy's way of interfacing with this is us explicitly
-  # listing fd numbers in the caddyfile. If caddy supported examining the
-  # descriptions, we could use multiple systemd.sockets, allowing more flexible
-  # configuration.
-  systemd.sockets."caddy" = {
-    listenStreams = [
-      # fd/4
-      "[::]:443"
-      # fd/5
-      "100.112.195.103:443"
-    ];
-    listenDatagrams = [
-      # fdgram/6
-      "[::]:443"
-      # fdgram/7
-      "100.112.195.103:443"
-    ];
-    socketConfig = {
-      BindIPv6Only = "both";
-      FreeBind = true;
-      ReusePort = true;
-    };
-    requiredBy = [ "caddy.service" ];
-    wantedBy = [ "sockets.target" ];
-  };
-
-  networking.hostId = "8425e349";
-  networking.hostName = "finch";
+  networking.hostId = "4129717c";
+  networking.hostName = "robin";
   networking.useDHCP = false;
 
   systemd.network = {
     enable = true;
     wait-online.anyInterface = true;
-    networks."10-enX0" = {
-      matchConfig.Name = "enX0";
-      dns = [
-        "1.1.1.1"
-        "1.0.0.1"
-      ];
-      address = [
-        "207.90.192.55/24"
-      ];
-      gateway = [ "207.90.192.1" ];
-    };
 
-    networks."10-enX1" = {
-      matchConfig.Name = "enX1";
-      dns = [
-        "2606:4700:4700::1111"
-        "2606:4700:4700::1001"
-      ];
-      address = [
-        "2602:ffd5:0001:1e7:0000:0000:0000:0001/36"
-      ];
-      gateway = [ "2602:ffd5:1:100::1" ];
+    networks."10-en" = {
+      matchConfig.Name = "en*";
+      networkConfig = {
+        DHCP = "ipv4";
+        DNSSEC = "no";
+      };
     };
 
     networks."50-tailscale" = {

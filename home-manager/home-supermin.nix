@@ -160,6 +160,8 @@ in
     defaultEditor = true;
     viAlias = true;
     vimAlias = true;
+    withPython3 = true;
+    withRuby = false;
   };
 
   # Let Home Manager install and manage itself.

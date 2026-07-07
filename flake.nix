@@ -18,7 +18,9 @@
     #targo.inputs.nixpkgs.follows = "nixpkgs";
     #targo.inputs.flake-utils.follows = "flake-utils";
     impermanence.url = "github:nix-community/impermanence";
+    impermanence.inputs.nixpkgs.follows = "nixpkgs";
     sops-nix.url = "github:Mic92/sops-nix";
+    sops-nix.inputs.nixpkgs.follows = "nixpkgs";
     #thereum-nix = {
     #  url = "github:codyps/ethereum.nix";
     #  inputs.nixpkgs.follows = "nixpkgs";
@@ -35,12 +37,7 @@
     let
       overlays = [
         (final: prev: {
-          #targo = targo.packages.${prev.system}.default;
-
-          # something is using the old name, hack around it.
-          utillinux = prev.util-linux;
-
-          caddyFull = prev.pkgs.caddy.withPlugins {
+          caddyFull = (nixpkgs.lib.traceVal final.pkgs.caddy).withPlugins {
             plugins = [
               "github.com/caddy-dns/cloudflare@v0.2.2-0.20250506153119-35fb8474f57d"
               "github.com/caddyserver/cache-handler@v0.14.0"
@@ -61,20 +58,21 @@
 
       getName = pkg: pkg.pname or (builtins.parseDrvName pkg.name).name;
       nixpkgsConfig = {
-        config.allowUnfreePredicate = pkg: builtins.elem (getName pkg) [
-          "vscode"
-          "copilot.vim"
-          # sabnzbd (consider substituting)
-          "unrar"
-          "claude-code"
-          "1password-cli"
-        ];
-        config.permittedInsecurePackages = [
-          "intel-media-sdk-23.2.2"
-        ];
-        config.allowDeprecardx86_64Darwin = true;
-
         inherit overlays;
+        config = {
+          allowUnfreePredicate = pkg: builtins.elem (getName pkg) [
+            "vscode"
+            "copilot.vim"
+            # sabnzbd (consider substituting)
+            "unrar"
+            "claude-code"
+            "1password-cli"
+          ];
+          permittedInsecurePackages = [
+            "intel-media-sdk-23.2.2"
+          ];
+          allowDeprecardx86_64Darwin = true;
+        };
       };
     in
     flake-utils.lib.eachDefaultSystem
@@ -168,6 +166,12 @@
               ./nixos/common.nix
               impermanence.nixosModules.impermanence
               home-manager.nixosModules.home-manager
+              {
+                users.users.nixosvmtest.isSystemUser = true;
+                users.users.nixosvmtest.initialPassword = "test";
+                users.groups.nixosvmtest = {};
+                users.users.nixosvmtest.group = "nixosvmtest";
+              }
               {
                 nixpkgs = nixpkgsConfig;
                 home-manager.useGlobalPkgs = true;

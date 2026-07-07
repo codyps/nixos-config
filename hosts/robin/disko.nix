@@ -1,12 +1,20 @@
 {
+  virtualisation.vmVariantWithDisko = {
+    virtualisation.fileSystems."/persist".neededForBoot = true;
+  };
+
   disko.devices = {
     disk = {
       root = {
         type = "disk";
         device = "/dev/sda";
         content = {
-          type = "mbr";
+          type = "gpt";
           partitions = {
+            bios = {
+              size = "1M";
+              type = "EF02";
+            };
             boot = {
               size = "2G";
               content = {
@@ -69,6 +77,7 @@
             options.mountpoint = "/persist";
           };
           "safe/syncthing" = {
+            type = "zfs_fs";
             mountpoint = "/var/lib/syncthing";
             options.mountpoint = "/var/lib/syncthing";
           };

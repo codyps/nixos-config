@@ -88,7 +88,7 @@
           pkgs = import nixpkgs {
             inherit system;
             inherit overlays;
-            config.allowDeprecardx86_64Darwin = true;
+            config.allowDeprecatedx86_64Darwin = true;
           };
         in
         {

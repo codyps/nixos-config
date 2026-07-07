@@ -17,6 +17,8 @@
             };
             boot = {
               size = "2G";
+              type = "EF00";
+              priority = 1;
               content = {
                 type = "filesystem";
                 format = "vfat";
@@ -26,12 +28,14 @@
             };
             swap = {
               size = "4G";
+              priority = 2;
               content = {
                 type = "swap";
               };
             };
             zfs = {
               size = "100%";
+              priority = 3;
               content = {
                 type = "zfs";
                 pool = "robin";

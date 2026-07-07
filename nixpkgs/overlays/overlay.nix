@@ -1,4 +1,4 @@
 (final: prev: ({ } // prev.lib.packagesFromDirectoryRecursive {
-  inherit (final.pkgs) callPackage;
+  inherit (final) callPackage;
   directory = ./pkgs;
 }))

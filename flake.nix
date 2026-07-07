@@ -11,7 +11,7 @@
     nix-darwin.inputs.nixpkgs.follows = "nixpkgs";
     home-manager.url = "github:nix-community/home-manager";
     home-manager.inputs.nixpkgs.follows = "nixpkgs";
-    disko.url = "github:nix-community/disko";
+    disko.url = "github:codyps/disko";
     disko.inputs.nixpkgs.follows = "nixpkgs";
 
     #targo.url = "github:codyps/targo";
@@ -37,7 +37,8 @@
     let
       overlays = [
         (final: prev: {
-          caddyFull = (nixpkgs.lib.traceVal final.pkgs.caddy).withPlugins {
+
+          caddyFull = prev.caddy.withPlugins {
             plugins = [
               "github.com/caddy-dns/cloudflare@v0.2.2-0.20250506153119-35fb8474f57d"
               "github.com/caddyserver/cache-handler@v0.14.0"

@@ -23,9 +23,6 @@ in
     fzf
     gnupg
     ccache
-    cargo-generate
-    tokei
-    rust-bindgen
   ];
 
   # Auto upgrade nix package and the daemon service.
@@ -52,6 +49,7 @@ in
   # FIXME: customize so this does the right thing for x86_64 and aarch64
   nix.linux-builder = {
     #enable = true;
+    config.documentation.enable = false;
     # FIXME: qemu-x86_64 SIGSEV, so removed extra system
     # > qemu-x86_64: QEMU internal SIGSEGV {code=MAPERR, addr=0x20}
     #systems =
@@ -72,6 +70,11 @@ in
 
   # Create /etc/zshrc that loads the nix-darwin environment.
   programs.zsh.enable = true; # default shell on catalina
+
+  # nix-darwin currently passes a removed --toc-depth flag to newer
+  # nixos-render-docs when building the HTML manual.
+  documentation.enable = false;
+  system.tools.darwin-uninstaller.enable = false;
 
   # Used for backwards compatibility, please read the changelog before changing.
   # $ darwin-rebuild changelog

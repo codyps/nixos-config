@@ -7,6 +7,15 @@ let
       qt_pinentry=${pkgs.pinentry-qt}/bin/pinentry-qt
       tty_pinentry=${pkgs.pinentry-curses}/bin/pinentry-curses
 
+      printf "PINENTRY ENV {{{\n" >&2
+      env >&2
+      printf "}}}\n" >&2
+
+      if [ -n "$WAYLAND_DISPLAY" ]; then
+        >&2 echo "Using qt_pinentry short-circuit on WAYLAND_DISPLAY"
+        exec "$qt_pinentry"
+      fi
+
       buffered_commands="$(mktemp)"
       trap 'rm -f "$buffered_commands"' EXIT
 
@@ -48,6 +57,7 @@ let
       }
 
       while IFS= read -r command; do
+        echo "command: $command" >&2
         case "$command" in
           "OPTION display="?*)
             saw_display=1

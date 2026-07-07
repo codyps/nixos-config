@@ -32,16 +32,7 @@ in
       if [ -x /opt/homebrew/bin/brew ]; then
         eval $(/opt/homebrew/bin/brew shellenv)
       fi
-    '' +
-    # https://github.com/anthropics/claude-code/issues/2110
-    (if config.programs.direnv.enable then
-      ''
-        #if [ -n "$CLAUDECODE" ]; then
-        #  eval "$(DIRENV_LOG_FORMAT= zsh ${pkgs.direnv}/bin/direnv export zsh)"
-        #fi
-      ''
-    else
-      "");
+    '';
   };
 
   programs.bash = {
@@ -56,6 +47,7 @@ in
     # /etc/profile can reset PATH in nested login shells (including Codex's
     # bash -lc), while inherited guards skip hm-session-vars.sh and nix-daemon.sh.
     # Restore session paths on every login, keeping wrappers before the profile.
+    # https://github.com/anthropics/claude-code/issues/2110
     profileExtra = ''
       export PATH="${lib.concatStringsSep ":" (config.home.sessionPath ++ [ "${config.home.profileDirectory}/bin" ])}:$PATH"
     '' + (builtins.readFile ../config/.profile) + ''

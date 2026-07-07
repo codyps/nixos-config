@@ -13,6 +13,17 @@
 
   virtualisation.vmware.guest.enable = true;
 
+  nix = {
+    sshServe = {
+      enable = true;
+      write = true;
+      protocol = "ssh-ng";
+      keys = [
+        "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAILO6B2Cx3SVmD65J9sJsmxhjZq/AGprzpRMcrqbCuu6Y cody@u3.bed.einic.org"
+      ];
+    };
+  };
+
   networking.hostName = "mifflin"; # Define your hostname.
   # networking.wireless.enable = true;  # Enables wireless support via wpa_supplicant.
 

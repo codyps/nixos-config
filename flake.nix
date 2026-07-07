@@ -36,16 +36,21 @@
   outputs = { self, nixpkgs, flake-utils, nix-darwin, home-manager, nixos-wsl, nixos-vscode-server, impermanence, sops-nix, disko }:
     let
       overlays = [
-        (final: prev: {
-
-          caddyFull = prev.caddy.withPlugins {
+        (final: prev: 
+        let caddy = prev.callPackage (nixpkgs + "/pkgs/by-name/ca/caddy/package.nix") {
+          inherit caddy;
+        };
+          in
+        {
+          inherit caddy;
+          caddyFull = caddy.withPlugins {
             plugins = [
               "github.com/caddy-dns/cloudflare@v0.2.2-0.20250506153119-35fb8474f57d"
               "github.com/caddyserver/cache-handler@v0.14.0"
               "github.com/darkweak/storages/badger/caddy@v0.0.10"
               "github.com/WeidiDeng/caddy-cloudflare-ip@v0.0.0-20231130002422-f53b62aa13cb"
             ];
-            hash = "sha256-NYAmZIpeQy34YWDTNbKaKy6tzsb96xq+cVgPh2oHSzw=";
+            hash = "sha256-sWGf5lod1CmipDuCKbFrOz87p+ADoK4chHYTdlALe8g=";
           };
 
           # re-import audiobookshelf with ffmpeg-full replaced by ffmpeg-headless
@@ -348,6 +353,7 @@
         darwinConfigurations."u3" = nix-darwin.lib.darwinSystem {
           specialArgs = { inherit self; };
           modules = [
+            sops-nix.darwinModules.sops
             ({ pkgs, ... }: {
               users.users.cody = {
                 name = "cody";

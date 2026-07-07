@@ -22,7 +22,7 @@
 
   # TODO: ipv6 vs ipv4? (I copied this from my existing config)
   # TODO: grab the default port from somewhere? (this is _probably_ not the default)
-  config.services.harmonia.settings.bind = lib.mkDefault "[::1]:8916";
+  config.services.harmonia.cache.settings.bind = lib.mkDefault "[::1]:8916";
 
   # TODO: ipv6 vs ipv4? (I copied this from my existing config)
   # TODO: grab the default port from somewhere? (this is _probably_ not the default)

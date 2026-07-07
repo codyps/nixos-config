@@ -21,7 +21,8 @@ in
   nix.optimise.automatic = lib.mkForce false;
   nix.gc.automatic = lib.mkForce false;
 
-  boot.zfs.devNodes = "/dev/disk/by-partuuid";
+  # mkDefault so it is overridden when building the vm
+  boot.zfs.devNodes = lib.mkDefault "/dev/disk/by-partuuid";
 
   # https://discourse.nixos.org/t/zfs-rollback-not-working-using-boot-initrd-systemd/37195/3
   boot.initrd.systemd.enable = true;

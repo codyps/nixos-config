@@ -1,5 +1,80 @@
 { config, pkgs, ... }:
 
+let
+  pinentry-mifflin = pkgs.writeShellApplication {
+    name = "pinentry";
+    text = ''
+      qt_pinentry=${pkgs.pinentry-qt}/bin/pinentry-qt
+      tty_pinentry=${pkgs.pinentry-curses}/bin/pinentry-curses
+
+      buffered_commands="$(mktemp)"
+      trap 'rm -f "$buffered_commands"' EXIT
+
+      saw_display=0
+      prefer_tty=0
+
+      printf 'OK Pleased to meet you\n'
+
+      run_pinentry() {
+        local command="$1"
+        local pinentry="$qt_pinentry"
+
+        if [[ "$prefer_tty" == 1 || "$saw_display" == 0 ]]; then
+          pinentry="$tty_pinentry"
+        fi
+
+        coproc real_pinentry { "$pinentry"; }
+
+        IFS= read -r _ <&"''${real_pinentry[0]}" || exit 1
+
+        while IFS= read -r buffered_command; do
+          printf '%s\n' "$buffered_command" >&"''${real_pinentry[1]}"
+          while IFS= read -r response <&"''${real_pinentry[0]}"; do
+            [[ "$response" == OK* || "$response" == ERR* ]] && break
+          done
+        done < "$buffered_commands"
+
+        while true; do
+          printf '%s\n' "$command" >&"''${real_pinentry[1]}"
+
+          while IFS= read -r response <&"''${real_pinentry[0]}"; do
+            printf '%s\n' "$response"
+            [[ "$response" == OK* || "$response" == ERR* ]] && break
+          done
+
+          [[ "$command" == BYE ]] && break
+          IFS= read -r command || break
+        done
+      }
+
+      while IFS= read -r command; do
+        case "$command" in
+          "OPTION display="?*)
+            saw_display=1
+            ;;
+          "OPTION pinentry-user-data="*mifflin-ssh*)
+            prefer_tty=1
+            ;;
+        esac
+
+        case "$command" in
+          GETPIN*|CONFIRM*|MESSAGE*)
+            run_pinentry "$command"
+            exit 0
+            ;;
+          BYE)
+            printf 'OK closing connection\n'
+            exit 0
+            ;;
+          *)
+            printf '%s\n' "$command" >> "$buffered_commands"
+            printf 'OK\n'
+            ;;
+        esac
+      done
+    '';
+  };
+in
 {
   imports =
     [
@@ -132,7 +207,18 @@
   programs.gnupg.agent = {
     enable = true;
     enableSSHSupport = true;
+    pinentryPackage = pinentry-mifflin;
   };
+
+  programs.zsh.interactiveShellInit = ''
+    if [[ -n ''${SSH_CONNECTION-} || -n ''${SSH_CLIENT-} ]]; then
+      if gpg_tty="$(tty)" && [[ "$gpg_tty" != "not a tty" ]]; then
+        export GPG_TTY="$gpg_tty"
+        export PINENTRY_USER_DATA=mifflin-ssh
+        gpg-connect-agent updatestartuptty /bye >/dev/null 2>&1 || true
+      fi
+    fi
+  '';
 
   services.openssh.enable = true;
 

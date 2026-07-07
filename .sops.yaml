@@ -21,8 +21,7 @@ creation_rules:
       age:
       - *host_ward
   - path_regex: hosts/u3/.*$
-    key_groups:
-    - pgp:
-      - *admin_cody
-      age:
-      - *host_u3
+    pgp:
+    - *admin_cody
+    age:
+    - *host_u3

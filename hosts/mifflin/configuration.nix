@@ -11,25 +11,35 @@ let
       env >&2
       printf "}}}\n" >&2
 
-      if [ -n "$WAYLAND_DISPLAY" ]; then
-        >&2 echo "Using qt_pinentry short-circuit on WAYLAND_DISPLAY"
-        exec "$qt_pinentry"
-      fi
-
       buffered_commands="$(mktemp)"
       trap 'rm -f "$buffered_commands"' EXIT
 
-      saw_display=0
-      prefer_tty=0
+      user_data=""
 
       printf 'OK Pleased to meet you\n'
 
       run_pinentry() {
         local command="$1"
         local pinentry="$qt_pinentry"
+        local prefer_tty=false
 
-        if [[ "$prefer_tty" == 1 || "$saw_display" == 0 ]]; then
+        case "$user_data" in
+          *USE_CURSES=1)
+            prefer_tty=true
+            >&2 echo "Userdata wants curses: $user_data"
+            ;;
+          "")
+            ;;
+          *)
+            >&2 echo "Userdata unrecognized: $user_data"
+            ;;
+        esac
+
+        if "$prefer_tty"; then
+          >&2 echo "Prefer tty"
           pinentry="$tty_pinentry"
+        else
+          >&2 echo "Using pinentry-qt!"
         fi
 
         coproc real_pinentry { "$pinentry"; }
@@ -59,11 +69,8 @@ let
       while IFS= read -r command; do
         echo "command: $command" >&2
         case "$command" in
-          "OPTION display="?*)
-            saw_display=1
-            ;;
-          "OPTION pinentry-user-data="*mifflin-ssh*)
-            prefer_tty=1
+          "OPTION pinentry-user-data="*)
+            user_data="$command"
             ;;
         esac
 

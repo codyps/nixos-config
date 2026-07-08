@@ -20,16 +20,6 @@
     sshKey = "${config.sops.secrets."mifflin-ssh-key".path}";
   }];
 
-  programs.codex = {
-    enable = true;
-    settings = {
-      sandbox_workspace_write = {
-        network_access = true;
-        sandbox_mode = "danger-full-access";
-      };
-    };
-  };
-
   sops.age.sshKeyPaths = [
     "/etc/ssh/ssh_host_ed25519_key"
   ];

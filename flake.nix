@@ -385,6 +385,7 @@
                 imports = [
                   ./nix-darwin/home.nix
                   ./home-manager/home.nix
+                  ./hosts/u3/home.nix
                 ];
 
               };

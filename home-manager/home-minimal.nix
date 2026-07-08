@@ -33,6 +33,13 @@ in
         eval $(/opt/homebrew/bin/brew shellenv)
       fi
     '';
+
+    zshrcExtra = ''
+      if [ -n "$CLAUDECODE" ] && command -v direnv >/dev/null 2>&1; then
+        eval "$(${pkgs.direnv}/bin/direnv hook zsh)"
+        eval "$(DIRENV_LOG_FORMAT= ${pkgs.direnv}/bin/direnv export zsh)"
+      fi
+    '';
   };
 
   programs.bash = {
@@ -48,12 +55,16 @@ in
     # bash -lc), while inherited guards skip hm-session-vars.sh and nix-daemon.sh.
     # Restore session paths on every login, keeping wrappers before the profile.
     # https://github.com/anthropics/claude-code/issues/2110
+    # goes in `~/.profile`, `~/.bash_profile` is empty
     profileExtra = ''
       export PATH="${lib.concatStringsSep ":" (config.home.sessionPath ++ [ "${config.home.profileDirectory}/bin" ])}:$PATH"
-    '' + (builtins.readFile ../config/.profile) + ''
-      #if [ -n "$CLAUDECODE" ]; then
-      #  eval "$(${pkgs.direnv}/bin/direnv export bash)"
-      #fi
+    '' + (builtins.readFile ../config/.profile);
+
+    bashrcExtra = ''
+      if [ -n "$CLAUDECODE" ] && command -v direnv >/dev/null 2>&1; then
+        eval "$(${pkgs.direnv}/bin/direnv hook bash)"
+        eval "$(DIRENV_LOG_FORMAT= ${pkgs.direnv}/bin/direnv export bash)"
+      fi
     '';
   };
 

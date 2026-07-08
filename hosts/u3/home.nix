@@ -20,6 +20,7 @@
       # https://github.com/openai/codex/issues/4843#issuecomment-3533072321
       # https://github.com/openai/codex/issues/25452
       # https://github.com/openai/codex/issues/4210
+      # https://github.com/openai/codex/issues/16910
       sandbox_workspace_write = {
         network_access = true;
         sandbox_mode = "danger-full-access";

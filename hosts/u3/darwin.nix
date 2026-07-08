@@ -11,7 +11,8 @@
 
   nix.buildMachines = [{
     hostName = "mifflin";
-    systems = [ "x86_64-linux" "aarch64-linux" ];
+    sshUser = "nix-ssh";
+    systems = [ "x86_64-linux" ];
     maxJobs = 4;
     speedFactor = 10;
     supportedFeatures = [ "kvm" "benchmark" "big-parallel" ];
@@ -29,4 +30,3 @@
     key = "mifflin-ssh-key";
   };
 }
-

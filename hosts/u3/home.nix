@@ -1,7 +1,7 @@
 {
-  programs.codex = {
-    enable = true;
-    settings = {
+  #programs.codex = {
+    #enable = true;
+    #settings = {
       # FIXME: we _probably_ need to wrap codex (and give it a custom bash
       # wrapper) to work around some of these.
       #
@@ -21,14 +21,14 @@
       # https://github.com/openai/codex/issues/25452
       # https://github.com/openai/codex/issues/4210
       # https://github.com/openai/codex/issues/16910
-      sandbox_workspace_write = {
-        network_access = true;
-        sandbox_mode = "workspace-write";
-      };
-      shell_environment_policy = {
-        "inherit" = "all";
-        ignore_default_excludes = true;
-      };
-    };
-  };
+      #sandbox_workspace_write = {
+      #  network_access = true;
+      #  sandbox_mode = "workspace-write";
+      #};
+      #shell_environment_policy = {
+      #  "inherit" = "all";
+      #  ignore_default_excludes = true;
+      #};
+    #};
+  #};
 }

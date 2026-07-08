@@ -23,7 +23,7 @@
       # https://github.com/openai/codex/issues/16910
       sandbox_workspace_write = {
         network_access = true;
-        sandbox_mode = "danger-full-access";
+        sandbox_mode = "workspace-write";
       };
       shell_environment_policy = {
         "inherit" = "all";

@@ -13,6 +13,7 @@
           partitions = {
             bios = {
               size = "1M";
+              priority = 0;
               type = "EF02";
             };
             boot = {
@@ -59,7 +60,7 @@
           "root" = {
             type = "zfs_fs";
             mountpoint = "/";
-            postCreateHook = "zfs list -t snapshot -H -o name zroot/root | grep -E '^zroot/root@blank$' || zfs snapshot zroot/root@blank";
+            postCreateHook = "zfs list -t snapshot -H -o name robin/root | grep -E '^robin/root@blank$' || zfs snapshot robin/root@blank";
           };
           "nix" = {
             type = "zfs_fs";

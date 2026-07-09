@@ -34,7 +34,7 @@ in
       fi
     '';
 
-    zshrcExtra = ''
+    loginExtra = ''
       if [ -n "$CLAUDECODE" ] && command -v direnv >/dev/null 2>&1; then
         eval "$(${pkgs.direnv}/bin/direnv hook zsh)"
         eval "$(DIRENV_LOG_FORMAT= ${pkgs.direnv}/bin/direnv export zsh)"

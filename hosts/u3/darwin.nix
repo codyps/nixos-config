@@ -4,7 +4,7 @@
 
     taps = [ ];
     #brews = [ "meshtastic" ];
-    casks = [ ];
+    casks = [ "josm" ];
   };
 
   nix.linux-builder.enable = true;

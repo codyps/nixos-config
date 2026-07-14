@@ -1,4 +1,9 @@
-{
+{pkgs, ...}: {
+
+  home.packages = with pkgs; [
+    josm
+  ];
+
   #programs.codex = {
     #enable = true;
     #settings = {

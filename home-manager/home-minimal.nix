@@ -224,7 +224,8 @@ in
 
   programs.fzf = {
     enable = true;
-    historyWidget.command = "";
+    #enableNushellIntegration = false;
+    #historyWidget.command = "";
   };
 
   programs.direnv = {

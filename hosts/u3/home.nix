@@ -2,6 +2,7 @@
 
   home.packages = with pkgs; [
     josm
+    gh
   ];
 
   #programs.codex = {

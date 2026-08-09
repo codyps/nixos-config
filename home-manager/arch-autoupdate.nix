@@ -27,8 +27,34 @@ let
     WantedBy=timers.target
   '';
 
-  installPacmanAutoUpdate = pkgs.writeShellApplication {
-    name = "install-pacman-auto-update";
+  nixService = pkgs.writeText "nix-auto-update.service" ''
+    [Unit]
+    Description=Automatically update the system-wide Nix installation
+    After=network-online.target
+    Wants=network-online.target
+
+    [Service]
+    Type=oneshot
+    ExecStart=/nix/var/nix/profiles/default/bin/nix upgrade-nix --profile /nix/var/nix/profiles/default
+    ExecStartPost=/usr/bin/systemctl daemon-reload
+    ExecStartPost=/usr/bin/systemctl try-restart nix-daemon.service
+  '';
+
+  nixTimer = pkgs.writeText "nix-auto-update.timer" ''
+    [Unit]
+    Description=Weekly system-wide Nix update
+
+    [Timer]
+    OnCalendar=weekly
+    Persistent=true
+    RandomizedDelaySec=2h
+
+    [Install]
+    WantedBy=timers.target
+  '';
+
+  installSystemAutoUpdates = pkgs.writeShellApplication {
+    name = "install-system-auto-updates";
     runtimeInputs = [ pkgs.coreutils pkgs.systemd ];
     text = ''
       if (( EUID != 0 )); then
@@ -39,10 +65,14 @@ let
         /etc/systemd/system/pacman-auto-update.service
       install -Dm0644 ${pacmanTimer} \
         /etc/systemd/system/pacman-auto-update.timer
+      install -Dm0644 ${nixService} \
+        /etc/systemd/system/nix-auto-update.service
+      install -Dm0644 ${nixTimer} \
+        /etc/systemd/system/nix-auto-update.timer
 
       systemctl daemon-reload
-      systemctl enable --now pacman-auto-update.timer
-      systemctl status --no-pager pacman-auto-update.timer
+      systemctl enable --now pacman-auto-update.timer nix-auto-update.timer
+      systemctl status --no-pager pacman-auto-update.timer nix-auto-update.timer
     '';
   };
 
@@ -66,12 +96,21 @@ let
   };
 in
 {
-  home.packages = [ installPacmanAutoUpdate ];
+  home.packages = [ installSystemAutoUpdates ];
 
-  home.activation.pacmanAutoUpdate = lib.hm.dag.entryAfter [ "installPackages" ] ''
-    if ! /usr/bin/systemctl is-enabled --quiet pacman-auto-update.timer 2>/dev/null; then
-      warnEcho "The pacman auto-update system timer is not installed."
-      warnEcho "Run: install-pacman-auto-update"
+  home.activation.systemAutoUpdates = lib.hm.dag.entryAfter [ "installPackages" ] ''
+    if ! ${pkgs.diffutils}/bin/cmp --silent ${pacmanService} \
+        /etc/systemd/system/pacman-auto-update.service \
+      || ! ${pkgs.diffutils}/bin/cmp --silent ${pacmanTimer} \
+        /etc/systemd/system/pacman-auto-update.timer \
+      || ! ${pkgs.diffutils}/bin/cmp --silent ${nixService} \
+        /etc/systemd/system/nix-auto-update.service \
+      || ! ${pkgs.diffutils}/bin/cmp --silent ${nixTimer} \
+        /etc/systemd/system/nix-auto-update.timer \
+      || ! /usr/bin/systemctl is-enabled --quiet pacman-auto-update.timer 2>/dev/null \
+      || ! /usr/bin/systemctl is-enabled --quiet nix-auto-update.timer 2>/dev/null; then
+      warnEcho "The pacman and Nix auto-update system units are missing, outdated, or disabled."
+      warnEcho "Run: install-system-auto-updates"
     fi
   '';
 

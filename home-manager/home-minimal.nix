@@ -288,7 +288,6 @@ in
   };
 
 
-
   xdg.configFile."nvim/raw".source = ./nvim;
 
   # You can also manage environment variables but you will have to manually

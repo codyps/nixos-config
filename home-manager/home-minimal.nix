@@ -104,6 +104,7 @@ in
     };
 
     settings = {
+      init.defaultBranch = "main";
       core = {
         fscache = true;
         preloadindex = true;

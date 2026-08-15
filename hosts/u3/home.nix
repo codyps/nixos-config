@@ -1,5 +1,10 @@
 {pkgs, ...}: {
 
+  home.sessionVariables.JAVA_HOME = "/Library/Java/JavaVirtualMachines/temurin-21.jdk/Contents/Home";
+  home.sessionPath = [
+    "/Library/Java/JavaVirtualMachines/temurin-21.jdk/Contents/Home/bin"
+  ];
+
   home.packages = with pkgs; [
     josm
     gh

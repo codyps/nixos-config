@@ -1,5 +1,14 @@
 {pkgs, ...}: {
 
+  home.file.".gnupg/gpg-agent.conf" = {
+    text = ''
+      pinentry-program ${pkgs.pinentry_mac}/bin/pinentry-mac
+    '';
+    onChange = ''
+      ${pkgs.gnupg}/bin/gpgconf --reload gpg-agent
+    '';
+  };
+
   home.sessionVariables.JAVA_HOME = "/Library/Java/JavaVirtualMachines/temurin-21.jdk/Contents/Home";
   home.sessionPath = [
     "/Library/Java/JavaVirtualMachines/temurin-21.jdk/Contents/Home/bin"

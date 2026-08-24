@@ -11,6 +11,16 @@ let
 in
 {
 
+  # NOTE: to tweak this, `nvm` must be disabled
+  #home.sessionVariables.NPM_CONFIG_PREFIX = "${config.home.homeDirectory}/.local";
+
+  #home.sessionPath = [
+  #  "${config.home.homeDirectory}/.local/bin"
+  #];
+
+  # NVM is _very_ slow to load: 1 second delay on shell opening if we load it
+  # in zshrc. So delay it until first use. This is probably fine unless it
+  # tweaks my path on init.
   programs.zsh.initContent = ''
     export NVM_DIR="$HOME/.nvm"
 

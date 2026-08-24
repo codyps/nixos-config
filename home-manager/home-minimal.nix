@@ -9,6 +9,8 @@ let
   ;
 in
 {
+  imports = [ ./git-emdash-hook.nix ];
+
   # This value determines the Home Manager release that your configuration is
   # compatible with. This helps avoid breakage when a new Home Manager release
   # introduces backwards incompatible changes.
@@ -35,6 +37,10 @@ in
     '';
 
     loginExtra = ''
+      if [ -n "$CLAUDECODE" ]; then
+        # claude loves using "echo ===" as a seperator, but zsh tries to expand it and returns errors
+        unsetopt equals
+      fi
       if [ -n "$CLAUDECODE" ] && command -v direnv >/dev/null 2>&1; then
         eval "$(${pkgs.direnv}/bin/direnv hook zsh)"
         eval "$(DIRENV_LOG_FORMAT= ${pkgs.direnv}/bin/direnv export zsh)"
@@ -131,6 +137,10 @@ in
       };
       log = {
         date = "iso";
+      };
+      i18n = {
+        commitEncoding = "utf-8";
+        logOutputEncoding = "utf-8";
       };
       color = {
         ui = "auto";

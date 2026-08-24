@@ -1,4 +1,36 @@
-{pkgs, ...}: {
+{ config, pkgs, ... }:
+let
+  shizuku-usb-watch = pkgs.writeShellApplication {
+    name = "shizuku-usb-watch";
+    runtimeInputs = with pkgs; [
+      android-tools
+      coreutils
+    ];
+    text = builtins.readFile ../../scripts/shizuku-usb-watch.sh;
+  };
+in
+{
+
+  programs.zsh.initContent = ''
+    export NVM_DIR="$HOME/.nvm"
+
+    _nvm_lazy_load() {
+      unfunction nvm node npm npx corepack 2>/dev/null
+      if [ ! -s "$NVM_DIR/nvm.sh" ]; then
+        print -u2 "NVM is not installed at $NVM_DIR"
+        return 127
+      fi
+      . "$NVM_DIR/nvm.sh"
+    }
+
+    nvm() { _nvm_lazy_load || return; nvm "$@"; }
+    node() { _nvm_lazy_load || return; node "$@"; }
+    npm() { _nvm_lazy_load || return; npm "$@"; }
+    npx() { _nvm_lazy_load || return; npx "$@"; }
+    corepack() { _nvm_lazy_load || return; corepack "$@"; }
+  '';
+
+  programs.zsh.completionInit = "";
 
   home.file.".gnupg/gpg-agent.conf" = {
     text = ''
@@ -17,7 +49,21 @@
   home.packages = with pkgs; [
     josm
     gh
+    shizuku-usb-watch
   ];
+
+  launchd.agents.shizuku-usb-watch = {
+    enable = true;
+    config = {
+      ProgramArguments = [ "${shizuku-usb-watch}/bin/shizuku-usb-watch" ];
+      EnvironmentVariables.HOME = config.home.homeDirectory;
+      ProcessType = "Background";
+      RunAtLoad = true;
+      KeepAlive = true;
+      StandardOutPath = "${config.home.homeDirectory}/Library/Logs/shizuku-usb-watch.log";
+      StandardErrorPath = "${config.home.homeDirectory}/Library/Logs/shizuku-usb-watch-error.log";
+    };
+  };
 
   #programs.codex = {
     #enable = true;

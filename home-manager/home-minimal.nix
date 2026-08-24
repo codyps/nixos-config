@@ -36,9 +36,9 @@ in
     # https://github.com/anthropics/claude-code/issues/2110
     (if config.programs.direnv.enable then
       ''
-        if [ -n "$CLAUDECODE" ]; then
-          eval "$(DIRENV_LOG_FORMAT= zsh ${pkgs.direnv}/bin/direnv export zsh)"
-        fi
+        #if [ -n "$CLAUDECODE" ]; then
+        #  eval "$(DIRENV_LOG_FORMAT= zsh ${pkgs.direnv}/bin/direnv export zsh)"
+        #fi
       ''
     else
       "");
@@ -55,9 +55,9 @@ in
 
     # goes in `~/.profile`, `~/.bash_profile` is empty
     profileExtra = (builtins.readFile ../config/.profile) + ''
-      if [ -n "$CLAUDECODE" ]; then
-        eval "$(${pkgs.direnv}/bin/direnv export bash)"
-      fi
+      #if [ -n "$CLAUDECODE" ]; then
+      #  eval "$(${pkgs.direnv}/bin/direnv export bash)"
+      #fi
     '';
   };
 

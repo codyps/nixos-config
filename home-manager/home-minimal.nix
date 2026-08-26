@@ -296,7 +296,13 @@ in
           let
             atuin-daemon = pkgs.writeShellScriptBin "atuin-daemon" ''
               mkdir -p ${config.home.homeDirectory}/${cache-home}/atuin;
-              ${pkgs.atuin}/bin/atuin daemon;
+              # A stale socket left behind by an unclean shutdown makes the
+              # daemon crash-loop with "Address already in use" (launchd
+              # guarantees a single instance, so removal is safe here).
+              rm -f ${config.home.homeDirectory}/.local/share/atuin/atuin.sock;
+              # exec so atuin gets launchd's SIGTERM directly and can clean up
+              # its socket, instead of dying as an orphan when the shell exits.
+              exec ${pkgs.atuin}/bin/atuin daemon;
             '';
           in
           [ "${atuin-daemon}/bin/atuin-daemon" ];

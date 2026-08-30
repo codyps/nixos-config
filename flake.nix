@@ -79,7 +79,7 @@
           permittedInsecurePackages = [
             "intel-media-sdk-23.2.2"
           ];
-          allowDeprecardx86_64Darwin = true;
+          allowDeprecatedx86_64Darwin = "force";
         };
       };
     in
@@ -89,7 +89,7 @@
           pkgs = import nixpkgs {
             inherit system;
             inherit overlays;
-            config.allowDeprecatedx86_64Darwin = true;
+            config.allowDeprecatedx86_64Darwin = "force";
           };
         in
         {
@@ -325,7 +325,7 @@
               };
               nixpkgs.hostPlatform = "x86_64-darwin";
               ids.gids.nixbld = 350;
-              nixpkgs.config.allowDeprecatedx86_64Darwin = true;
+              nixpkgs.config.allowDeprecatedx86_64Darwin = "force";
             })
             ./nix-darwin/configuration.nix
             home-manager.darwinModules.home-manager
@@ -351,7 +351,7 @@
                 home = "/Users/cody";
               };
               nixpkgs.hostPlatform = "x86_64-darwin";
-              nixpkgs.config.allowDeprecatedx86_64Darwin = true;
+              nixpkgs.config.allowDeprecatedx86_64Darwin = "force";
               nix.enable = true;
               nix.package = pkgs.lix;
               nix.settings.use-case-hack = false;

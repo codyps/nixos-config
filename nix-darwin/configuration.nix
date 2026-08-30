@@ -83,7 +83,7 @@ in
   # Set Git commit hash for darwin-version.
   system.configurationRevision = self.rev or self.dirtyRev or null;
 
-  nixpkgs.config.allowDeprecatedx86_64Darwin = true;
+  nixpkgs.config.allowDeprecatedx86_64Darwin = "force";
 
   environment.etc."nix/source-flake".source = ../.;
 }

@@ -408,8 +408,11 @@ in
   services.tailscale.enable = true;
 
   services.i2pd.enable = true;
-  services.i2pd.proto.http.enable = true;
-  services.i2pd.proto.http.hostname = "i2pd.arnold.einic.org";
+  services.i2pd.settings.http = {
+    enabled = true;
+    hostname = "i2pd.arnold.einic.org";
+    port = 7070;
+  };
 
   security.tpm2 = {
     enable = true;
@@ -668,7 +671,7 @@ in
         @i2pd host i2pd.arnold.einic.org
         route @i2pd {
           import /persist/etc/secret/caddy-auth
-          reverse_proxy :${toString config.services.i2pd.proto.http.port}
+          reverse_proxy :${toString config.services.i2pd.settings.http.port}
         }
         
         root * /srv/http
@@ -828,7 +831,7 @@ in
   hardware.graphics = {
     enable = true;
     extraPackages = with pkgs; [
-      vaapiIntel
+      intel-vaapi-driver
       libvdpau-va-gl
       ocl-icd
 

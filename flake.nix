@@ -1,12 +1,17 @@
 {
   inputs = {
-    # x86_64-darwin deprecation.
-    #nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
-    nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-26.05-darwin";
-    nix-darwin.url = "github:LnL7/nix-darwin/nix-darwin-26.05";
+    nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
+    nix-darwin.url = "github:LnL7/nix-darwin";
     nix-darwin.inputs.nixpkgs.follows = "nixpkgs";
-    home-manager.url = "github:nix-community/home-manager/release-26.05";
+    home-manager.url = "github:nix-community/home-manager";
     home-manager.inputs.nixpkgs.follows = "nixpkgs";
+
+    # Nixpkgs 26.05 is the final release with an x86_64-darwin stdenv.
+    nixpkgs-darwin.url = "github:NixOS/nixpkgs/nixpkgs-26.05-darwin";
+    nix-darwin-26-05.url = "github:LnL7/nix-darwin/nix-darwin-26.05";
+    nix-darwin-26-05.inputs.nixpkgs.follows = "nixpkgs-darwin";
+    home-manager-26-05.url = "github:nix-community/home-manager/release-26.05";
+    home-manager-26-05.inputs.nixpkgs.follows = "nixpkgs-darwin";
 
     nixos-wsl.url = "github:nix-community/NixOS-WSL/main";
     nixos-wsl.inputs.nixpkgs.follows = "nixpkgs";
@@ -34,12 +39,12 @@
     extra-trusted-public-keys = [ "nix-community.cachix.org-1:mB9FSh9qf2dCimDSUo8Zy7bkq5CX+/rkCWyvRCYg3Fs=" ];
   };
 
-  outputs = { self, nixpkgs, flake-utils, nix-darwin, home-manager, nixos-wsl, nixos-vscode-server, impermanence, sops-nix, disko }:
+  outputs = { self, nixpkgs, nixpkgs-darwin, flake-utils, nix-darwin, nix-darwin-26-05, home-manager, home-manager-26-05, nixos-wsl, nixos-vscode-server, impermanence, sops-nix, disko }:
     let
-      overlays = [
+      mkOverlays = nixpkgsSource: [
         (final: prev:
           let
-            caddy = prev.callPackage (nixpkgs + "/pkgs/by-name/ca/caddy/package.nix") {
+            caddy = prev.callPackage (nixpkgsSource + "/pkgs/by-name/ca/caddy/package.nix") {
               inherit caddy;
             };
           in
@@ -56,7 +61,7 @@
             };
 
             # re-import audiobookshelf with ffmpeg-full replaced by ffmpeg-headless
-            audiobookshelf-headless = prev.callPackage (nixpkgs + "/pkgs/by-name/au/audiobookshelf/package.nix") {
+            audiobookshelf-headless = prev.callPackage (nixpkgsSource + "/pkgs/by-name/au/audiobookshelf/package.nix") {
               ffmpeg-full = prev.ffmpeg-headless;
             };
           })
@@ -65,8 +70,8 @@
       ];
 
       getName = pkg: pkg.pname or (builtins.parseDrvName pkg.name).name;
-      nixpkgsConfig = {
-        inherit overlays;
+      mkNixpkgsConfig = nixpkgsSource: {
+        overlays = mkOverlays nixpkgsSource;
         config = {
           allowUnfreePredicate = pkg: builtins.elem (getName pkg) [
             "vscode"
@@ -82,13 +87,25 @@
           allowDeprecatedx86_64Darwin = "force";
         };
       };
+      nixpkgsConfig = mkNixpkgsConfig nixpkgs;
+      nixpkgsDarwinConfig = mkNixpkgsConfig nixpkgs-darwin;
+      x86_64DarwinHomeModule = {
+        # Legacy nix-shell/nix-build imports consult this file. Flake imports
+        # continue setting the option explicitly above.
+        xdg.configFile."nixpkgs/config.nix".text = ''
+          {
+            allowDeprecatedx86_64Darwin = "force";
+          }
+        '';
+      };
     in
     flake-utils.lib.eachDefaultSystem
       (system:
         let
-          pkgs = import nixpkgs {
+          nixpkgsSource = if system == "x86_64-darwin" then nixpkgs-darwin else nixpkgs;
+          pkgs = import nixpkgsSource {
             inherit system;
-            inherit overlays;
+            overlays = mkOverlays nixpkgsSource;
             config.allowDeprecatedx86_64Darwin = "force";
           };
         in
@@ -315,7 +332,7 @@
 
         # Build darwin flake using:
         # $ darwin-rebuild build --flake .#x-mbp
-        darwinConfigurations."x-mbp" = nix-darwin.lib.darwinSystem {
+        darwinConfigurations."x-mbp" = nix-darwin-26-05.lib.darwinSystem {
           specialArgs = { inherit self; };
           modules = [
             ({ ... }: {
@@ -328,20 +345,21 @@
               nixpkgs.config.allowDeprecatedx86_64Darwin = "force";
             })
             ./nix-darwin/configuration.nix
-            home-manager.darwinModules.home-manager
+            home-manager-26-05.darwinModules.home-manager
             {
-              nixpkgs = nixpkgsConfig;
+              nixpkgs = nixpkgsDarwinConfig;
               home-manager.useGlobalPkgs = true;
               home-manager.useUserPackages = true;
               home-manager.users.x.imports = [
                 ./nix-darwin/home.nix
                 ./home-manager/home.nix
+                x86_64DarwinHomeModule
               ];
             }
           ];
         };
 
-        darwinConfigurations."u3" = nix-darwin.lib.darwinSystem {
+        darwinConfigurations."u3" = nix-darwin-26-05.lib.darwinSystem {
           specialArgs = { inherit self; };
           modules = [
             sops-nix.darwinModules.sops
@@ -366,15 +384,16 @@
             })
             ./nix-darwin/configuration.nix
             #./modules/build-machines.nix
-            home-manager.darwinModules.home-manager
+            home-manager-26-05.darwinModules.home-manager
             {
-              nixpkgs = nixpkgsConfig;
+              nixpkgs = nixpkgsDarwinConfig;
               home-manager.useGlobalPkgs = true;
               home-manager.useUserPackages = true;
               home-manager.users.cody = {
                 imports = [
                   ./nix-darwin/home.nix
                   ./home-manager/home.nix
+                  x86_64DarwinHomeModule
                   ./hosts/u3/home.nix
                 ];
 
@@ -491,7 +510,7 @@
           system = "x86_64-linux";
           pkgs = (import nixpkgs {
             inherit system;
-            inherit overlays;
+            overlays = mkOverlays nixpkgs;
             inherit (nixpkgsConfig) config;
           });
         in

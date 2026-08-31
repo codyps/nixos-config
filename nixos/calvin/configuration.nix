@@ -12,7 +12,7 @@ in
     ];
 
   nix = {
-    package = pkgs.nixFlakes;
+    package = pkgs.nix;
     extraOptions = ''
       experimental-features = nix-command flakes
     '';
@@ -34,9 +34,19 @@ in
   #  kernelModules = ["tpm_crb"];
   #};
 
-  boot.initrd.postDeviceCommands = lib.mkAfter ''
-    zfs rollback -r calvin/local/root@blank
-  '';
+  boot.initrd.systemd.services.rollback = {
+    description = "Rollback root filesystem to a pristine state on boot";
+    wantedBy = [ "initrd.target" ];
+    after = [ "zfs-import-calvin.service" ];
+    requires = [ "zfs-import-calvin.service" ];
+    before = [ "sysroot.mount" ];
+    path = [ pkgs.zfs ];
+    unitConfig.DefaultDependencies = "no";
+    serviceConfig.Type = "oneshot";
+    script = ''
+      zfs rollback -r calvin/local/root@blank
+    '';
+  };
 
   boot.initrd.luks.devices = {
     calvin-crypt = {
@@ -60,6 +70,7 @@ in
 
   fileSystems."/var/lib/tailscale" = {
     device = "/persist/var/lib/tailscale";
+    fsType = "none";
     options = [ "bind" ];
     noCheck = true;
   };

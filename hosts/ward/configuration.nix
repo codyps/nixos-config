@@ -39,10 +39,6 @@ in
     ];
   };
 
-  services.openssh.settings = {
-    StreamLocalBindUnlink = "yes";
-  };
-
   boot.initrd = {
     systemd.enable = true;
 
@@ -385,6 +381,9 @@ in
   services.grafana = {
     enable = true;
     settings = {
+      # Preserve Grafana's former NixOS default so existing encrypted database
+      # values remain readable after upgrading nixpkgs.
+      security.secret_key = "SW2YcwTIb9zpOOhoPsMm";
       server = {
         http_addr = "127.0.0.1";
         http_port = 3001;
@@ -531,6 +530,7 @@ in
   services.openssh = {
     enable = true;
     settings = {
+      StreamLocalBindUnlink = "yes";
       PermitRootLogin = "no";
       PasswordAuthentication = true;
     };

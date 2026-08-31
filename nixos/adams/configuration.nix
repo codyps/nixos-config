@@ -11,7 +11,7 @@
   boot.loader.efi.canTouchEfiVariables = true;
   #boot.loader.grub.device = "/dev/disk/by-label/NIXBOOT";
 
-  services.logind.extraConfig = "RuntimeDirectorySize=1G";
+  services.logind.settings.Login.RuntimeDirectorySize = "1G";
 
   networking.hostName = "adams";
 
@@ -82,4 +82,3 @@
   system.stateVersion = "21.11"; # Did you read the comment?
 
 }
-

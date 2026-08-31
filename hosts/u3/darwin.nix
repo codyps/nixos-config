@@ -9,6 +9,22 @@
 
   nix.linux-builder.enable = true;
 
+  # Keep build-time store optimisation disabled: creating hard links is
+  # particularly expensive on APFS. Do it once a week after garbage
+  # collection instead.
+  nix.settings.auto-optimise-store = false;
+
+  nix.gc = {
+    automatic = true;
+    interval = [{ Weekday = 7; Hour = 3; Minute = 15; }];
+    options = "--delete-older-than 30d";
+  };
+
+  nix.optimise = {
+    automatic = true;
+    interval = [{ Weekday = 7; Hour = 4; Minute = 15; }];
+  };
+
   nix.buildMachines = [{
     hostName = "mifflin";
     sshUser = "nix-ssh";

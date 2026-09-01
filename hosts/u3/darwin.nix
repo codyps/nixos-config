@@ -1,4 +1,15 @@
-{ config, ... }: {
+{ config, pkgs, ... }:
+let
+  nix-maintenance = pkgs.writeShellApplication {
+    name = "nix-maintenance";
+    runtimeInputs = [
+      config.nix.package
+      pkgs.coreutils
+    ];
+    text = builtins.readFile ../../scripts/nix-maintenance.sh;
+  };
+in
+{
   homebrew = {
     enable = true;
 
@@ -10,19 +21,24 @@
   nix.linux-builder.enable = true;
 
   # Keep build-time store optimisation disabled: creating hard links is
-  # particularly expensive on APFS. Do it once a week after garbage
-  # collection instead.
+  # particularly expensive on APFS. The maintenance job does it after GC.
   nix.settings.auto-optimise-store = false;
 
-  nix.gc = {
-    automatic = true;
-    interval = [{ Weekday = 7; Hour = 3; Minute = 15; }];
-    options = "--delete-older-than 30d";
-  };
-
-  nix.optimise = {
-    automatic = true;
-    interval = [{ Weekday = 7; Hour = 4; Minute = 15; }];
+  # A single ordered job ensures optimisation always follows age-based GC.
+  # Its wrapper waits on battery and suspends an active phase until AC returns.
+  nix.gc.automatic = false;
+  nix.optimise.automatic = false;
+  launchd.daemons.nix-maintenance = {
+    command = "${nix-maintenance}/bin/nix-maintenance";
+    serviceConfig = {
+      RunAtLoad = false;
+      StartCalendarInterval = [{ Weekday = 7; Hour = 3; Minute = 15; }];
+      ProcessType = "Background";
+      LowPriorityIO = true;
+      # Keep the store work in the supervised process group so STOP/CONT
+      # pauses the filesystem activity rather than only a nix-daemon client.
+      EnvironmentVariables.NIX_REMOTE = "local";
+    };
   };
 
   nix.buildMachines = [{

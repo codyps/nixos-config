@@ -64,7 +64,7 @@ in
 
       if ! /usr/bin/codesign --verify --deep --strict \
         -R="$requirement" "$target" 2>/dev/null \
-        || [[ "$(/bin/readlink "$source_marker")" != "$source" ]]; then
+        || [[ "$(${pkgs.coreutils}/bin/readlink "$source_marker")" != "$source" ]]; then
         run /bin/mkdir -p "$(/usr/bin/dirname "$target")"
         run /bin/rm -rf "$target"
         run /bin/cp -R "$source" "$target"

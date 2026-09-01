@@ -1,7 +1,1 @@
-{
-  packageOverrides = pkgs: {
-    nur = import (builtins.fetchTarball "https://github.com/nix-community/NUR/archive/master.tar.gz") {
-      inherit pkgs;
-    };
-  };
-}
+/nix/store/058cxzfrhpy99d4f523aklqgpjc2qdrh-home-manager-files/.config/nixpkgs/config.nix

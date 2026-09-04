@@ -9,6 +9,9 @@ let
     text = builtins.readFile ../../scripts/shizuku-usb-watch.sh;
   };
 
+  fix-copilot-keychain-acl = pkgs.writeScriptBin "fix-copilot-keychain-acl"
+    (builtins.readFile ../../scripts/fix-copilot-keychain-acl.swift);
+
   pinentry-mac-app = "${config.home.homeDirectory}/.local/libexec/pinentry-mac.app";
   pinentry-mac-program = "${pinentry-mac-app}/Contents/MacOS/pinentry-mac";
 
@@ -96,6 +99,7 @@ in
     josm
     gh
     shizuku-usb-watch
+    fix-copilot-keychain-acl
   ];
 
   launchd.agents.shizuku-usb-watch = {

@@ -271,12 +271,11 @@ if [[ $target_directory != "$default_target" \
   exec "$real_cargo" "$@"
 fi
 
-workspace_name=${workspace_root##*/}
-workspace_name=$(printf '%s' "$workspace_name" | tr -c 'A-Za-z0-9._-' '_')
-workspace_name=${workspace_name:0:80}
-workspace_hash=$(printf '%s' "$workspace_root" | sha256sum)
-workspace_hash=${workspace_hash%% *}
-cache_target="$cache_home/cargo-targets/$workspace_name-${workspace_hash:0:16}"
+# Escape literal dashes before flattening separators so the mapping stays
+# unambiguous: /a-b/c becomes -a--b-c, while /a/b-c becomes -a-b--c.
+workspace_cache_key=${workspace_root//-/--}
+workspace_cache_key=${workspace_cache_key//\//-}
+cache_target="$cache_home/cargo-targets/$workspace_cache_key"
 
 if [[ $target_action == clean ]]; then
   if [[ $(readlink "$default_target") != "$cache_target" ]]; then

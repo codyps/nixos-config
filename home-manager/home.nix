@@ -1,4 +1,24 @@
-{ config, pkgs, ... }:
+{ lib, pkgs, ... }:
+let
+  default-cache-subdirectory =
+    if pkgs.stdenv.hostPlatform.isDarwin then
+      "Library/Caches"
+    else
+      ".cache";
+
+  cargo-with-cached-target = pkgs.writeShellApplication {
+    name = "cargo";
+    runtimeInputs = with pkgs; [
+      coreutils
+      jq
+    ];
+    text = ''
+      export CARGO_WRAPPER_REAL_CARGO=${lib.escapeShellArg "${pkgs.rustup}/bin/cargo"}
+      export CARGO_WRAPPER_DEFAULT_CACHE_SUBDIRECTORY=${lib.escapeShellArg default-cache-subdirectory}
+      ${builtins.readFile ../scripts/cargo-with-cached-target.sh}
+    '';
+  };
+in
 {
   imports = [
     ./home-minimal.nix
@@ -12,6 +32,7 @@
     pkgs.bazelisk
     pkgs.cargo-generate
     pkgs.cargo-limit
+    (lib.hiPrio cargo-with-cached-target)
     pkgs.ccache
     pkgs.curl
     pkgs.exiftool

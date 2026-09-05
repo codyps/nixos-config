@@ -234,20 +234,22 @@ fi
 
 cache_home=${XDG_CACHE_HOME:-$default_cache_home}
 candidate_target="$(dirname "$manifest_path")/target"
-if [[ $target_action != clean \
-  && -L $candidate_target \
-  && ! -e $candidate_target ]]; then
+managed_link_target=
+if [[ -L $candidate_target ]]; then
   link_target=$(readlink "$candidate_target")
-  if [[ $link_target == "$cache_home/cargo-targets/"* \
-    || $link_target == "$default_cache_home/cargo-targets/"* ]]; then
-    mkdir -p "$link_target"
-  fi
+  [[ $link_target == /* ]] || link_target="$(dirname "$candidate_target")/$link_target"
+  link_target=$(realpath -m -- "$link_target")
+  for cache_base in "$cache_home/cargo-targets" "$default_cache_home/cargo-targets"; do
+    if [[ $(dirname "$link_target") == "$(realpath -m -- "$cache_base")" ]]; then
+      managed_link_target=$link_target
+    fi
+  done
 fi
 if [[ $target_action == clean && ! -L $candidate_target ]]; then
   exec "$real_cargo" "$@"
 fi
 if [[ $target_action != clean \
-  && ( -e $candidate_target || -L $candidate_target ) ]]; then
+  && ( -e $candidate_target || ( -L $candidate_target && -z $managed_link_target ) ) ]]; then
   exec "$real_cargo" "$@"
 fi
 
@@ -267,7 +269,7 @@ fi
 default_target="$workspace_root/target"
 if [[ $target_directory != "$default_target" \
   || ( $target_action != clean \
-    && ( -e $default_target || -L $default_target ) ) ]]; then
+    && ( -e $default_target || ( -L $default_target && -z $managed_link_target ) ) ) ]]; then
   exec "$real_cargo" "$@"
 fi
 
@@ -277,8 +279,18 @@ workspace_cache_key=${workspace_root//-/--}
 workspace_cache_key=${workspace_cache_key//\//-}
 cache_target="$cache_home/cargo-targets/$workspace_cache_key"
 
+# Keep existing managed links working across cache naming changes. Only repair
+# after Cargo confirms this invocation uses its default workspace target.
+if [[ -n $managed_link_target ]]; then
+  cache_target=$managed_link_target
+  if [[ $target_action != clean ]]; then
+    mkdir -p -- "$cache_target"
+    exec "$real_cargo" "$@"
+  fi
+fi
+
 if [[ $target_action == clean ]]; then
-  if [[ $(readlink "$default_target") != "$cache_target" ]]; then
+  if [[ -z $managed_link_target ]]; then
     exec "$real_cargo" "$@"
   fi
 
@@ -290,7 +302,8 @@ if [[ $target_action == clean ]]; then
 
   # A full clean removes the cache directory, leaving the workspace link
   # dangling. Selective and dry-run cleans retain both.
-  if [[ -L $default_target && ! -e $default_target ]]; then
+  if [[ -L $default_target && ! -e $default_target ]] \
+    && ! has_subcommand_argument --dry-run; then
     rm "$default_target"
   fi
   exit "$clean_status"

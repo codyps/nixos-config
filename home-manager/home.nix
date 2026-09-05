@@ -18,6 +18,12 @@ let
       ${builtins.readFile ../scripts/cargo-with-cached-target.sh}
     '';
   };
+  cargo-gc = pkgs.writeShellApplication {
+    name = "cargo-gc";
+    text = ''
+      exec ${pkgs.python3}/bin/python3 ${../scripts/cargo-gc.py} "$@"
+    '';
+  };
 in
 {
   imports = [
@@ -33,6 +39,7 @@ in
     pkgs.cargo-generate
     pkgs.cargo-limit
     (lib.hiPrio cargo-with-cached-target)
+    cargo-gc
     pkgs.ccache
     pkgs.curl
     pkgs.exiftool

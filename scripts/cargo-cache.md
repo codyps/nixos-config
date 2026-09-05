@@ -38,3 +38,51 @@ are skipped. To collect an older cache location, pass
 
 Run regression tests with `python3 scripts/test-cargo-cache.py` with Bash, jq,
 and GNU coreutils on PATH (the same dependencies as the Nix wrapper).
+
+## Native Windows
+
+The `scripts/windows` directory contains a native PowerShell implementation.
+It uses directory junctions, so creating a cached `target` does not require
+Developer Mode or an elevated shell. Its default cache is resolved at runtime
+as `$HOME/.cache/cargo-targets`; `XDG_CACHE_HOME` can override the `.cache`
+portion. Literal dashes in a workspace path are doubled before drive and path
+separators are converted to dashes, matching the Unix wrapper's naming scheme.
+
+Install it from PowerShell with:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\windows\setup.ps1
+```
+
+The idempotent setup script copies the four runtime files to
+`$HOME/.local/lib/cargo-cache` and moves that directory to the front of the
+current user's `PATH`. Pass `-InstallDirectory D:\path\to\cargo-cache` to use a
+different location, or `-WhatIf` to preview the changes. Open a new terminal
+afterward so it receives the updated user environment. `cargo.cmd` then shadows
+`cargo.exe` and dispatches `cargo gc` to the bundled collector;
+`cargo-gc.cmd` also permits a direct `cargo-gc` invocation. The wrapper resolves
+the real `cargo.exe` at invocation time; set
+`CARGO_WRAPPER_REAL_CARGO` only when an unusual installation needs an explicit
+path.
+
+The Windows `cargo gc` options and safety rules are the same as those above.
+Broken-link cleanup recognizes both directory junctions and directory symbolic
+links but never traverses reparse points. Stop builds before deleting caches.
+
+For Codex on Windows, add the resolved cache location to the workspace-write
+allowlist (TOML accepts forward slashes):
+
+```toml
+sandbox_mode = "workspace-write"
+
+[sandbox_workspace_write]
+writable_roots = ["~/.cache/cargo-targets"]
+
+[windows]
+sandbox = "elevated"
+```
+
+The scripts are kept compatible with Windows PowerShell 5.1 and prefer
+PowerShell 7 (`pwsh.exe`) when it is installed. On the Windows machine, run
+`powershell -ExecutionPolicy Bypass -File scripts/windows/test-cargo-cache.ps1`
+to exercise the real Cargo executable and NTFS junction behavior.

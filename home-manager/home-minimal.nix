@@ -2,7 +2,7 @@
 
 let
   cache-home =
-    if pkgs.stdenv.isDarwin then
+    if pkgs.stdenv.hostPlatform.isDarwin then
       "Library/Caches"
     else
       ".cache"
@@ -228,6 +228,7 @@ in
     #enableNushellIntegration = false;
     #historyWidget.command = "";
   };
+  programs.fzf.historyWidget.command = "";
 
   programs.direnv = {
     enable = true;

@@ -1,4 +1,4 @@
-{ lib, pkgs, ... }:
+{ config, lib, pkgs, ... }:
 let
   default-cache-subdirectory =
     if pkgs.stdenv.hostPlatform.isDarwin then
@@ -28,9 +28,16 @@ in
 {
   imports = [
     ./home-minimal.nix
+    ./mbx.nix
   ];
 
-  home.packages = [
+  options.programs.cargo-target-cache.enable = lib.mkOption {
+    type = lib.types.bool;
+    default = true;
+    description = "Wrap Cargo to redirect workspace target directories into the shared cache.";
+  };
+
+  config.home.packages = [
     #pkgs.cargo-outdated
     #pkgs.ncdu
     pkgs.nixd
@@ -38,8 +45,6 @@ in
     pkgs.bazelisk
     pkgs.cargo-generate
     pkgs.cargo-limit
-    (lib.hiPrio cargo-with-cached-target)
-    cargo-gc
     pkgs.ccache
     pkgs.curl
     pkgs.exiftool
@@ -65,5 +70,8 @@ in
     pkgs.watch
     pkgs.yt-dlp
 
+  ] ++ lib.optionals config.programs.cargo-target-cache.enable [
+    (lib.hiPrio cargo-with-cached-target)
+    cargo-gc
   ];
 }

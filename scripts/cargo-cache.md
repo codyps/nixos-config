@@ -1,5 +1,19 @@
 # Cargo target cache
 
+The Nix wrapper is controlled by `programs.cargo-target-cache.enable` (default
+`true`). On `u3`, `programs.mbx.enable = true` disables it and wraps plain
+`cargo` with [mr-boxington](https://github.com/jdx/mr-boxington) instead.
+The Nix launchers use upstream's `MBX_CARGO_SHIM_MODE=1` dispatch and point
+`CARGO` at `programs.mbx.cargoPackage` (Rustup by default), preventing recursion
+for both `cargo build` and explicit `mbx build`. This preserves Rustup toolchain
+selection and leaves the shared Home Manager bin directory on PATH. No mutable
+`mbx setup` step is needed. `MBX_DISABLE=1 cargo build` bypasses caching.
+Existing target links and cache contents are not migrated or deleted by this
+switch.
+
+Run `python3 scripts/test-mbx.py /etc/profiles/per-user/cody` to smoke-test
+the enabled profile with an isolated cache and a temporary Rust project.
+
 The Cargo wrapper creates `target` links into
 `${XDG_CACHE_HOME}/cargo-targets`, falling back to
 `~/Library/Caches/cargo-targets` on macOS or `~/.cache/cargo-targets` on Linux.

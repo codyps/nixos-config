@@ -1,4 +1,4 @@
-{ config, lib, pkgs, ... }:
+{ config, lib, options, pkgs, ... }:
 
 let
   cache-home =
@@ -227,6 +227,9 @@ in
   programs.fzf = {
     enable = true;
     #enableNushellIntegration = false;
+  } // lib.optionalAttrs (lib.hasAttrByPath [ "programs" "fzf" "historyWidget" "command" ] options) {
+    # Newer Home Manager exposes this; the pinned Intel Darwin version does not.
+    historyWidget.command = "";
   };
 
   programs.direnv = {

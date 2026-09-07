@@ -1,0 +1,15 @@
+Port 22
+HostKey /builder-keys/ssh_host_ed25519_key
+AuthorizedKeysFile /builder-keys/authorized_keys
+PermitRootLogin prohibit-password
+PasswordAuthentication no
+KbdInteractiveAuthentication no
+AllowUsers root
+DisableForwarding yes
+PermitTTY no
+PermitUserEnvironment no
+UsePAM no
+LoginGraceTime 30
+ClientAliveInterval 60
+ClientAliveCountMax 3
+ForceCommand /usr/sbin/nix-daemon --stdio

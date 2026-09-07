@@ -1,5 +1,12 @@
-{ config, pkgs, ... }:
+{ config, lib, pkgs, ... }:
 let
+  primary-user = config.system.primaryUser;
+  primary-home = config.users.users.${primary-user}.home;
+  docker-builder-state = "${primary-home}/.local/state/nix-docker-builder";
+  docker-builder-proxy = pkgs.writeShellScript "docker-builder-proxy" ''
+    exec ${pkgs.python3}/bin/python3 ${../../scripts/docker-linux-builder/proxy.py} \
+      --docker ${lib.escapeShellArg "${primary-home}/.orbstack/bin/docker"}
+  '';
   nix-maintenance = pkgs.writeShellApplication {
     name = "nix-maintenance";
     runtimeInputs = [
@@ -19,6 +26,41 @@ in
   };
 
   nix.linux-builder.enable = true;
+  # Keep the VM and its cached store available for manual use. Setting enable
+  # to false deletes its working directory in nix-darwin's activation script.
+  launchd.daemons.linux-builder.serviceConfig = {
+    RunAtLoad = lib.mkForce false;
+    KeepAlive = lib.mkForce false;
+  };
+
+  # The small host proxy owns container lifecycle under the primary user's OrbStack.
+  launchd.daemons.docker-linux-builder = {
+    command = "${docker-builder-proxy}";
+    environment.HOME = primary-home;
+    serviceConfig = {
+      UserName = primary-user;
+      RunAtLoad = true;
+      KeepAlive = true;
+      ProcessType = "Background";
+      StandardOutPath = "${primary-home}/Library/Logs/docker-linux-builder.log";
+      StandardErrorPath = "${primary-home}/Library/Logs/docker-linux-builder.log";
+    };
+  };
+
+  environment.etc."ssh/ssh_config.d/101-docker-linux-builder.conf".text = ''
+    Host docker-linux-builder
+      HostName 127.0.0.1
+      Port 31023
+      User root
+      IdentityFile ${docker-builder-state}/id_ed25519
+      IdentitiesOnly yes
+      HostKeyAlias docker-linux-builder
+      UserKnownHostsFile ${docker-builder-state}/known_hosts
+      StrictHostKeyChecking yes
+      ConnectTimeout 60
+      ServerAliveInterval 30
+      ServerAliveCountMax 3
+  '';
 
   # Keep build-time store optimisation disabled: creating hard links is
   # particularly expensive on APFS. The maintenance job does it after GC.
@@ -41,7 +83,17 @@ in
     };
   };
 
-  nix.buildMachines = [{
+  # Replace the manual QEMU VM with the container; retain the remote fallback.
+  nix.buildMachines = lib.mkForce [ {
+    hostName = "docker-linux-builder";
+    sshUser = "root";
+    protocol = "ssh-ng";
+    sshKey = "${docker-builder-state}/id_ed25519";
+    systems = [ "x86_64-linux" ];
+    maxJobs = 4;
+    speedFactor = 20;
+    supportedFeatures = [ "benchmark" "big-parallel" ];
+  } {
     hostName = "mifflin";
     sshUser = "nix-ssh";
     systems = [ "x86_64-linux" ];

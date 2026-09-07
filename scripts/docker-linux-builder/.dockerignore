@@ -1,0 +1,4 @@
+*
+!Dockerfile
+!nix.conf
+!sshd_config

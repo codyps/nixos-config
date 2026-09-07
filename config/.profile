@@ -35,7 +35,6 @@ esac
 export IDF_TOOLS_PATH="$XDG_CACHE_HOME/espressif1"
 export ESP_IDF_TOOLS_INSTALL_DIR="target"
 export CCACHE_DIR="$XDG_CACHE_HOME/ccache"
-export SCCACHE_CACHE_SIZE="40G"
 
 if test "$SSH_CONNECTION"; then
 	export PINENTRY_USER_DATA="USE_CURSES=1"
@@ -93,7 +92,6 @@ if [ -e "/Applications/Tailscale.app/Contents/MacOS/Tailscale" ]; then
 fi
 
 export EDITOR="nvim"
-export RUSTC_WRAPPER="sccache"
 #export CMAKE="cmake-ccache"
 export PATH="$HOME/.local/bin:$PATH"
 export PATH="$HOME/.local/bin/ccache.d:$PATH"

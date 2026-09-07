@@ -1,4 +1,4 @@
-{ lib, rustPlatform, fetchFromGitHub, pkg-config, git }:
+{ lib, rustPlatform, fetchFromGitHub, pkg-config, git, cacert }:
 
 rustPlatform.buildRustPackage rec {
   pname = "mbx";
@@ -20,6 +20,10 @@ rustPlatform.buildRustPackage rec {
   env.CARGO_PROFILE_RELEASE_CODEGEN_UNITS = "16";
   cargoCheckType = "debug";
   cargoTestFlags = [ "-p" "mbx" "--lib" ];
+  # S3 client tests load native TLS roots even without making network requests.
+  preCheck = ''
+    export SSL_CERT_FILE=${cacert}/etc/ssl/certs/ca-bundle.crt
+  '';
   # Nix's rustc does not bundle rust-lld in its sysroot. Runtime toolchains
   # come from Rustup; this test specifically assumes a Rustup-style sysroot.
   checkFlags = [ "--skip=managed_linker::tests::rust_lld_repairs_a_dangling_cached_shim" ];

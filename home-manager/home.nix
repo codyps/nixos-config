@@ -61,7 +61,6 @@ in
     pkgs.rsync
     pkgs.rust-bindgen
     pkgs.rustup
-    pkgs.sccache
     pkgs.socat
     #pkgs.targo
     pkgs.tmux

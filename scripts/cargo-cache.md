@@ -1,7 +1,7 @@
 # Cargo target cache
 
 The Nix wrapper is controlled by `programs.cargo-target-cache.enable` (default
-`true`). On `u3`, `programs.mbx.enable = true` disables it and wraps plain
+`true`). On `u3` and `cody@penguin`, `programs.mbx.enable = true` disables it and wraps plain
 `cargo` with [mr-boxington](https://github.com/jdx/mr-boxington) instead.
 The Nix launchers use upstream's `MBX_CARGO_SHIM_MODE=1` dispatch and point
 `CARGO` at `programs.mbx.cargoPackage` (Rustup by default), preventing recursion
@@ -11,8 +11,42 @@ selection and leaves the shared Home Manager bin directory on PATH. No mutable
 Existing target links and cache contents are not migrated or deleted by this
 switch.
 
+The shared shell profile no longer sets `RUSTC_WRAPPER`. After activating this
+change, run `unset RUSTC_WRAPPER` in existing shells to clear the old setting.
+
 Run `python3 scripts/test-mbx.py /etc/profiles/per-user/cody` to smoke-test
 the enabled profile with an isolated cache and a temporary Rust project.
+
+## Nix binary cache for mbx
+
+`nix build .#mbx` builds the same package used by the Home Manager module.
+The `Build and cache mbx` GitHub Actions workflow builds it natively for
+`x86_64-linux`, `aarch64-linux`, `x86_64-darwin`, and `aarch64-darwin`.
+Each package build runs its Nix checks. Pull requests build without publishing;
+pushes to `master` and manual runs on `master` publish the resulting package
+and its runtime closure to Cachix. Build-only dependencies and temporary test
+outputs are not selected for upload.
+
+The nightly flake-update workflow also calls this workflow with the exact
+updated commit, since commits made using `GITHUB_TOKEN` do not trigger push
+workflows.
+
+The public cache is `codyps` at `https://codyps.cachix.org`, with its signing
+public key declared in `flake.nix`. Repository setup uses these settings in
+[the repository's Actions settings](https://github.com/codyps/nixos-config/settings/secrets/actions):
+
+- Repository variable `CACHIX_CACHE`: `codyps`.
+- Repository secret `CACHIX_AUTH_TOKEN`: a write token scoped to that cache.
+
+Run `gh workflow run mbx.yml --ref master` to populate the cache on demand.
+Consumers need the cache URL in `extra-substituters` and its public signing key
+in `extra-trusted-public-keys`, or can run `cachix use CACHE_NAME` to configure
+them. Never put the write token in Nix files. The cache reuses exact Nix store
+paths, so consumers must use matching flake inputs and package definitions.
+This caches the mbx executable; Rust compilation caches managed by mbx remain
+separate.
+
+## Cargo target-directory wrapper
 
 The Cargo wrapper creates `target` links into
 `${XDG_CACHE_HOME}/cargo-targets`, falling back to

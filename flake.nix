@@ -35,8 +35,14 @@
   };
 
   nixConfig = {
-    extra-substituters = [ "https://nix-community.cachix.org" ];
-    extra-trusted-public-keys = [ "nix-community.cachix.org-1:mB9FSh9qf2dCimDSUo8Zy7bkq5CX+/rkCWyvRCYg3Fs=" ];
+    extra-substituters = [
+      "https://nix-community.cachix.org"
+      "https://codyps.cachix.org"
+    ];
+    extra-trusted-public-keys = [
+      "nix-community.cachix.org-1:mB9FSh9qf2dCimDSUo8Zy7bkq5CX+/rkCWyvRCYg3Fs="
+      "codyps.cachix.org-1:T2SgQFUIPVsszIqt74ku8XhkfVDVm3sVzn4qOfUoEFY="
+    ];
   };
 
   outputs = { self, nixpkgs, nixpkgs-darwin, flake-utils, nix-darwin, nix-darwin-26-05, home-manager, home-manager-26-05, nixos-wsl, nixos-vscode-server, impermanence, sops-nix, disko }:
@@ -110,6 +116,7 @@
           };
         in
         {
+          packages.mbx = pkgs.mbx;
           devShell = pkgs.mkShell {
             nativeBuildInputs = with pkgs; [
               age
@@ -533,6 +540,7 @@
               })
               ./home-manager/home.nix
               ({ lib, ... }: {
+                programs.mbx.enable = true;
                 programs.git.signing = {
                   format = lib.mkForce "ssh";
                   key = lib.mkForce "~/.ssh/id_ed25519";

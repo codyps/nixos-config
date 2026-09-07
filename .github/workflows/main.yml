@@ -9,6 +9,8 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    outputs:
+      ref: ${{ steps.commit.outputs.commit_hash || github.sha }}
     permissions:
       contents: write
     steps:
@@ -16,6 +18,17 @@ jobs:
       - uses: cachix/install-nix-action@v27
       - run: nix flake update
       - uses: stefanzweifel/git-auto-commit-action@v5
+        id: commit
         with:
           commit_message: nix flake update
           file_pattern: flake.lock
+
+  # Commits made with GITHUB_TOKEN do not trigger push workflows.
+  cache-mbx:
+    needs: build
+    permissions:
+      contents: read
+    uses: ./.github/workflows/mbx.yml
+    with:
+      ref: ${{ needs.build.outputs.ref }}
+    secrets: inherit

@@ -1,16 +1,23 @@
 { config, lib, pkgs, ... }:
 let
   cfg = config.programs.mbx;
-  cargo = pkgs.writeShellScriptBin "cargo" ''
-    export CARGO=${cfg.cargoPackage}/bin/cargo
-    export MBX_CARGO_SHIM_MODE=1
-    unset MBX_CARGO_SHIM_PATH
-    exec ${cfg.package}/bin/mbx "$@"
-  '';
-  mbx = pkgs.writeShellScriptBin "mbx" ''
-    export CARGO=${cfg.cargoPackage}/bin/cargo
-    unset MBX_CARGO_SHIM_MODE MBX_CARGO_SHIM_PATH
-    exec ${cfg.package}/bin/mbx "$@"
+  dataHome = if pkgs.stdenv.hostPlatform.isDarwin then
+    "${config.home.homeDirectory}/Library/Application Support"
+  else
+    config.xdg.dataHome;
+  shimDirectory = "${dataHome}/mbx/bin";
+  # doctor compares the launcher byte-for-byte with this upstream constant.
+  # Extract it from the selected package's source, without patching its shebang.
+  cargoShim = pkgs.runCommand "mbx-cargo-shim" { } ''
+    ${pkgs.python3}/bin/python3 - ${cfg.package.src}/crates/mbx/src/cli/setup.rs "$out" <<'PYTHON'
+    import pathlib, re, sys
+    source = pathlib.Path(sys.argv[1]).read_bytes()
+    match = re.search(rb'CARGO_SHIM_LAUNCHER:.*?br#"(.*?)"#;', source, re.S)
+    if match is None or not match[1].startswith(b"#!/bin/sh\n"):
+        raise SystemExit("mbx upstream Cargo shim format changed")
+    pathlib.Path(sys.argv[2]).write_bytes(match[1])
+    PYTHON
+    chmod +x "$out"
   '';
 in
 {
@@ -29,14 +36,11 @@ in
       message = "programs.mbx and programs.cargo-target-cache cannot both wrap Cargo.";
     }];
 
-    # Use upstream's shim-mode dispatch (also used by mise). Pin the real
-    # Cargo instead of removing the shim's directory from PATH: Home Manager
-    # merges cargo with other tools in one bin directory. Explicit mbx commands
-    # need the same real Cargo to avoid rediscovering our cargo launcher.
-    home.packages = [
-      (lib.hiPrio cargo)
-      mbx
-      cfg.cargoPackage
-    ];
+    home.file."${shimDirectory}/cargo".source = cargoShim;
+    home.file."${shimDirectory}/mbx-target".text = "${cfg.package}/bin/mbx\n";
+    # Upstream removes this dedicated directory before finding real Cargo.
+    # Keep Rustup and other tools in the shared profile, outside that directory.
+    home.sessionPath = [ shimDirectory ];
+    home.packages = [ cfg.package cfg.cargoPackage ];
   };
 }

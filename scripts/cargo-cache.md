@@ -3,19 +3,24 @@
 The Nix wrapper is controlled by `programs.cargo-target-cache.enable` (default
 `true`). On `u3` and `cody@penguin`, `programs.mbx.enable = true` disables it and wraps plain
 `cargo` with [mr-boxington](https://github.com/jdx/mr-boxington) instead.
-The Nix launchers use upstream's `MBX_CARGO_SHIM_MODE=1` dispatch and point
-`CARGO` at `programs.mbx.cargoPackage` (Rustup by default), preventing recursion
-for both `cargo build` and explicit `mbx build`. This preserves Rustup toolchain
-selection and leaves the shared Home Manager bin directory on PATH. No mutable
-`mbx setup` step is needed. `MBX_DISABLE=1 cargo build` bypasses caching.
-Existing target links and cache contents are not migrated or deleted by this
-switch.
+Home Manager installs upstream's exact standalone launcher and `mbx-target`
+under `~/Library/Application Support/mbx/bin` on macOS, or
+`$XDG_DATA_HOME/mbx/bin` on Linux, and prepends that directory to PATH.
+The launcher is extracted from the selected package's source without changing
+its shebang, so `mbx doctor` recognizes it as current. `mbx-target` points at
+that package's Nix store executable and updates with the Home Manager generation.
+Upstream removes only the dedicated shim directory before finding real Cargo
+in the shared profile (`programs.mbx.cargoPackage`, Rustup by default).
+No mutable `mbx setup` step is needed. Open a new shell after activation to load
+the new PATH. `MBX_DISABLE=1 cargo build` bypasses caching. Existing target links
+and cache contents are not migrated or deleted by this switch.
 
 The shared shell profile no longer sets `RUSTC_WRAPPER`. After activating this
 change, run `unset RUSTC_WRAPPER` in existing shells to clear the old setting.
 
-Run `python3 scripts/test-mbx.py /etc/profiles/per-user/cody` to smoke-test
-the enabled profile with an isolated cache and a temporary Rust project.
+Run `python3 scripts/test-mbx.py /path/to/home-manager-generation` to test the
+built generation's files and session PATH with an isolated home, cache, and Rust
+project. It also requires `mbx doctor`'s setup check to pass.
 
 ## Nix binary cache for mbx
 

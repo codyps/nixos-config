@@ -66,6 +66,7 @@ in
   home.packages = [
     pkgs.atuin
     pkgs.fd
+    pkgs.gh
     pkgs.fzf
     pkgs.git
     pkgs.git-crypt

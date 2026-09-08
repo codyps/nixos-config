@@ -188,10 +188,12 @@
               impermanence.nixosModules.impermanence
               home-manager.nixosModules.home-manager
               {
-                users.users.nixosvmtest.isSystemUser = true;
-                users.users.nixosvmtest.initialPassword = "test";
-                users.groups.nixosvmtest = { };
-                users.users.nixosvmtest.group = "nixosvmtest";
+                virtualisation.vmVariantWithDisko = {
+                  users.users.nixosvmtest.isSystemUser = true;
+                  users.users.nixosvmtest.initialPassword = "test";
+                  users.groups.nixosvmtest = { };
+                  users.users.nixosvmtest.group = "nixosvmtest";
+                };
               }
               {
                 nixpkgs = nixpkgsConfig;

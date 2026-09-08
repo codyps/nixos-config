@@ -3,6 +3,7 @@ keys:
   - &host_arnold age1fd2pv8mgmej7peex64wncrxflkpd0mj4mewzv330gljy5cemws6sqngde8
   - &host_ward age1x3nqfwhq43unwvxtzlhl74q3dl0n2f95ujc4vngu28e73qk5xq3sfk2n5u
   - &host_u3 age17f0hupxeyd03j0xgv0076qzyj2h8t5c0v6s6d97wpw8mewh5fdkqe4ckx0
+  - &host_robin age1vea6s0zsnm33gr26xp8g0jwzg5qx6nzmw2xm9sx5kpa0w2mkkvwqa2ugv4
 creation_rules:
   - path_regex: secrets/[^/]+\.(yaml|json|env|ini)$
     key_groups:
@@ -25,3 +26,8 @@ creation_rules:
     - *admin_cody
     age:
     - *host_u3
+  - path_regex: hosts/robin/secrets\.yaml$
+    pgp:
+    - *admin_cody
+    age:
+    - *host_robin

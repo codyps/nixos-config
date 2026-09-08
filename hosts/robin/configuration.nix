@@ -13,6 +13,8 @@ in
     [
       ../../nixos-modules/all-modules.nix
       ./disko.nix
+      ./secrets.nix
+      (modulesPath + "/profiles/qemu-guest.nix")
     ];
 
   services.logrotate.checkConfig = false;
@@ -22,7 +24,34 @@ in
   nix.gc.automatic = lib.mkForce false;
 
   # mkDefault so it is overridden when building the vm
-  boot.zfs.devNodes = lib.mkDefault "/dev/disk/by-partuuid";
+  boot.zfs.devNodes = lib.mkDefault "/dev/robin-vg";
+  boot.zfs.forceImportRoot = false;
+
+  boot.initrd.availableKernelModules = [ "ata_piix" "uhci_hcd" "virtio_pci" "virtio_scsi" "sd_mod" "sr_mod" ];
+  boot.initrd.kernelModules = [ "virtio_net" ];
+  boot.kernelModules = [ "kvm-intel" ];
+
+  boot.initrd.network = {
+    enable = true;
+    ssh = {
+      enable = true;
+      port = 2222;
+      inherit authorizedKeys;
+      # Separate from the SOPS identity: this key is copied into unencrypted /boot.
+      hostKeys = [ "/persist/ssh/initrd_ssh_host_ed25519_key" ];
+    };
+  };
+  boot.initrd.systemd.network.networks."10-en" = {
+    matchConfig.Name = "en*";
+    networkConfig.DHCP = "ipv4";
+  };
+  boot.initrd.systemd.users.root.shell = "/bin/systemd-tty-ask-password-agent";
+
+  # Do not start the ZFS import timeout while waiting for manual LUKS unlock.
+  boot.initrd.systemd.services.zfs-import-robin = {
+    requires = [ "dev-robin\\x2dvg-zfs.device" ];
+    after = [ "dev-robin\\x2dvg-zfs.device" ];
+  };
 
   # https://discourse.nixos.org/t/zfs-rollback-not-working-using-boot-initrd-systemd/37195/3
   boot.initrd.systemd.enable = true;
@@ -47,11 +76,11 @@ in
 
   systemd.services.caddy =
     let
-      mounts = [ "var-lib-libation.mount" "var-lib-syncthing.mount" ];
+      mounts = [ "var-lib-syncthing.mount" ];
     in
     {
       serviceConfig = {
-        EnvironmentFile = "/persist/etc/default/caddy";
+        EnvironmentFile = config.sops.templates."caddy-env".path or [ ];
         RuntimeDirectory = "caddy";
       };
 
@@ -132,12 +161,12 @@ in
   users.defaultUserShell = pkgs.zsh;
   users.users.root = {
     openssh.authorizedKeys.keys = authorizedKeys;
-    hashedPasswordFile = "/persist/etc/passwd.d/root";
+    hashedPasswordFile = config.sops.secrets."root-password-hash".path or null;
   };
   users.users.cody = {
     isNormalUser = true;
     extraGroups = [ "wheel" ];
-    hashedPasswordFile = "/persist/etc/passwd.d/cody";
+    hashedPasswordFile = config.sops.secrets."cody-password-hash".path or null;
     openssh.authorizedKeys.keys = authorizedKeys;
   };
 

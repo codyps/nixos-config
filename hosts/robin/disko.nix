@@ -1,5 +1,7 @@
+{ lib, ... }:
 {
   virtualisation.vmVariantWithDisko = {
+    disko.devices.disk.root.content.partitions.crypt.content.passwordFile = lib.mkForce null;
     virtualisation.fileSystems."/persist".neededForBoot = true;
   };
 
@@ -7,7 +9,7 @@
     disk = {
       root = {
         type = "disk";
-        device = "/dev/sda";
+        device = "/dev/disk/by-id/scsi-0QEMU_QEMU_HARDDISK_drive-scsi0-0-0-0";
         content = {
           type = "gpt";
           partitions = {
@@ -24,24 +26,39 @@
                 type = "filesystem";
                 format = "vfat";
                 mountpoint = "/boot";
-                mountOptions = [ "nofail" ];
               };
             };
-            swap = {
-              size = "4G";
+            crypt = {
+              size = "100%";
               priority = 2;
               content = {
-                type = "swap";
+                type = "luks";
+                name = "cryptroot";
+                # Installation-only input, never embedded in the initrd/store.
+                passwordFile = "/tmp/robin-luks-password";
+                extraFormatArgs = [ "--type" "luks2" ];
+                content = {
+                  type = "lvm_pv";
+                  vg = "robin-vg";
+                };
               };
             };
-            zfs = {
-              size = "100%";
-              priority = 3;
-              content = {
-                type = "zfs";
-                pool = "robin";
-              };
-            };
+          };
+        };
+      };
+    };
+    lvm_vg."robin-vg" = {
+      type = "lvm_vg";
+      lvs = {
+        swap = {
+          size = "4G";
+          content.type = "swap";
+        };
+        zfs = {
+          size = "100%FREE";
+          content = {
+            type = "zfs";
+            pool = "robin";
           };
         };
       };

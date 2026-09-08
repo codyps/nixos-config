@@ -9,6 +9,7 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    timeout-minutes: 90
     outputs:
       ref: ${{ steps.commit.outputs.commit_hash || github.sha }}
     permissions:
@@ -17,11 +18,13 @@ jobs:
       - uses: actions/checkout@v4
       - uses: cachix/install-nix-action@v27
       - run: nix flake update
+      - name: Refresh custom Caddy source hashes
+        run: python3 scripts/update-caddy-hashes.py
       - uses: stefanzweifel/git-auto-commit-action@v5
         id: commit
         with:
           commit_message: nix flake update
-          file_pattern: flake.lock
+          file_pattern: flake.lock nixpkgs/caddy-hashes.json
 
   # Commits made with GITHUB_TOKEN do not trigger push workflows.
   cache-mbx:
@@ -29,6 +32,15 @@ jobs:
     permissions:
       contents: read
     uses: ./.github/workflows/mbx.yml
+    with:
+      ref: ${{ needs.build.outputs.ref }}
+    secrets: inherit
+
+  cache-caddy:
+    needs: build
+    permissions:
+      contents: read
+    uses: ./.github/workflows/caddy.yml
     with:
       ref: ${{ needs.build.outputs.ref }}
     secrets: inherit

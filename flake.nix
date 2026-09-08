@@ -63,7 +63,10 @@
                 "github.com/darkweak/storages/badger/caddy@v0.0.10"
                 "github.com/WeidiDeng/caddy-cloudflare-ip@v0.0.0-20231130002422-f53b62aa13cb"
               ];
-              hash = "sha256-sWGf5lod1CmipDuCKbFrOz87p+ADoK4chHYTdlALe8g=";
+              # The pinned Darwin package set has a separate Caddy source bundle.
+              hash = if nixpkgsSource.outPath == nixpkgs.outPath
+                then (builtins.fromJSON (builtins.readFile ./nixpkgs/caddy-hashes.json)).nixpkgs
+                else (builtins.fromJSON (builtins.readFile ./nixpkgs/caddy-hashes.json)).nixpkgs-darwin;
             };
 
             # re-import audiobookshelf with ffmpeg-full replaced by ffmpeg-headless
@@ -116,7 +119,20 @@
           };
         in
         {
-          packages.mbx = pkgs.mbx;
+          packages = {
+            mbx = pkgs.mbx;
+            caddyFull = pkgs.caddyFull;
+          } // pkgs.lib.optionalAttrs pkgs.stdenv.hostPlatform.isLinux {
+            # Refresh both platform-independent source bundles on Linux CI.
+            caddy-source = (import nixpkgs {
+              inherit system;
+              overlays = mkOverlays nixpkgs;
+            }).caddyFull.src;
+            caddy-darwin-source = (import nixpkgs-darwin {
+              inherit system;
+              overlays = mkOverlays nixpkgs-darwin;
+            }).caddyFull.src;
+          };
           devShell = pkgs.mkShell {
             nativeBuildInputs = with pkgs; [
               age

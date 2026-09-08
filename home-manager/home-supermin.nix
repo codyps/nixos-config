@@ -47,8 +47,12 @@ in
 
     initExtra = (builtins.readFile ../config/.bashrc);
 
-    # goes in `~/.profile`, `~/.bash_profile` is empty
-    profileExtra = (builtins.readFile ../config/.profile);
+    # /etc/profile can reset PATH in nested login shells (including Codex's
+    # bash -lc), while inherited guards skip hm-session-vars.sh and nix-daemon.sh.
+    # Restore session paths on every login, keeping wrappers before the profile.
+    profileExtra = ''
+      export PATH="${lib.concatStringsSep ":" (config.home.sessionPath ++ [ "${config.home.profileDirectory}/bin" ])}:$PATH"
+    '' + (builtins.readFile ../config/.profile);
   };
 
   home.packages = [

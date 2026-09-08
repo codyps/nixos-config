@@ -12,4 +12,7 @@ UsePAM no
 LoginGraceTime 30
 ClientAliveInterval 60
 ClientAliveCountMax 3
+# ControlPersist clients can retain the transport after their last build ends.
+# Expire only connections with no open channels, never silent build sessions.
+UnusedConnectionTimeout 60
 ForceCommand /usr/sbin/nix-daemon --stdio

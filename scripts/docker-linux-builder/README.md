@@ -9,7 +9,12 @@ SSH to **127.0.0.1:31024**. Concurrent connections share one container.
 
 After all connections close, the container stops after five minutes (plus up to
 30 seconds for the idle check). A remaining `nix-daemon` process prevents the
-stop, including after a proxy restart. A silent active connection is not idle.
+stop, including after a proxy restart. A silent active build session is not idle.
+The SSH server closes transports with no open channels after 60 seconds via
+`UnusedConnectionTimeout`. This prevents a client's `ControlPersist yes` master
+from keeping the container alive forever after the final build finishes. The
+five-minute proxy timer starts when that transport closes (up to roughly six
+and a half minutes total). SSH keepalive probes alone do not keep it alive.
 The stopped container is not repeatedly polled, so the proxy does not keep
 waking Docker. OrbStack must be available; the proxy does not launch the
 OrbStack app or shut down its shared Linux VM.

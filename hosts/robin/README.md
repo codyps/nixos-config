@@ -20,7 +20,7 @@ template and restarts when that template changes.
 
 `../../secrets/robin-bootstrap.yaml` is encrypted **only for the admin GPG
 key**. It backs up the normal SSH identity, a separate initrd SSH identity,
-and the generated admin passwords. Never add Robin as a recipient to that
+and the generated admin passwords and LUKS passphrase. Never add Robin as a recipient to that
 file: it is the recovery source for Robin's own decryption key.
 
 To view a generated password locally (do not paste it into chat):
@@ -44,9 +44,9 @@ The normal key is also used by OpenSSH after boot. The initrd key is copied
 into the initrd on unencrypted `/boot`; **never use it for SOPS decryption**.
 The public keys alongside this README allow fingerprints to be checked.
 
-The LUKS passphrase is separate from SOPS/admin credentials. Create a
-0600 file outside the repository containing your chosen passphrase, and
-provide it with `--disk-encryption-keys /tmp/robin-luks-password <local-file>`.
+The generated LUKS passphrase is separate from the admin credentials and is
+stored as `luks-password` in the admin-encrypted bootstrap file. Extract it
+into a 0600 file outside the repository (with `umask 077`), and provide it with `--disk-encryption-keys /tmp/robin-luks-password <local-file>`.
 Disko uses this only for formatting/unlocking during installation; no key
 file is configured for subsequent boots. Remove plaintext installation
 staging and the local passphrase file after installation.
@@ -76,7 +76,9 @@ an existing NixOS ISO normally skips nixos-anywhere's kexec step. A reboot
 into an updated ISO or a deliberately selected kexec workflow is required.
 
 After formatting, transfer closures into the mounted target store, stage
-identities, install, and export the pool cleanly before reboot. Do not copy
+identities, install, and export the pool cleanly before reboot. Detach the ISO
+or set the provider VM to boot from disk first; otherwise it returns to the
+old ISO and loses the installer session's temporary SSH authorization. Do not copy
 the full closure into the ISO's small RAM-backed store. Validate a real boot,
 SSH unlock, SOPS user setup, root rollback on a second boot, encrypted swap,
 and Caddy before calling the installation complete.

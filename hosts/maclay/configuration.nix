@@ -117,7 +117,7 @@
   programs.mtr.enable = true;
   programs.gnupg.agent = {
     # Added to get prompted on ssh?
-    pinentryPackage = lib.mkForce pkgs.pinentry-gtk2;
+    pinentryPackage = lib.mkForce pkgs.pinentry-gnome3;
   };
 
   services.openssh.enable = true;

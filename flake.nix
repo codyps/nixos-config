@@ -34,6 +34,7 @@
     #};
   };
 
+  # Flake metadata must be literal; modules/nix-cache.nix reuses these values.
   nixConfig = {
     extra-substituters = [
       "https://nix-community.cachix.org"
@@ -47,6 +48,9 @@
 
   outputs = { self, nixpkgs, nixpkgs-darwin, flake-utils, nix-darwin, nix-darwin-26-05, home-manager, home-manager-26-05, nixos-wsl, nixos-vscode-server, impermanence, sops-nix, disko }:
     let
+      withCache = constructor: args: constructor (args // {
+        modules = [ ./modules/nix-cache.nix ] ++ args.modules;
+      });
       mkOverlays = nixpkgsSource: [
         (final: prev:
           let
@@ -148,7 +152,7 @@
       ) //
     (
       let
-        nixosSystem = nixpkgs.lib.nixosSystem;
+        nixosSystem = withCache nixpkgs.lib.nixosSystem;
       in
       {
         nixosConfigurations = {
@@ -245,7 +249,7 @@
           };
 
           # x220
-          forbes = nixpkgs.lib.nixosSystem {
+          forbes = nixosSystem {
             system = "x86_64-linux";
             specialArgs = { inherit home-manager self; };
             modules = [
@@ -299,7 +303,7 @@
           };
 
           # old sony vaio	
-          constance = nixpkgs.lib.nixosSystem {
+          constance = nixosSystem {
             system = "x86_64-linux";
             specialArgs = { inherit home-manager; };
             modules = [
@@ -308,7 +312,7 @@
           };
 
           # work vmware vm
-          trunix = nixpkgs.lib.nixosSystem {
+          trunix = nixosSystem {
             system = "x86_64-linux";
             modules = [
               ./nixos/trunix/configuration.nix
@@ -316,7 +320,7 @@
           };
 
           # work utm vm
-          maclay = nixpkgs.lib.nixosSystem {
+          maclay = nixosSystem {
             system = "aarch64-linux";
             specialArgs = { inherit home-manager self; };
             modules = [
@@ -338,7 +342,7 @@
           };
 
           # x-mbp vmware vm
-          adams = nixpkgs.lib.nixosSystem {
+          adams = nixosSystem {
             system = "x86_64-linux";
 
             modules = [
@@ -346,7 +350,7 @@
             ];
           };
 
-          calvin = nixpkgs.lib.nixosSystem {
+          calvin = nixosSystem {
             system = "x86_64-linux";
 
             modules = [
@@ -357,7 +361,7 @@
 
         # Build darwin flake using:
         # $ darwin-rebuild build --flake .#x-mbp
-        darwinConfigurations."x-mbp" = nix-darwin-26-05.lib.darwinSystem {
+        darwinConfigurations."x-mbp" = (withCache nix-darwin-26-05.lib.darwinSystem) {
           specialArgs = { inherit self; };
           modules = [
             ({ ... }: {
@@ -384,7 +388,7 @@
           ];
         };
 
-        darwinConfigurations."u3" = nix-darwin-26-05.lib.darwinSystem {
+        darwinConfigurations."u3" = (withCache nix-darwin-26-05.lib.darwinSystem) {
           specialArgs = { inherit self; };
           modules = [
             sops-nix.darwinModules.sops
@@ -428,7 +432,7 @@
           ];
         };
 
-        darwinConfigurations."RVW-LYY7YT7329M" = nix-darwin.lib.darwinSystem {
+        darwinConfigurations."RVW-LYY7YT7329M" = (withCache nix-darwin.lib.darwinSystem) {
           specialArgs = { inherit self; };
           modules = [
             ({ ... }: {
@@ -548,7 +552,7 @@
           # 3. add `experimental-features = nix-command flake` to /etc/nix/nix.conf
           # 4. modify /etc/ssh/ssh_config to kill the warning about gssapiauthentication
           # 5. ssh-keygen -t ed25519
-          homeConfigurations."cody@penguin" = home-manager.lib.homeManagerConfiguration {
+          homeConfigurations."cody@penguin" = (withCache home-manager.lib.homeManagerConfiguration) {
             inherit pkgs;
 
             modules = [
@@ -575,7 +579,7 @@
           };
 
           # arnold
-          homeConfigurations."y@arnold" = home-manager.lib.homeManagerConfiguration {
+          homeConfigurations."y@arnold" = (withCache home-manager.lib.homeManagerConfiguration) {
             inherit pkgs;
 
             modules = [
@@ -588,7 +592,7 @@
           };
 
           # vm on x-mbp
-          homeConfigurations."x@adams" = home-manager.lib.homeManagerConfiguration {
+          homeConfigurations."x@adams" = (withCache home-manager.lib.homeManagerConfiguration) {
             inherit pkgs;
 
             modules = [
@@ -600,7 +604,7 @@
             ];
           };
 
-          homeConfigurations."cody@constance" = home-manager.lib.homeManagerConfiguration {
+          homeConfigurations."cody@constance" = (withCache home-manager.lib.homeManagerConfiguration) {
             inherit pkgs;
 
             modules = [
@@ -612,7 +616,7 @@
             ];
           };
 
-          homeConfigurations."cody@arch1" = home-manager.lib.homeManagerConfiguration {
+          homeConfigurations."cody@arch1" = (withCache home-manager.lib.homeManagerConfiguration) {
             inherit pkgs;
 
             modules = [

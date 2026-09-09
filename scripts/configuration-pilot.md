@@ -38,4 +38,14 @@ targeted cleanup or a larger builder before enabling scheduled builds.
 
 The pilot pushes runtime closures. It does not activate systems, install
 Homebrew packages, or cache every intermediate build dependency. Cachix retention
-and client substituter configuration remain separate operational concerns.
+remains a separate operational concern.
+
+`modules/nix-cache.nix` reuses the flake's cache URLs and signing keys in every
+NixOS, Darwin, and standalone Home Manager configuration. The pilot verifies
+these settings and evaluation of each generated `nix.conf` before building.
+Activate the updated system or Home Manager generation to install the settings.
+Embedded Home Manager users inherit their system's daemon cache configuration.
+On standalone Home Manager installations using a separately managed multi-user
+daemon, its administrator must also authorize the cache if the user is untrusted.
+The Docker builder's `nix.conf` carries matching settings; rebuild/recreate the
+builder using its setup instructions to apply them to an existing container.

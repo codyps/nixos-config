@@ -29,6 +29,10 @@ jobs:
       - uses: cachix/install-nix-action@b85815f71a6de0ddee80b8a80a98d43f4bcc66c7 # v31
       - name: Test pilot reporting
         run: python3 scripts/test-configuration-pilot.py
+      - name: Check persistent cache settings for every configuration
+        run: |
+          nix eval --accept-flake-config --no-update-lock-file --impure --json \
+            --expr 'let flake = builtins.getFlake ("path:" + toString ./.); in import (flake.outPath + "/scripts/check-nix-caches.nix") flake'
       - name: Discover configuration targets
         id: matrix
         run: |

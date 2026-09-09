@@ -23,5 +23,17 @@ in {
   include =
     entries "nixosConfigurations" flake.nixosConfigurations "config.system.build.toplevel"
     ++ entries "homeConfigurations" flake.homeConfigurations "activationPackage"
-    ++ entries "darwinConfigurations" flake.darwinConfigurations "system";
+    ++ entries "darwinConfigurations" flake.darwinConfigurations "system"
+    # Configurations need not reference every exported package on every platform.
+    # Keep package coverage automatic, including the Caddy source bundles.
+    ++ builtins.concatMap
+      (system: builtins.map
+        (name: {
+          kind = "packages";
+          inherit name system;
+          runner = runners.${system};
+          target = ".#packages.${builtins.toJSON system}.${builtins.toJSON name}";
+        })
+        (builtins.attrNames flake.packages.${system}))
+      (builtins.attrNames flake.packages);
 }

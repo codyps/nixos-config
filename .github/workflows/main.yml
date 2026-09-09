@@ -27,20 +27,12 @@ jobs:
           file_pattern: flake.lock nixpkgs/caddy-hashes.json
 
   # Commits made with GITHUB_TOKEN do not trigger push workflows.
-  cache-mbx:
+  cache-outputs:
     needs: build
     permissions:
       contents: read
-    uses: ./.github/workflows/mbx.yml
+    uses: ./.github/workflows/configurations-pilot.yml
     with:
       ref: ${{ needs.build.outputs.ref }}
-    secrets: inherit
-
-  cache-caddy:
-    needs: build
-    permissions:
-      contents: read
-    uses: ./.github/workflows/caddy.yml
-    with:
-      ref: ${{ needs.build.outputs.ref }}
+      publish: true
     secrets: inherit

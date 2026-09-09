@@ -18,7 +18,7 @@ def main(target):
     minimum_free = initial_free
     metrics = {
         "target": target,
-        "revision": os.environ.get("GITHUB_SHA"),
+        "revision": os.environ.get("CACHE_REVISION", os.environ.get("GITHUB_SHA")),
         "initial_free_bytes": initial_free,
     }
     try:

@@ -1,11 +1,12 @@
 # Custom Caddy CI
 
 `packages.<system>.caddyFull` is the same plugin-enabled Caddy used by the
-host overlay. `.github/workflows/caddy.yml` builds it for Linux and macOS,
-on both x86_64 and aarch64. Nixpkgs' install checks verify plugin versions.
-Successful master builds publish the binary and runtime closure using the
-existing `CACHIX_CACHE` repository variable and `CACHIX_AUTH_TOKEN` secret,
-shared with the mbx workflow. Pull requests build without publishing.
+host overlay. The shared **Build and cache flake outputs** workflow discovers it
+on all four platforms, along with the Linux source-bundle outputs. Nixpkgs'
+install checks verify plugin versions. Successful master builds publish the
+binary and runtime closure using `CACHIX_CACHE` and `CACHIX_AUTH_TOKEN`.
+Pull requests build without publishing. There is no separate Caddy workflow.
+The shared workflow also runs the hash updater's failure-handling tests.
 
 The scheduled/manual flake-update workflow runs `nix flake update`, then
 `python3 scripts/update-caddy-hashes.py` on Linux. The updater forces a fresh
@@ -18,7 +19,7 @@ Both hashes live in `nixpkgs/caddy-hashes.json`, because Intel macOS uses the
 separately pinned `nixpkgs-darwin` input. Source bundles are generated on Linux;
 the platform matrix checks that they work for each native Caddy build.
 The update commits this file together with `flake.lock`, then explicitly calls
-the cache workflows with the resulting commit (token-generated commits do not
+the shared cache workflow with the resulting commit (token-generated commits do not
 trigger push workflows). Binary build failures fail CI after the update commit;
 they do not roll it back.
 

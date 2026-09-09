@@ -27,7 +27,11 @@ class PilotTests(unittest.TestCase):
             process.wait.side_effect = [subprocess.TimeoutExpired("nix", 2), exit_code]
             free = [1000, 800, 500, 700]
             with (
-                patch.dict(os.environ, {"GITHUB_STEP_SUMMARY": "summary.md"}),
+                patch.dict(os.environ, {
+                    "GITHUB_STEP_SUMMARY": "summary.md",
+                    "GITHUB_SHA": "caller-commit",
+                    "CACHE_REVISION": "updated-commit",
+                }),
                 patch.object(pilot.shutil, "disk_usage", side_effect=[
                     MagicMock(free=value) for value in free]),
                 patch.object(pilot.subprocess, "Popen", return_value=process) as build,
@@ -46,6 +50,7 @@ class PilotTests(unittest.TestCase):
                 if exit_code:
                     info.assert_not_called()
                 metrics = json.loads(Path("pilot/metrics.json").read_text())
+                self.assertEqual(metrics["revision"], "updated-commit")
                 self.assertEqual(metrics["minimum_sampled_free_bytes"], 500)
                 self.assertEqual(metrics["peak_sampled_disk_growth_bytes"], 500)
                 self.assertIn("cody@arch1", Path("summary.md").read_text())

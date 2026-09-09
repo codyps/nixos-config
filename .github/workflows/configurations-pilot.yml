@@ -1,6 +1,9 @@
-name: Configuration cache pilot
+name: Build and cache flake outputs
 
 on:
+  push:
+    branches: [master]
+  pull_request:
   workflow_dispatch:
     inputs:
       publish:
@@ -8,11 +11,22 @@ on:
         type: boolean
         default: true
 
+  workflow_call:
+    inputs:
+      ref:
+        description: Exact commit produced by the flake updater
+        required: true
+        type: string
+      publish:
+        description: Publish successful closures on master
+        type: boolean
+        default: true
+
 permissions:
   contents: read
 
 concurrency:
-  group: configurations-pilot-${{ github.ref }}
+  group: flake-cache-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
@@ -24,16 +38,18 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ github.sha }}
+          ref: ${{ inputs.ref || github.sha }}
           persist-credentials: false
       - uses: cachix/install-nix-action@b85815f71a6de0ddee80b8a80a98d43f4bcc66c7 # v31
       - name: Test pilot reporting
         run: python3 scripts/test-configuration-pilot.py
+      - name: Test Caddy hash updater
+        run: python3 scripts/test-update-caddy-hashes.py
       - name: Check persistent cache settings for every configuration
         run: |
           nix eval --accept-flake-config --no-update-lock-file --impure --json \
             --expr 'let flake = builtins.getFlake ("path:" + toString ./.); in import (flake.outPath + "/scripts/check-nix-caches.nix") flake'
-      - name: Discover configuration targets
+      - name: Discover configuration and package targets
         id: matrix
         run: |
           nix eval --accept-flake-config --no-update-lock-file --impure --json \
@@ -41,8 +57,8 @@ jobs:
           jq -e '.include | length > 0' matrix.json
           echo "configurations=$(jq -c . matrix.json)" >> "$GITHUB_OUTPUT"
           {
-            echo '### Configuration cache pilot'
-            echo "Revision: $GITHUB_SHA"
+            echo '### Flake cache targets'
+            echo "Revision: $(git rev-parse HEAD)"
             echo '```json'
             jq . matrix.json
             echo '```'
@@ -58,15 +74,16 @@ jobs:
       max-parallel: 4
       matrix: ${{ fromJSON(needs.matrix.outputs.configurations) }}
     env:
+      CACHE_REVISION: ${{ inputs.ref || github.sha }}
       CONFIGURATION_TARGET: ${{ matrix.target }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ github.sha }}
+          ref: ${{ inputs.ref || github.sha }}
           persist-credentials: false
 
       - name: Check publishing credentials
-        if: inputs.publish && github.ref == 'refs/heads/master'
+        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/master' && (inputs.publish || (github.event_name == 'push' && inputs.ref == ''))
         env:
           CACHIX_CACHE: ${{ vars.CACHIX_CACHE }}
           CACHIX_AUTH_TOKEN: ${{ secrets.CACHIX_AUTH_TOKEN }}
@@ -81,11 +98,11 @@ jobs:
           name: ${{ vars.CACHIX_CACHE }}
           skipPush: true
 
-      - name: Build configuration and measure resources
+      - name: Build target and measure resources
         run: python3 scripts/configuration-pilot.py "$CONFIGURATION_TARGET"
 
-      - name: Publish configuration runtime closure
-        if: inputs.publish && github.ref == 'refs/heads/master'
+      - name: Publish target runtime closure
+        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/master' && (inputs.publish || (github.event_name == 'push' && inputs.ref == ''))
         env:
           CACHIX_CACHE: ${{ vars.CACHIX_CACHE }}
           CACHIX_AUTH_TOKEN: ${{ secrets.CACHIX_AUTH_TOKEN }}

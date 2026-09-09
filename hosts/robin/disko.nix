@@ -73,7 +73,17 @@
           xattr = "sa";
         };
         options.ashift = "12";
-        datasets = {
+        datasets = lib.genAttrs [
+          "tank" "tank/books" "tank/books/kindle" "tank/books/personal"
+          "tank/libation" "tank/local" "tank/storyteller" "tank/storyteller/data"
+          "tank/syncthing" "tank/syncthing/Cameras" "tank/syncthing/Dropbox"
+          "tank/syncthing/Roms" "tank/syncthing/Sync" "tank/syncthing/Windows"
+          "tank/tmp"
+        ] (name: {
+          type = "zfs_fs";
+          mountpoint = "/${name}";
+          options.mountpoint = "/${name}";
+        }) // {
           "root" = {
             type = "zfs_fs";
             mountpoint = "/";

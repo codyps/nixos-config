@@ -14,6 +14,7 @@ in
       ../../nixos-modules/all-modules.nix
       ./disko.nix
       ./secrets.nix
+      ./media.nix
       (modulesPath + "/profiles/qemu-guest.nix")
     ];
 
@@ -76,7 +77,7 @@ in
 
   systemd.services.caddy =
     let
-      mounts = [ "var-lib-syncthing.mount" ];
+      mounts = [ "tank-libation.mount" "tank-syncthing.mount" ];
     in
     {
       serviceConfig = {
@@ -109,7 +110,7 @@ in
       extraConfig = ''
         @audiobooks host audiobooks.einic.org
         handle @audiobooks {
-          root /var/lib/libation/data/
+          root /tank/libation/data/
           file_server browse
         }
 
@@ -196,17 +197,6 @@ in
     ];
   };
 
-  services.syncthing = {
-    enable = true;
-    dataDir = "/var/lib/syncthing";
-    overrideDevices = false;
-    settings = {
-      devices = {
-        "u3" = { id = "SYFXMYB-T4PKQ3E-IQHWO7R-LDHJ7LL-P7BTPBR-NRDS6CG-3NB7W72-ZCATPAW"; };
-      };
-    };
-  };
-
   networking.firewall.enable = true;
   networking.firewall.allowedTCPPorts = [ 22 443 80 22000 ];
   networking.firewall.allowedUDPPorts = [ 443 22000 41641 ];
@@ -217,93 +207,6 @@ in
   boot.kernel.sysctl."net.ipv6.conf.all.forwarding" = 1;
 
   services.tailscale.permitCertUid = "caddy";
-
-  #virtualisation.oci-containers.containers = {
-  #libation = {
-  #  image = "docker.io/rmcrackan/libation:latest";
-  #  autoStart = false;
-  #  volumes = [
-  #    "/tank/libation/data:/data"
-  #    "/tank/libation/config:/config"
-  #    "/tank/libation/tmp:/tmp"
-  #    #"/var/lib/libation/data:/data"
-  #    #"/var/lib/libation/config:/config"
-  #  ];
-  #  labels = {
-  #    "io.containers.autoupdate" = "registry";
-  #  };
-  #};
-
-  #storyteller = {
-  #  image = "registry.gitlab.com/smoores/storyteller:latest";
-  #  volumes = [
-  #    "/tank/storyteller/data:/data"
-  #    "/tank/storyteller/secret:/run/secret"
-  #  ];
-  #  environment = {
-  #    STORYTELLER_SECRET_KEY_FILE = "/run/secret/key";
-  #  };
-  #  ports = [
-  #    "127.0.0.1:8918:8001"
-  #  ];
-  #  labels = {
-  #    "io.containers.autoupdate" = "registry";
-  #  };
-  #};
-  #};
-
-  #systemd.services.podman-libation =
-  #  let
-  #    mounts = [
-  #      "tank-libation.mount"
-  #      "tank-books-kindle.mount"
-  #      "tank-books-personal.mount"
-  #    ];
-  #  in
-  #  {
-  #    serviceConfig = {
-  #      Type = lib.mkForce "oneshot";
-  #      Restart = lib.mkForce "on-failure";
-  #    };
-  #    after = mounts;
-  #    requires = mounts;
-  #  };
-
-  #systemd.timers.podman-libation = {
-  #  wantedBy = [ "timers.target" ];
-  #  timerConfig = {
-  #    Persistent = true;
-  #    OnCalendar = "hourly";
-  #    AccuracySec = "30m";
-  #    RandomizedDelaySec = "20m";
-  #  };
-  #};
-
-  # oci-containers can't handle running as a user. See:
-  # https://github.com/NixOS/nixpkgs/issues/259770
-  #systemd.services.podman-libation.serviceConfig = {
-  #  User = "libation";
-  #  Home = "/tank/libation";
-  #DynamicUser = true;
-  #StateDirectory = "libation";
-  #};
-  #users.users.libation = {
-  #  isSystemUser = true;
-  #  group = "libation";
-  #};
-  #users.groups.libation = {};
-
-  #virtualisation.podman = {
-  #  enable = true;
-  #  autoPrune.enable = true;
-  #  defaultNetwork.settings.dns_enabled = true;
-  #};
-
-  #services.audiobookshelf = {
-  #  package = pkgs.audiobookshelf-headless;
-  #  enable = true;
-  #  port = 8917;
-  #};
 
   zramSwap.enable = true;
 

@@ -86,6 +86,7 @@ and Caddy before calling the installation complete.
 The `virtualisation.vmVariantWithDisko` variant alone has the `nixosvmtest`
 account/password. It disables production SOPS/Caddy and initrd SSH, and uses
 Disko's interactive/test password instead of the installation password file.
-Caddy's former missing Libation mount dependency has been removed; its
-Libation data and disabled Audiobookshelf backend still need provisioning
-before those routes can serve content.
+The media services and their `/tank` datasets are defined in `media.nix` and
+`disko.nix`. See [MIGRATION.md](MIGRATION.md) for the Finch data migration,
+validation, and rollback state. A fresh installation still requires restoring
+application data before the media routes can serve the existing libraries.

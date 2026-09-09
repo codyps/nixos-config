@@ -73,10 +73,15 @@
                 else (builtins.fromJSON (builtins.readFile ./nixpkgs/caddy-hashes.json)).nixpkgs-darwin;
             };
 
-            # re-import audiobookshelf with ffmpeg-full replaced by ffmpeg-headless
-            audiobookshelf-headless = prev.callPackage (nixpkgsSource + "/pkgs/by-name/au/audiobookshelf/package.nix") {
-              ffmpeg-full = prev.ffmpeg-headless;
-            };
+            audiobookshelf-headless =
+              let
+                package = nixpkgsSource + "/pkgs/by-name/au/audiobookshelf/package.nix";
+                args = builtins.functionArgs (import package);
+              in prev.callPackage package (
+                if args ? ffmpeg_8-full
+                then { ffmpeg_8-full = prev.ffmpeg_8-headless; }
+                else { ffmpeg-full = prev.ffmpeg-headless; }
+              );
           })
         (import ./nixpkgs/overlays/overlay.nix)
         #ethereum-nix.overlays.default

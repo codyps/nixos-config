@@ -25,6 +25,8 @@ in
   };
   users.users.audiobookshelf.uid = 992;
   users.groups.audiobookshelf.gid = 990;
+  # This virtual host serves ABS at /; OIDC validates callbacks against this path.
+  systemd.services.audiobookshelf.environment.ROUTER_BASE_PATH = "";
   systemd.services.audiobookshelf.unitConfig.RequiresMountsFor = [
     "/tank/libation/data" "/tank/books/kindle" "/tank/books/personal"
   ];

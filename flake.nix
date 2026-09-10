@@ -1,6 +1,8 @@
 {
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
+    atuin.url = "github:codyps/atuin/ctrl-r-memory";
+    atuin.inputs.nixpkgs.follows = "nixpkgs";
     nix-darwin.url = "github:LnL7/nix-darwin";
     nix-darwin.inputs.nixpkgs.follows = "nixpkgs";
     home-manager.url = "github:nix-community/home-manager";
@@ -46,7 +48,7 @@
     ];
   };
 
-  outputs = { self, nixpkgs, nixpkgs-darwin, flake-utils, nix-darwin, nix-darwin-26-05, home-manager, home-manager-26-05, nixos-wsl, nixos-vscode-server, impermanence, sops-nix, disko }:
+  outputs = { self, atuin, nixpkgs, nixpkgs-darwin, flake-utils, nix-darwin, nix-darwin-26-05, home-manager, home-manager-26-05, nixos-wsl, nixos-vscode-server, impermanence, sops-nix, disko }:
     let
       withCache = constructor: args: constructor (args // {
         modules = [ ./modules/nix-cache.nix ] ++ args.modules;
@@ -54,12 +56,24 @@
       mkOverlays = nixpkgsSource: [
         (final: prev:
           let
+            # Use each host's package set, including the pinned Intel Darwin
+            # stdenv, with the Rust version required by the Atuin fork.
+            atuinToolchain = (prev.callPackage atuin.inputs.fenix { }).fromToolchainFile {
+              file = atuin + "/rust-toolchain.toml";
+              sha256 = "sha256-P30Tm3O7vQAE725YtDCDHGjNrSsfZO4us11UwJGZSJo=";
+            };
             caddy = prev.callPackage (nixpkgsSource + "/pkgs/by-name/ca/caddy/package.nix") {
               inherit caddy;
             };
           in
           {
             inherit caddy;
+            atuin = prev.callPackage (atuin + "/atuin.nix") {
+              rustPlatform = prev.makeRustPlatform {
+                cargo = atuinToolchain;
+                rustc = atuinToolchain;
+              };
+            };
             caddyFull = caddy.withPlugins {
               plugins = [
                 "github.com/caddy-dns/cloudflare@v0.2.2-0.20250506153119-35fb8474f57d"
@@ -129,6 +143,7 @@
         in
         {
           packages = {
+            atuin = pkgs.atuin;
             mbx = pkgs.mbx;
             caddyFull = pkgs.caddyFull;
           } // pkgs.lib.optionalAttrs pkgs.stdenv.hostPlatform.isLinux {

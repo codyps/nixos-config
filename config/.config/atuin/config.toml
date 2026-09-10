@@ -38,7 +38,8 @@
 
 ## which search mode to use
 ## possible values: prefix, fulltext, fuzzy, skim
-# search_mode = "fuzzy"
+# Use the daemon index, including the fork's loading and allocation improvements.
+search_mode = "daemon-fuzzy"
 
 ## which filter mode to use
 ## possible values: global, host, session, directory

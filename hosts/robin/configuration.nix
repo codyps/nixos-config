@@ -116,6 +116,7 @@ in
 
         @audiobookshelf host audiobookshelf.einic.org
         handle @audiobookshelf {
+          redir / /audiobookshelf/ 302
           reverse_proxy http://127.0.0.1:8917
         }
 

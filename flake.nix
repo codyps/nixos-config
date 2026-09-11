@@ -238,14 +238,17 @@
                   users.users.nixosvmtest.group = "nixosvmtest";
                 };
               }
-              {
+              ({ pkgs, ... }: {
                 nixpkgs = nixpkgsConfig;
                 home-manager.useGlobalPkgs = true;
                 home-manager.useUserPackages = true;
                 home-manager.users.cody.imports = [
                   ./home-manager/home-supermin.nix
                 ];
-              }
+                home-manager.users.cody.home.packages = [
+                  pkgs.gh
+                ];
+              })
             ];
           };
 

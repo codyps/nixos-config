@@ -103,9 +103,67 @@ in
   boot.loader.systemd-boot.enable = true;
   boot.loader.efi.canTouchEfiVariables = true;
 
-  virtualisation.vmware.guest.enable = true;
+  virtualisation.vmware.guest = {
+    enable = true;
+    headless = false;
+  };
+
+  services.clipway = {
+    enable = true;
+    target = "plasma-workspace.target";
+  };
+  systemd.user.services.clipway = {
+    partOf = [ "plasma-workspace.target" ];
+    unitConfig.ConditionEnvironment = "WAYLAND_DISPLAY";
+  };
+  # Clipway owns the Wayland desktop agent. Keep the module's X11 session
+  # command, but prevent the package's XDG autostart from running a second one.
+  environment.etc."xdg/autostart/vmware-user.desktop".text = ''
+    [Desktop Entry]
+    Type=Application
+    Name=VMware User Agent
+    Hidden=true
+  '';
+
+  # Keep host-driven memory reclamation and guest/host communication available.
+  boot.kernelModules = [ "vmw_balloon" "vmw_vmci" ];
+
+  # Accept resources if the hypervisor supports and enables hot-add.
+  boot.kernelParams = [ "memhp_default_state=online" ];
+  services.udev.extraRules = ''
+    SUBSYSTEM=="cpu", ACTION=="add", TEST=="online", ATTR{online}=="0", ATTR{online}="1"
+  '';
+
+  # NTP disciplines the clock; VMware still corrects it on resume/restore.
+  services.timesyncd.enable = true;
+  environment.etc."vmware-tools/tools.conf".text = ''
+    [timeSync]
+    disable-periodic = true
+    disable-all = false
+  '';
+  systemd.services.vmware = {
+    restartTriggers = [ config.environment.etc."vmware-tools/tools.conf".source ];
+    serviceConfig = {
+      Restart = "on-failure";
+      RestartSec = "5s";
+    };
+  };
+
+  # Prefer interactive guest work when builds contend for CPU or disk.
+  # These weights operate inside the guest; Fusion controls host scheduling.
+  systemd.services.nix-daemon.serviceConfig = {
+    Nice = 10;
+    CPUWeight = 25;
+    IOWeight = 25;
+  };
 
   nix = {
+    settings = {
+      # One parallel build can use the CPUs currently available to the guest.
+      # Avoid max-jobs=auto multiplying all-core builds on this shared laptop.
+      max-jobs = 1;
+      cores = 0;
+    };
     sshServe = {
       enable = true;
       write = true;
@@ -131,11 +189,9 @@ in
   networking.networkmanager.enable = true;
   systemd.services.NetworkManager-wait-online.enable = false;
 
+  # Use periodic TRIM when supported by the virtual disk. The current SATA
+  # device advertises no discard support; a mount option cannot enable it.
   services.fstrim.enable = true;
-
-  fileSystems."/".options = [
-    "discard"
-  ];
 
   # Set your time zone.
   time.timeZone = "America/New_York";

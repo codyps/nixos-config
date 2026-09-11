@@ -24,6 +24,26 @@
         "type": "github"
       }
     },
+    "clipway": {
+      "inputs": {
+        "nixpkgs": [
+          "nixpkgs"
+        ]
+      },
+      "locked": {
+        "lastModified": 1788167754,
+        "narHash": "sha256-jbyY3+2j20E2A/cHiu4QcG0PWIFzJs/AzrjVOLYML3g=",
+        "owner": "krisztianfekete",
+        "repo": "clipway",
+        "rev": "8ef107f43820c8e2e8bd2dc8ec01f9c26d44c0f2",
+        "type": "github"
+      },
+      "original": {
+        "owner": "krisztianfekete",
+        "repo": "clipway",
+        "type": "github"
+      }
+    },
     "disko": {
       "inputs": {
         "nixpkgs": [
@@ -381,6 +401,7 @@
     "root": {
       "inputs": {
         "atuin": "atuin",
+        "clipway": "clipway",
         "disko": "disko",
         "flake-utils": "flake-utils",
         "home-manager": "home-manager",

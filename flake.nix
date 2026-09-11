@@ -7,6 +7,8 @@
     nix-darwin.inputs.nixpkgs.follows = "nixpkgs";
     home-manager.url = "github:nix-community/home-manager";
     home-manager.inputs.nixpkgs.follows = "nixpkgs";
+    clipway.url = "github:krisztianfekete/clipway";
+    clipway.inputs.nixpkgs.follows = "nixpkgs";
 
     # Nixpkgs 26.05 is the final release with an x86_64-darwin stdenv.
     nixpkgs-darwin.url = "github:NixOS/nixpkgs/nixpkgs-26.05-darwin";
@@ -48,7 +50,7 @@
     ];
   };
 
-  outputs = { self, atuin, nixpkgs, nixpkgs-darwin, flake-utils, nix-darwin, nix-darwin-26-05, home-manager, home-manager-26-05, nixos-wsl, nixos-vscode-server, impermanence, sops-nix, disko }:
+  outputs = { self, atuin, nixpkgs, nixpkgs-darwin, flake-utils, nix-darwin, nix-darwin-26-05, home-manager, home-manager-26-05, nixos-wsl, nixos-vscode-server, impermanence, sops-nix, disko, clipway }:
     let
       withCache = constructor: args: constructor (args // {
         modules = [ ./modules/nix-cache.nix ] ++ args.modules;
@@ -157,7 +159,7 @@
               overlays = mkOverlays nixpkgs-darwin;
             }).caddyFull.src;
           };
-          devShell = pkgs.mkShell {
+          devShells.default = pkgs.mkShell {
             nativeBuildInputs = with pkgs; [
               age
               gnupg
@@ -182,6 +184,7 @@
             specialArgs = { inherit home-manager self; };
             modules = [
               ./hosts/mifflin/configuration.nix
+              clipway.nixosModules.default
               ./nixos/common.nix
               sops-nix.nixosModules.sops
               home-manager.nixosModules.home-manager

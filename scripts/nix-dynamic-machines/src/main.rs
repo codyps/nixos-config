@@ -1,3 +1,4 @@
+use std::collections::BTreeMap;
 use std::env;
 use std::ffi::OsString;
 use std::fs::{self, OpenOptions};
@@ -7,7 +8,10 @@ use std::process::{Child, Command, ExitCode, Stdio};
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Mutex;
 use std::thread;
-use std::time::{Duration, Instant};
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
+
+use serde::{Deserialize, Serialize};
+use wait_timeout::ChildExt;
 
 #[cfg(unix)]
 use std::os::unix::fs::OpenOptionsExt;
@@ -20,6 +24,11 @@ Options:
   --nix PATH              nix executable to use (default: nix)
   --timeout SECONDS       timeout for each probe (default: 3)
   --parallelism COUNT     maximum concurrent probes (default: 8)
+  --state PATH            persistent probe cache (default: OUTPUT.state.json)
+  --healthy-interval SEC  recheck healthy builders after SEC (default: 60)
+  --retry-interval SEC    first retry after failure (default: 15)
+  --max-retry-interval SEC  maximum retry delay (default: 120)
+  --force                 probe now, ignoring cached deadlines (never probes always)
   -h, --help              show this help
 
 Each non-comment candidate line is `probe MACHINE_SPEC` or `always MACHINE_SPEC`,
@@ -45,6 +54,100 @@ struct Args {
     nix: OsString,
     timeout: Duration,
     parallelism: usize,
+    state: PathBuf,
+    policy: Policy,
+    force: bool,
+}
+
+#[derive(Clone, Copy, Debug)]
+struct Policy {
+    healthy: u64,
+    retry: u64,
+    max_retry: u64,
+}
+
+impl Default for Policy {
+    fn default() -> Self {
+        Self {
+            healthy: 60,
+            retry: 15,
+            max_retry: 120,
+        }
+    }
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+struct ProbeRecord {
+    checked_at: u64,
+    failures: u32,
+}
+
+impl ProbeRecord {
+    fn delay(&self, policy: Policy) -> u64 {
+        if self.failures == 0 {
+            policy.healthy
+        } else {
+            policy
+                .retry
+                .saturating_mul(1u64 << (self.failures - 1).min(63))
+                .min(policy.max_retry)
+        }
+    }
+
+    fn fresh(&self, now: u64, policy: Policy) -> bool {
+        // A clock rollback invalidates the observation instead of extending it.
+        now >= self.checked_at && now < self.checked_at.saturating_add(self.delay(policy))
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+struct State {
+    version: u32,
+    nix: PathBuf,
+    records: BTreeMap<String, ProbeRecord>,
+}
+
+fn now_seconds() -> Result<u64, String> {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|time| time.as_secs())
+        .map_err(|e| format!("invalid system clock: {e}"))
+}
+
+fn appended(path: &Path, suffix: &str) -> PathBuf {
+    let mut name = path.as_os_str().to_os_string();
+    name.push(suffix);
+    name.into()
+}
+
+fn parent_dir(path: &Path) -> &Path {
+    path.parent()
+        .filter(|p| !p.as_os_str().is_empty())
+        .unwrap_or(Path::new("."))
+}
+
+fn load_state(path: &Path, nix: &OsString) -> Result<State, String> {
+    let bytes = match fs::read(path) {
+        Ok(bytes) => bytes,
+        Err(e) if e.kind() == io::ErrorKind::NotFound => {
+            return Ok(State {
+                version: 1,
+                nix: PathBuf::from(nix),
+                records: BTreeMap::new(),
+            })
+        }
+        Err(e) => return Err(format!("cannot read state {}: {e}", path.display())),
+    };
+    let mut state: State = serde_json::from_slice(&bytes)
+        .map_err(|e| format!("invalid state {}: {e}", path.display()))?;
+    if state.version != 1 {
+        return Err(format!("unsupported state version {}", state.version));
+    }
+    if state.nix != Path::new(nix) {
+        state.nix = PathBuf::from(nix);
+        state.records.clear();
+    }
+    Ok(state)
 }
 
 fn main() -> ExitCode {
@@ -62,22 +165,102 @@ fn run(args: impl Iterator<Item = OsString>) -> Result<(), String> {
         println!("{USAGE}");
         return Ok(());
     };
+    fs::create_dir_all(parent_dir(&args.output)).map_err(|e| e.to_string())?;
+    fs::create_dir_all(parent_dir(&args.state)).map_err(|e| e.to_string())?;
+    let lock_path = appended(&args.output, ".lock");
+    let mut paths = Vec::new();
+    for path in [&args.candidates, &args.output, &args.state, &lock_path] {
+        let resolved = if path.exists() {
+            fs::canonicalize(path)
+        } else {
+            fs::canonicalize(parent_dir(path))
+                .map(|parent| parent.join(path.file_name().unwrap_or_default()))
+        }
+        .map_err(|e| format!("cannot resolve {}: {e}", path.display()))?;
+        if paths.contains(&resolved) {
+            return Err("candidates, output, state, and lock paths must be distinct".to_owned());
+        }
+        paths.push(resolved);
+    }
+    // Hold a separate, stable lock across reads, probes, and both publications.
+    // Concurrent timer/manual runs then consume the latest cache rather than
+    // probing twice or publishing an older observation after a newer one.
+    let lock = OpenOptions::new()
+        .read(true)
+        .write(true)
+        .create(true)
+        .truncate(false)
+        .open(&lock_path)
+        .map_err(|e| format!("cannot open lock: {e}"))?;
+    lock.lock()
+        .map_err(|e| format!("cannot lock output: {e}"))?;
     let source = fs::read_to_string(&args.candidates)
         .map_err(|e| format!("cannot read {}: {e}", args.candidates.display()))?;
     let candidates = parse_candidates(&source)?;
-    let healthy = reconcile(&candidates, &args.nix, args.timeout, args.parallelism)?;
+    let mut state = load_state(&args.state, &args.nix)?;
+    let now = now_seconds()?;
+    let due: Vec<_> = candidates
+        .iter()
+        .filter(|candidate| {
+            candidate.mode == Mode::Probe
+                && (args.force
+                    || !state
+                        .records
+                        .get(&candidate.machine_line)
+                        .is_some_and(|record| record.fresh(now, args.policy)))
+        })
+        .cloned()
+        .collect();
+    let results = reconcile(&due, &args.nix, args.timeout, args.parallelism)?;
+    let checked_at = now_seconds()?;
+    for (candidate, healthy) in due.iter().zip(results) {
+        let failures = if healthy {
+            0
+        } else {
+            state
+                .records
+                .get(&candidate.machine_line)
+                .map_or(1, |r| r.failures.saturating_add(1))
+        };
+        state.records.insert(
+            candidate.machine_line.clone(),
+            ProbeRecord {
+                checked_at,
+                failures,
+            },
+        );
+    }
+    state.records.retain(|line, _| {
+        candidates
+            .iter()
+            .any(|c| c.mode == Mode::Probe && c.machine_line == *line)
+    });
+    let healthy: Vec<_> = candidates
+        .iter()
+        .map(|c| {
+            c.mode == Mode::Always
+                || state
+                    .records
+                    .get(&c.machine_line)
+                    .is_some_and(|r| r.failures == 0)
+        })
+        .collect();
     let contents = render(&candidates, &healthy);
+    let state_bytes = serde_json::to_vec_pretty(&state).map_err(|e| e.to_string())?;
     let changed = atomic_write_if_changed(&args.output, contents.as_bytes())
         .map_err(|e| format!("cannot update {}: {e}", args.output.display()))?;
+    atomic_write_if_changed(&args.state, &state_bytes)
+        .map_err(|e| format!("cannot update state {}: {e}", args.state.display()))?;
     eprintln!(
-        "nix-dynamic-machines: {} of {} candidates enabled{}",
+        "nix-dynamic-machines: {} of {} candidates enabled{}; {} probed",
         healthy.iter().filter(|healthy| **healthy).count(),
         candidates.len(),
         if changed {
             " (updated)"
         } else {
             " (unchanged)"
-        }
+        },
+        due.len()
     );
     Ok(())
 }
@@ -88,6 +271,9 @@ fn parse_args(mut args: impl Iterator<Item = OsString>) -> Result<Option<Args>, 
     let mut nix = OsString::from("nix");
     let mut timeout = Duration::from_secs(3);
     let mut parallelism = 8;
+    let mut state = None;
+    let mut policy = Policy::default();
+    let mut force = false;
 
     while let Some(arg) = args.next() {
         let text = arg
@@ -102,13 +288,29 @@ fn parse_args(mut args: impl Iterator<Item = OsString>) -> Result<Option<Args>, 
             "--candidates" => candidates = Some(PathBuf::from(value(&mut args, text)?)),
             "--output" => output = Some(PathBuf::from(value(&mut args, text)?)),
             "--nix" => nix = value(&mut args, text)?,
+            "--state" => state = Some(PathBuf::from(value(&mut args, text)?)),
+            "--force" => force = true,
+            "--healthy-interval" | "--retry-interval" | "--max-retry-interval" => {
+                let seconds = value(&mut args, text)?
+                    .to_str()
+                    .and_then(|s| s.parse::<u64>().ok())
+                    .filter(|n| (1..=86400).contains(n))
+                    .ok_or_else(|| format!("{text} must be an integer from 1 to 86400"))?;
+                match text {
+                    "--healthy-interval" => policy.healthy = seconds,
+                    "--retry-interval" => policy.retry = seconds,
+                    _ => policy.max_retry = seconds,
+                }
+            }
             "--timeout" => {
                 let raw = value(&mut args, text)?;
                 let seconds = raw
                     .to_str()
                     .and_then(|s| s.parse::<f64>().ok())
-                    .filter(|n| n.is_finite() && *n > 0.0)
-                    .ok_or_else(|| "--timeout must be a positive number".to_owned())?;
+                    .filter(|n| n.is_finite() && *n >= 0.001 && *n <= 86400.0)
+                    .ok_or_else(|| {
+                        "--timeout must be between 0.001 and 86400 seconds".to_owned()
+                    })?;
                 timeout = Duration::from_secs_f64(seconds);
             }
             "--parallelism" => {
@@ -122,12 +324,24 @@ fn parse_args(mut args: impl Iterator<Item = OsString>) -> Result<Option<Args>, 
         }
     }
 
+    let candidates = candidates.ok_or_else(|| "--candidates is required".to_owned())?;
+    let output = output.ok_or_else(|| "--output is required".to_owned())?;
+    let state = state.unwrap_or_else(|| appended(&output, ".state.json"));
+    if policy.retry > policy.max_retry {
+        return Err("--retry-interval must not exceed --max-retry-interval".to_owned());
+    }
+    if candidates == output || candidates == state || output == state {
+        return Err("candidates, output, and state paths must be distinct".to_owned());
+    }
     Ok(Some(Args {
-        candidates: candidates.ok_or_else(|| "--candidates is required".to_owned())?,
-        output: output.ok_or_else(|| "--output is required".to_owned())?,
+        candidates,
+        output,
         nix,
         timeout,
         parallelism,
+        state,
+        policy,
+        force,
     }))
 }
 
@@ -253,6 +467,9 @@ fn reconcile(
     timeout: Duration,
     parallelism: usize,
 ) -> Result<Vec<bool>, String> {
+    if candidates.is_empty() {
+        return Ok(Vec::new());
+    }
     let next = AtomicUsize::new(0);
     let results = Mutex::new(vec![false; candidates.len()]);
     let errors = Mutex::new(Vec::new());
@@ -305,21 +522,29 @@ fn probe(nix: &OsString, uri: &str, timeout: Duration) -> io::Result<bool> {
     command.process_group(0);
 
     let mut child = command.spawn()?;
-    let deadline = Instant::now() + timeout;
-    loop {
-        match child.try_wait() {
-            Ok(Some(status)) => return Ok(status.success()),
-            Ok(None) => {}
-            Err(error) => {
-                terminate_process_group(&mut child);
-                return Err(error);
+    // SIGCHLD-backed waiting on Unix; no periodic try_wait wakeups.
+    // Recheck once at the deadline: signal delivery can lag process exit, and
+    // an already-completed child must not be classified as a timeout.
+    let result = child.wait_timeout(timeout).and_then(|status| match status {
+        Some(status) => Ok(Some(status)),
+        None => child.try_wait(),
+    });
+    match result {
+        Ok(Some(status)) => {
+            if !status.success() {
+                eprintln!("nix-dynamic-machines: probe exited with {status}: {uri}");
             }
+            Ok(status.success())
         }
-        if Instant::now() >= deadline {
+        Ok(None) => {
+            eprintln!("nix-dynamic-machines: probe timed out after {timeout:?}: {uri}");
             terminate_process_group(&mut child);
-            return Ok(false);
+            Ok(false)
         }
-        thread::sleep(Duration::from_millis(20).min(timeout));
+        Err(error) => {
+            terminate_process_group(&mut child);
+            Err(error)
+        }
     }
 }
 
@@ -372,7 +597,7 @@ fn atomic_write_if_changed(path: &Path, contents: &[u8]) -> io::Result<bool> {
     if fs::read(path).ok().as_deref() == Some(contents) {
         return Ok(false);
     }
-    let parent = path.parent().unwrap_or_else(|| Path::new("."));
+    let parent = parent_dir(path);
     fs::create_dir_all(parent)?;
     let file_name = path
         .file_name()
@@ -399,6 +624,7 @@ fn atomic_write_if_changed(path: &Path, contents: &[u8]) -> io::Result<bool> {
 mod tests {
     use super::*;
     use std::sync::atomic::AtomicU64;
+    use std::time::Instant;
 
     static NEXT_TEMP: AtomicU64 = AtomicU64::new(0);
 
@@ -498,6 +724,174 @@ mod tests {
         fs::remove_dir_all(directory).unwrap();
     }
 
+    #[test]
+    fn retry_delays_are_capped_and_clock_rollback_expires_cache() {
+        let policy = Policy::default();
+        for (failures, delay) in [
+            (0, 60),
+            (1, 15),
+            (2, 30),
+            (3, 60),
+            (4, 120),
+            (u32::MAX, 120),
+        ] {
+            let record = ProbeRecord {
+                checked_at: 1000,
+                failures,
+            };
+            assert_eq!(record.delay(policy), delay);
+            assert!(record.fresh(1000 + delay - 1, policy));
+            assert!(!record.fresh(1000 + delay, policy));
+            assert!(!record.fresh(999, policy));
+        }
+    }
+
+    fn invoke(directory: &Path, nix: &OsString, force: bool) -> Result<(), String> {
+        let mut args = vec![
+            OsString::from("--candidates"),
+            directory.join("candidates").into_os_string(),
+            OsString::from("--output"),
+            directory.join("machines").into_os_string(),
+            OsString::from("--nix"),
+            nix.clone(),
+        ];
+        if force {
+            args.push(OsString::from("--force"));
+        }
+        run(args.into_iter())
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn cache_skips_probes_force_refreshes_and_changes_invalidate() {
+        let directory = temp_dir();
+        let calls = directory.join("calls");
+        let nix = executable(
+            &directory,
+            "nix",
+            &format!("printf x >> '{}'\nexit 0", calls.display()),
+        );
+        let input = directory.join("candidates");
+        let output = directory.join("machines");
+        let state_path = appended(&output, ".state.json");
+        fs::write(&input, "always ssh-ng://docker\nprobe ssh-ng://remote").unwrap();
+        invoke(&directory, &nix, false).unwrap();
+        let state_bytes = fs::read(&state_path).unwrap();
+        invoke(&directory, &nix, false).unwrap();
+        assert_eq!(fs::read(&calls).unwrap(), b"x");
+        assert_eq!(fs::read(&state_path).unwrap(), state_bytes);
+        assert_eq!(
+            fs::read_to_string(&output).unwrap(),
+            "ssh-ng://docker\nssh-ng://remote\n"
+        );
+        invoke(&directory, &nix, true).unwrap();
+        assert_eq!(fs::read(&calls).unwrap(), b"xx");
+        fs::write(
+            &input,
+            "always ssh-ng://docker\nprobe ssh-ng://remote - /new-key",
+        )
+        .unwrap();
+        invoke(&directory, &nix, false).unwrap();
+        assert_eq!(fs::read(&calls).unwrap(), b"xxx");
+        let state = load_state(&state_path, &nix).unwrap();
+        assert_eq!(state.records.len(), 1);
+        assert!(state.records.contains_key("ssh-ng://remote - /new-key"));
+        fs::write(&input, "always ssh-ng://docker").unwrap();
+        invoke(
+            &directory,
+            &directory.join("nonexistent-nix").into_os_string(),
+            true,
+        )
+        .unwrap();
+        assert_eq!(fs::read(&calls).unwrap(), b"xxx");
+        assert_eq!(fs::read_to_string(&output).unwrap(), "ssh-ng://docker\n");
+        fs::remove_dir_all(directory).unwrap();
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn failed_probes_back_off_and_success_resets_failures() {
+        let directory = temp_dir();
+        let calls = directory.join("calls");
+        let recovered = directory.join("recovered");
+        let nix = executable(
+            &directory,
+            "nix",
+            &format!(
+                "printf x >> '{}'\ntest -f '{}'",
+                calls.display(),
+                recovered.display()
+            ),
+        );
+        fs::write(directory.join("candidates"), "probe ssh-ng://remote").unwrap();
+        let state_path = directory.join("machines.state.json");
+        for failures in 1..=5 {
+            invoke(&directory, &nix, false).unwrap();
+            let mut state = load_state(&state_path, &nix).unwrap();
+            assert_eq!(state.records["ssh-ng://remote"].failures, failures);
+            invoke(&directory, &nix, false).unwrap();
+            assert_eq!(fs::read(&calls).unwrap().len(), failures as usize);
+            state.records.get_mut("ssh-ng://remote").unwrap().checked_at = 0;
+            fs::write(&state_path, serde_json::to_vec(&state).unwrap()).unwrap();
+        }
+        fs::write(&recovered, "ready").unwrap();
+        invoke(&directory, &nix, false).unwrap();
+        let state = load_state(&state_path, &nix).unwrap();
+        assert_eq!(state.records["ssh-ng://remote"].failures, 0);
+        assert_eq!(
+            fs::read_to_string(directory.join("machines")).unwrap(),
+            "ssh-ng://remote\n"
+        );
+        fs::remove_dir_all(directory).unwrap();
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn overlapping_runs_share_the_latest_result() {
+        let directory = temp_dir();
+        let calls = directory.join("calls");
+        let nix = executable(
+            &directory,
+            "nix",
+            &format!("printf x >> '{}'\nsleep 0.1\nexit 0", calls.display()),
+        );
+        fs::write(directory.join("candidates"), "probe ssh-ng://remote").unwrap();
+        thread::scope(|scope| {
+            let first = scope.spawn(|| invoke(&directory, &nix, false));
+            let second = scope.spawn(|| invoke(&directory, &nix, false));
+            first.join().unwrap().unwrap();
+            second.join().unwrap().unwrap();
+        });
+        assert_eq!(fs::read(&calls).unwrap(), b"x");
+        fs::remove_dir_all(directory).unwrap();
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn local_error_and_corrupt_cache_preserve_both_files() {
+        let directory = temp_dir();
+        let nix = executable(&directory, "nix", "exit 0");
+        fs::write(directory.join("candidates"), "probe ssh-ng://remote").unwrap();
+        invoke(&directory, &nix, false).unwrap();
+        let state_path = directory.join("machines.state.json");
+        let bytes = fs::read(&state_path).unwrap();
+        assert!(invoke(
+            &directory,
+            &directory.join("missing").into_os_string(),
+            true
+        )
+        .is_err());
+        assert_eq!(fs::read(&state_path).unwrap(), bytes);
+        fs::write(&state_path, "corrupt").unwrap();
+        assert!(invoke(&directory, &nix, false).is_err());
+        assert_eq!(fs::read_to_string(&state_path).unwrap(), "corrupt");
+        assert_eq!(
+            fs::read_to_string(directory.join("machines")).unwrap(),
+            "ssh-ng://remote\n"
+        );
+        fs::remove_dir_all(directory).unwrap();
+    }
+
     #[cfg(unix)]
     #[test]
     fn timeout_kills_descendants_after_leader_exits() {
@@ -550,8 +944,10 @@ mod tests {
         let success = executable(&directory, "success", "exit 0");
         let failure = executable(&directory, "failure", "exit 1");
         let sleeper = executable(&directory, "sleeper", "sleep 10");
-        assert!(probe(&success, "ssh-ng://example", Duration::from_secs(1)).unwrap());
-        assert!(!probe(&failure, "ssh-ng://example", Duration::from_secs(1)).unwrap());
+        // These assertions check exit status, not process-startup latency in a
+        // loaded package sandbox. The separate sleeper checks the short deadline.
+        assert!(probe(&success, "ssh-ng://example", Duration::from_secs(5)).unwrap());
+        assert!(!probe(&failure, "ssh-ng://example", Duration::from_secs(5)).unwrap());
         let started = Instant::now();
         assert!(!probe(&sleeper, "ssh-ng://example", Duration::from_millis(50)).unwrap());
         assert!(started.elapsed() < Duration::from_secs(2));

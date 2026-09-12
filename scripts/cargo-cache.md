@@ -28,7 +28,7 @@ project. It also requires `mbx doctor`'s setup check to pass.
 The shared `Build and cache flake outputs` workflow discovers it natively for
 `x86_64-linux`, `aarch64-linux`, `x86_64-darwin`, and `aarch64-darwin`.
 Each package build runs its Nix checks. Pull requests build without publishing;
-pushes to `master` and manual runs on `master` publish the resulting package
+pushes to `main` and manual runs on `main` publish the resulting package
 and its runtime closure to Cachix. Build-only dependencies and temporary test
 outputs are not selected for upload.
 
@@ -43,7 +43,7 @@ public key declared in `flake.nix`. Repository setup uses these settings in
 - Repository variable `CACHIX_CACHE`: `codyps`.
 - Repository secret `CACHIX_AUTH_TOKEN`: a write token scoped to that cache.
 
-Run `gh workflow run configurations-pilot.yml --ref master` to populate the cache on demand.
+Run `gh workflow run configurations-pilot.yml --ref main` to populate the cache on demand.
 Consumers need the cache URL in `extra-substituters` and its public signing key
 in `extra-trusted-public-keys`, or can run `cachix use CACHE_NAME` to configure
 them. Never put the write token in Nix files. The cache reuses exact Nix store

@@ -3,7 +3,7 @@
 `packages.<system>.caddyFull` is the same plugin-enabled Caddy used by the
 host overlay. The shared **Build and cache flake outputs** workflow discovers it
 on all four platforms, along with the Linux source-bundle outputs. Nixpkgs'
-install checks verify plugin versions. Successful master builds publish the
+install checks verify plugin versions. Successful main builds publish the
 binary and runtime closure using `CACHIX_CACHE` and `CACHIX_AUTH_TOKEN`.
 Pull requests build without publishing. There is no separate Caddy workflow.
 The shared workflow also runs the hash updater's failure-handling tests.

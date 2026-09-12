@@ -1,6 +1,6 @@
 # Automatic flake caching
 
-**Build and cache flake outputs** runs on every push to `master` and on pull
+**Build and cache flake outputs** runs on every push to `main` and on pull
 requests. The daily flake updater explicitly calls it with the exact commit it
 created, because commits made with `GITHUB_TOKEN` do not trigger push workflows.
 It remains manually runnable from Actions; the historical workflow filename is
@@ -17,8 +17,8 @@ ARM Linux and both Darwin platforms. All exported packages are included, so no
 package-specific workflow list needs maintenance. Shared dependencies reuse
 Cachix; concurrently started cold builds may still duplicate work.
 
-Successful `master` push and updater builds publish runtime closures to Cachix.
-PRs and manual branch runs never publish. Manual runs on `master` publish by
+Successful `main` push and updater builds publish runtime closures to Cachix.
+PRs and manual branch runs never publish. Manual runs on `main` publish by
 default; disable the `publish` input for a build-only run. The workflow uses the
 existing `CACHIX_CACHE` variable and `CACHIX_AUTH_TOKEN` secret. Only publishing
 and its credential preflight receive the token.

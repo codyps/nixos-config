@@ -2,12 +2,12 @@ name: Build and cache flake outputs
 
 on:
   push:
-    branches: [master]
+    branches: [main]
   pull_request:
   workflow_dispatch:
     inputs:
       publish:
-        description: Publish successful closures to Cachix (master only)
+        description: Publish successful closures to Cachix (main only)
         type: boolean
         default: true
 
@@ -18,7 +18,7 @@ on:
         required: true
         type: string
       publish:
-        description: Publish successful closures on master
+        description: Publish successful closures on main
         type: boolean
         default: true
 
@@ -83,7 +83,7 @@ jobs:
           persist-credentials: false
 
       - name: Check publishing credentials
-        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/master' && (inputs.publish || (github.event_name == 'push' && inputs.ref == ''))
+        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main' && (inputs.publish || (github.event_name == 'push' && inputs.ref == ''))
         env:
           CACHIX_CACHE: ${{ vars.CACHIX_CACHE }}
           CACHIX_AUTH_TOKEN: ${{ secrets.CACHIX_AUTH_TOKEN }}
@@ -102,7 +102,7 @@ jobs:
         run: python3 scripts/configuration-pilot.py "$CONFIGURATION_TARGET"
 
       - name: Publish target runtime closure
-        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/master' && (inputs.publish || (github.event_name == 'push' && inputs.ref == ''))
+        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main' && (inputs.publish || (github.event_name == 'push' && inputs.ref == ''))
         env:
           CACHIX_CACHE: ${{ vars.CACHIX_CACHE }}
           CACHIX_AUTH_TOKEN: ${{ secrets.CACHIX_AUTH_TOKEN }}

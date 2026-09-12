@@ -1,0 +1,11 @@
+[package]
+name = "nix-dynamic-machines"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+description = "Build a Nix remote-machines file from reachable candidates"
+
+[profile.release]
+strip = true
+lto = true
+codegen-units = 1

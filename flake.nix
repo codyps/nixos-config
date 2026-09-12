@@ -148,6 +148,7 @@
             atuin = pkgs.atuin;
             mbx = pkgs.mbx;
             caddyFull = pkgs.caddyFull;
+            nix-dynamic-machines = pkgs.nix-dynamic-machines;
           } // pkgs.lib.optionalAttrs pkgs.stdenv.hostPlatform.isLinux {
             # Refresh both platform-independent source bundles on Linux CI.
             caddy-source = (import nixpkgs {

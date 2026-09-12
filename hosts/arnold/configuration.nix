@@ -377,7 +377,7 @@ in
 
   environment.systemPackages = with pkgs; [
     neovim
-    linuxPackages.perf
+    perf
     git
     curl
     htop
@@ -1018,10 +1018,19 @@ in
   };
 
   services.sabnzbd = {
-    # TODO: generate/track config file here instead of using the default
     enable = true;
-    configFile = "/persist/etc/sabnzbd/sabnzbd.ini";
+    configFile = null;
+    allowConfigWrite = true;
   };
+
+  # Seed the module's writable state from the legacy external configuration.
+  # Once migrated, the module preserves changes made through the web UI.
+  systemd.services.sabnzbd.preStart = lib.mkBefore ''
+    if [[ ! -e /var/lib/sabnzbd/sabnzbd.ini && -e /persist/etc/sabnzbd/sabnzbd.ini ]]; then
+      ${pkgs.coreutils}/bin/install -D -m 0600 -o sabnzbd -g sabnzbd \
+        /persist/etc/sabnzbd/sabnzbd.ini /var/lib/sabnzbd/sabnzbd.ini
+    fi
+  '';
 
   services.prowlarr = {
     # TODO: set port here

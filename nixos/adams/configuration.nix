@@ -27,9 +27,6 @@
     dpi = 180;
 
     videoDrivers = [ "vmware" ];
-    displayManager.defaultSession = "none+i3";
-    displayManager.autoLogin.enable = true;
-    displayManager.autoLogin.user = "x";
     windowManager.i3 = {
       enable = true;
       extraPackages = with pkgs; [
@@ -40,6 +37,10 @@
       ];
     };
   };
+
+  services.displayManager.defaultSession = "none+i3";
+  services.displayManager.autoLogin.enable = true;
+  services.displayManager.autoLogin.user = "x";
 
   users.users.x = {
     isNormalUser = true;

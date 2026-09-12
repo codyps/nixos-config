@@ -71,7 +71,7 @@ in
 
   # Enable the Pantheon Desktop Environment.
   services.xserver.displayManager.lightdm.enable = true;
-  services.xserver.desktopManager.pantheon.enable = true;
+  services.desktopManager.pantheon.enable = true;
   services.gvfs.enable = true;
 
   # Configure keymap in X11
@@ -167,7 +167,7 @@ in
 
   hardware.graphics = {
     enable = true;
-    extraPackages = [ pkgs.mesa.drivers ];
+    extraPackages = [ pkgs.mesa ];
   };
 
   services.xserver.videoDrivers = [

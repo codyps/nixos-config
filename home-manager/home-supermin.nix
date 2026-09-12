@@ -9,6 +9,8 @@ let
   ;
 in
 {
+  imports = [ ./git-emdash-hook.nix ];
+
   # This value determines the Home Manager release that your configuration is
   # compatible with. This helps avoid breakage when a new Home Manager release
   # introduces backwards incompatible changes.
@@ -105,6 +107,10 @@ in
       };
       log = {
         date = "iso";
+      };
+      i18n = {
+        commitEncoding = "utf-8";
+        logOutputEncoding = "utf-8";
       };
       color = {
         ui = "auto";

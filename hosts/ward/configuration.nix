@@ -14,7 +14,7 @@ in
   boot.loader.systemd-boot.enable = true;
   boot.loader.efi.canTouchEfiVariables = true;
 
-  systemd.watchdog.runtimeTime = "30s";
+  systemd.settings.Manager.RuntimeWatchdogSec = "30s";
 
   # hashedPasswordFile reads from this
   fileSystems."/persist".neededForBoot = true;
@@ -86,7 +86,7 @@ in
     useSubstitutes = true;
   };
 
-  services.harmonia = {
+  services.harmonia.cache = {
     enable = true;
     signKeyPaths = [
       "/persist/etc/nix-binary-cache/binary-cache.secret"
@@ -396,7 +396,7 @@ in
   services.influxdb = {
     enable = true;
     dataDir = "/persist/var/lib/influxdb";
-    extraConfig = {
+    settings = {
       http = {
         bind-address = "[::1]:8086";
       };
@@ -459,9 +459,9 @@ in
 
 
   # Enable the GNOME Desktop Environment.
-  services.xserver.desktopManager.gnome.enable = true;
-  services.xserver.displayManager.gdm.enable = true;
-  services.xserver.displayManager.gdm.autoSuspend = false;
+  services.desktopManager.gnome.enable = true;
+  services.displayManager.gdm.enable = true;
+  services.displayManager.gdm.autoSuspend = false;
   systemd.targets.sleep.enable = false;
   systemd.targets.suspend.enable = false;
   systemd.targets.hibernate.enable = false;
@@ -519,7 +519,7 @@ in
 
   environment.systemPackages = with pkgs; [
     neovim
-    linuxPackages.perf
+    perf
     git
     curl
     htop

@@ -9,6 +9,8 @@ let
   ;
 in
 {
+  imports = [ ./git-emdash-hook.nix ];
+
   # This value determines the Home Manager release that your configuration is
   # compatible with. This helps avoid breakage when a new Home Manager release
   # introduces backwards incompatible changes.
@@ -32,16 +34,18 @@ in
       if [ -x /opt/homebrew/bin/brew ]; then
         eval $(/opt/homebrew/bin/brew shellenv)
       fi
-    '' +
-    # https://github.com/anthropics/claude-code/issues/2110
-    (if config.programs.direnv.enable then
-      ''
-        #if [ -n "$CLAUDECODE" ]; then
-        #  eval "$(DIRENV_LOG_FORMAT= zsh ${pkgs.direnv}/bin/direnv export zsh)"
-        #fi
-      ''
-    else
-      "");
+    '';
+
+    loginExtra = ''
+      if [ -n "$CLAUDECODE" ]; then
+        # claude loves using "echo ===" as a seperator, but zsh tries to expand it and returns errors
+        unsetopt equals
+      fi
+      if [ -n "$CLAUDECODE" ] && command -v direnv >/dev/null 2>&1; then
+        eval "$(${pkgs.direnv}/bin/direnv hook zsh)"
+        eval "$(DIRENV_LOG_FORMAT= ${pkgs.direnv}/bin/direnv export zsh)"
+      fi
+    '';
   };
 
   programs.bash = {
@@ -56,12 +60,17 @@ in
     # /etc/profile can reset PATH in nested login shells (including Codex's
     # bash -lc), while inherited guards skip hm-session-vars.sh and nix-daemon.sh.
     # Restore session paths on every login, keeping wrappers before the profile.
+    # https://github.com/anthropics/claude-code/issues/2110
+    # goes in `~/.profile`, `~/.bash_profile` is empty
     profileExtra = ''
       export PATH="${lib.concatStringsSep ":" (config.home.sessionPath ++ [ "${config.home.profileDirectory}/bin" ])}:$PATH"
-    '' + (builtins.readFile ../config/.profile) + ''
-      #if [ -n "$CLAUDECODE" ]; then
-      #  eval "$(${pkgs.direnv}/bin/direnv export bash)"
-      #fi
+    '' + (builtins.readFile ../config/.profile);
+
+    bashrcExtra = ''
+      if [ -n "$CLAUDECODE" ] && command -v direnv >/dev/null 2>&1; then
+        eval "$(${pkgs.direnv}/bin/direnv hook bash)"
+        eval "$(DIRENV_LOG_FORMAT= ${pkgs.direnv}/bin/direnv export bash)"
+      fi
     '';
   };
 
@@ -99,7 +108,8 @@ in
       "*~"
       ".DS_Store"
       ".direnv"
-      ".vim/"
+      ".vim"
+      ".claude"
     ];
 
     signing = {
@@ -127,6 +137,10 @@ in
       };
       log = {
         date = "iso";
+      };
+      i18n = {
+        commitEncoding = "utf-8";
+        logOutputEncoding = "utf-8";
       };
       color = {
         ui = "auto";
@@ -282,7 +296,13 @@ in
           let
             atuin-daemon = pkgs.writeShellScriptBin "atuin-daemon" ''
               mkdir -p ${config.home.homeDirectory}/${cache-home}/atuin;
-              ${pkgs.atuin}/bin/atuin daemon;
+              # A stale socket left behind by an unclean shutdown makes the
+              # daemon crash-loop with "Address already in use" (launchd
+              # guarantees a single instance, so removal is safe here).
+              rm -f ${config.home.homeDirectory}/.local/share/atuin/atuin.sock;
+              # exec so atuin gets launchd's SIGTERM directly and can clean up
+              # its socket, instead of dying as an orphan when the shell exits.
+              exec ${pkgs.atuin}/bin/atuin daemon;
             '';
           in
           [ "${atuin-daemon}/bin/atuin-daemon" ];

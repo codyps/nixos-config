@@ -37,6 +37,8 @@ in
     description = "Wrap Cargo to redirect workspace target directories into the shared cache.";
   };
 
+  config.programs.mbx.enable = true;
+
   config.home.packages = [
     #pkgs.cargo-outdated
     #pkgs.ncdu

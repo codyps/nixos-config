@@ -55,8 +55,6 @@ in
 
   programs.zsh.completionInit = "";
 
-  programs.mbx.enable = true;
-
   # Keychain ACLs identify the executable reading a password by its designated
   # code-signing requirement. Sign a mutable copy with a certificate-backed
   # identity so "Always Allow" survives package rebuilds and agent restarts.

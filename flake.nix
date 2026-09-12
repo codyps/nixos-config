@@ -58,9 +58,22 @@
       mkOverlays = nixpkgsSource: [
         (final: prev:
           let
+            # Atuin and its pinned Fenix input still read the deprecated
+            # stdenv.isDarwin/isLinux aliases. Supply equivalent plain values
+            # until those inputs adopt stdenv.hostPlatform.
+            compatStdenv = prev.stdenv // {
+              isDarwin = prev.stdenv.hostPlatform.isDarwin;
+              isLinux = prev.stdenv.hostPlatform.isLinux;
+            };
+            compatPkgs = prev // {
+              stdenv = compatStdenv;
+              callPackage = prev.lib.callPackageWith compatPkgs;
+            };
             # Use each host's package set, including the pinned Intel Darwin
             # stdenv, with the Rust version required by the Atuin fork.
-            atuinToolchain = (prev.callPackage atuin.inputs.fenix { }).fromToolchainFile {
+            atuinToolchain = (prev.callPackage atuin.inputs.fenix {
+              pkgs = compatPkgs;
+            }).fromToolchainFile {
               file = atuin + "/rust-toolchain.toml";
               sha256 = "sha256-P30Tm3O7vQAE725YtDCDHGjNrSsfZO4us11UwJGZSJo=";
             };
@@ -71,6 +84,7 @@
           {
             inherit caddy;
             atuin = prev.callPackage (atuin + "/atuin.nix") {
+              stdenv = compatStdenv;
               rustPlatform = prev.makeRustPlatform {
                 cargo = atuinToolchain;
                 rustc = atuinToolchain;
@@ -588,7 +602,6 @@
               })
               ./home-manager/home.nix
               ({ lib, ... }: {
-                programs.mbx.enable = true;
                 programs.git.signing = {
                   format = lib.mkForce "ssh";
                   key = lib.mkForce "~/.ssh/id_ed25519";

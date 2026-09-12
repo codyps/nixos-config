@@ -29,16 +29,9 @@
   # Enable the X11 windowing system.
   services.xserver = {
     enable = true;
-    libinput.enable = true;
 
     desktopManager = {
       xterm.enable = false;
-    };
-
-    displayManager = {
-      lightdm.enable = true;
-      autoLogin = { enable = true; user = "cody"; };
-      defaultSession = "custom-i3";
     };
 
     displayManager.session = [{
@@ -58,9 +51,16 @@
     };
   };
 
+  services.libinput.enable = true;
+  services.displayManager = {
+    autoLogin = { enable = true; user = "cody"; };
+    defaultSession = "custom-i3";
+  };
+  services.xserver.displayManager.lightdm.enable = true;
+
   services.avahi = {
     enable = true;
-    nssmdns = true;
+    nssmdns4 = true;
     publish = {
       enable = true;
       addresses = true;

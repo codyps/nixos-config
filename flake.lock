@@ -10,16 +10,16 @@
         ]
       },
       "locked": {
-        "lastModified": 1788932636,
-        "narHash": "sha256-yHAm+Ycn3xDS/lafZZIafi3ACjvUDV+JcVLr3OfZi3w=",
+        "lastModified": 1789053741,
+        "narHash": "sha256-D/RqIB3xBQCjfgFkN35uona+9Sd3SF7qKbCZJi3kTz8=",
         "owner": "codyps",
         "repo": "atuin",
-        "rev": "e6460ff3a2ce841fc923c29a63b5aafced9fc13d",
+        "rev": "688bd7601143d4b08cc4fd8ebea1471e031728ff",
         "type": "github"
       },
       "original": {
         "owner": "codyps",
-        "ref": "ctrl-r-memory",
+        "ref": "fuzzy-scoring-allocations",
         "repo": "atuin",
         "type": "github"
       }

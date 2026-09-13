@@ -1,7 +1,7 @@
 {
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
-    atuin.url = "github:codyps/atuin/ctrl-r-memory";
+    atuin.url = "github:codyps/atuin/fuzzy-scoring-allocations";
     atuin.inputs.nixpkgs.follows = "nixpkgs";
     nix-darwin.url = "github:LnL7/nix-darwin";
     nix-darwin.inputs.nixpkgs.follows = "nixpkgs";

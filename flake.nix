@@ -23,6 +23,8 @@
     flake-utils.url = "github:numtide/flake-utils";
     disko.url = "github:codyps/disko";
     disko.inputs.nixpkgs.follows = "nixpkgs";
+    lanzaboote.url = "github:nix-community/lanzaboote";
+    lanzaboote.inputs.nixpkgs.follows = "nixpkgs";
 
     #targo.url = "github:codyps/targo";
     #targo.inputs.nixpkgs.follows = "nixpkgs";
@@ -50,7 +52,7 @@
     ];
   };
 
-  outputs = { self, atuin, nixpkgs, nixpkgs-darwin, flake-utils, nix-darwin, nix-darwin-26-05, home-manager, home-manager-26-05, nixos-wsl, nixos-vscode-server, impermanence, sops-nix, disko, clipway }:
+  outputs = { self, atuin, nixpkgs, nixpkgs-darwin, flake-utils, nix-darwin, nix-darwin-26-05, home-manager, home-manager-26-05, nixos-wsl, nixos-vscode-server, impermanence, sops-nix, disko, lanzaboote, clipway }:
     let
       withCache = constructor: args: constructor (args // {
         modules = [ ./modules/nix-cache.nix ] ++ args.modules;
@@ -158,6 +160,11 @@
           };
         in
         {
+          checks = pkgs.lib.optionalAttrs (system == "x86_64-linux") {
+            warbler-vm = import ./hosts/warbler/vm-test.nix {
+              inherit pkgs self disko impermanence lanzaboote sops-nix;
+            };
+          };
           packages = {
             atuin = pkgs.atuin;
             mbx = pkgs.mbx;
@@ -195,6 +202,28 @@
         nixosModules.nix-dynamic-machines = import ./nixos-modules/nix-dynamic-machines.nix;
         darwinModules.nix-dynamic-machines = import ./nix-darwin/modules/nix-dynamic-machines.nix;
         nixosConfigurations = {
+          warbler-bootstrap = self.nixosConfigurations.warbler.extendModules {
+            modules = [
+              ({ lib, ... }: {
+                warbler.remoteUnlock.enable = lib.mkForce false;
+                warbler.tpmUnlock.enable = lib.mkForce false;
+              })
+            ];
+          };
+          warbler = nixosSystem {
+            system = "x86_64-linux";
+            specialArgs = { inherit self; };
+            modules = [
+              disko.nixosModules.disko
+              impermanence.nixosModules.impermanence
+              lanzaboote.nixosModules.lanzaboote
+              sops-nix.nixosModules.sops
+              ./nixos/common.nix
+              ./hosts/warbler/configuration.nix
+              { nixpkgs = nixpkgsConfig; }
+            ];
+          };
+
           # u3 macbook vmware vm
           mifflin = nixosSystem {
             system = "x86_64-linux";

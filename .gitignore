@@ -3,3 +3,4 @@ keys/
 result
 .direnv
 .cloudflare
+__pycache__/

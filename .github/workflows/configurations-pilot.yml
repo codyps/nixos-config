@@ -45,6 +45,8 @@ jobs:
         run: python3 scripts/test-configuration-pilot.py
       - name: Test Caddy hash updater
         run: python3 scripts/test-update-caddy-hashes.py
+      - name: Test dynamic builder modules
+        run: nix eval --impure --json --option eval-cache false --file scripts/test-nix-dynamic-machines-modules.nix
       - name: Check persistent cache settings for every configuration
         run: |
           nix eval --accept-flake-config --no-update-lock-file --impure --json \

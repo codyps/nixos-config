@@ -9,7 +9,10 @@ description = "Build a Nix remote-machines file from reachable candidates"
 [dependencies]
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-wait-timeout = "0.2.1"
+tokio = { version = "1", features = ["rt", "macros", "process", "signal", "sync", "time"] }
+
+[dev-dependencies]
+tokio = { version = "1", features = ["test-util"] }
 
 [profile.release]
 strip = true

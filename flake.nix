@@ -192,6 +192,8 @@
         nixosSystem = withCache nixpkgs.lib.nixosSystem;
       in
       {
+        nixosModules.nix-dynamic-machines = import ./nixos-modules/nix-dynamic-machines.nix;
+        darwinModules.nix-dynamic-machines = import ./nix-darwin/modules/nix-dynamic-machines.nix;
         nixosConfigurations = {
           # u3 macbook vmware vm
           mifflin = nixosSystem {

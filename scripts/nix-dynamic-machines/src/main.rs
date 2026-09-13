@@ -4,19 +4,15 @@ use std::ffi::OsString;
 use std::fs::{self, OpenOptions};
 use std::io::{self, Write};
 use std::path::{Path, PathBuf};
-use std::process::{Child, Command, ExitCode, Stdio};
-use std::sync::atomic::{AtomicUsize, Ordering};
-use std::sync::Mutex;
-use std::thread;
+use std::process::{ExitCode, Stdio};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use serde::{Deserialize, Serialize};
-use wait_timeout::ChildExt;
+use tokio::process::{Child, Command};
+mod scheduler;
 
 #[cfg(unix)]
 use std::os::unix::fs::OpenOptionsExt;
-#[cfg(unix)]
-use std::os::unix::process::CommandExt;
 
 const USAGE: &str = "Usage: nix-dynamic-machines --candidates PATH --output PATH [OPTIONS]
 
@@ -29,6 +25,7 @@ Options:
   --retry-interval SEC    first retry after failure (default: 15)
   --max-retry-interval SEC  maximum retry delay (default: 120)
   --force                 probe now, ignoring cached deadlines (never probes always)
+  --watch                 stay running; SIGHUP reloads and refreshes probe entries
   -h, --help              show this help
 
 Each non-comment candidate line is `probe MACHINE_SPEC` or `always MACHINE_SPEC`,
@@ -47,7 +44,7 @@ struct Candidate {
     probe_uri: String,
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 struct Args {
     candidates: PathBuf,
     output: PathBuf,
@@ -57,6 +54,7 @@ struct Args {
     state: PathBuf,
     policy: Policy,
     force: bool,
+    watch: bool,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -100,7 +98,7 @@ impl ProbeRecord {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 struct State {
     version: u32,
     nix: PathBuf,
@@ -183,8 +181,7 @@ fn run(args: impl Iterator<Item = OsString>) -> Result<(), String> {
         paths.push(resolved);
     }
     // Hold a separate, stable lock across reads, probes, and both publications.
-    // Concurrent timer/manual runs then consume the latest cache rather than
-    // probing twice or publishing an older observation after a newer one.
+    // Reject overlapping runs instead of waiting indefinitely behind a watcher.
     let lock = OpenOptions::new()
         .read(true)
         .write(true)
@@ -192,12 +189,15 @@ fn run(args: impl Iterator<Item = OsString>) -> Result<(), String> {
         .truncate(false)
         .open(&lock_path)
         .map_err(|e| format!("cannot open lock: {e}"))?;
-    lock.lock()
-        .map_err(|e| format!("cannot lock output: {e}"))?;
+    lock.try_lock()
+        .map_err(|e| format!("cannot lock output (another instance may be running; send SIGHUP to refresh a watcher): {e}"))?;
     let source = fs::read_to_string(&args.candidates)
         .map_err(|e| format!("cannot read {}: {e}", args.candidates.display()))?;
     let candidates = parse_candidates(&source)?;
     let mut state = load_state(&args.state, &args.nix)?;
+    if args.watch {
+        return runtime()?.block_on(scheduler::watch(&args, candidates, state));
+    }
     let now = now_seconds()?;
     let due: Vec<_> = candidates
         .iter()
@@ -274,6 +274,7 @@ fn parse_args(mut args: impl Iterator<Item = OsString>) -> Result<Option<Args>, 
     let mut state = None;
     let mut policy = Policy::default();
     let mut force = false;
+    let mut watch = false;
 
     while let Some(arg) = args.next() {
         let text = arg
@@ -290,6 +291,7 @@ fn parse_args(mut args: impl Iterator<Item = OsString>) -> Result<Option<Args>, 
             "--nix" => nix = value(&mut args, text)?,
             "--state" => state = Some(PathBuf::from(value(&mut args, text)?)),
             "--force" => force = true,
+            "--watch" => watch = true,
             "--healthy-interval" | "--retry-interval" | "--max-retry-interval" => {
                 let seconds = value(&mut args, text)?
                     .to_str()
@@ -342,6 +344,7 @@ fn parse_args(mut args: impl Iterator<Item = OsString>) -> Result<Option<Args>, 
         state,
         policy,
         force,
+        watch,
     }))
 }
 
@@ -467,51 +470,71 @@ fn reconcile(
     timeout: Duration,
     parallelism: usize,
 ) -> Result<Vec<bool>, String> {
-    if candidates.is_empty() {
-        return Ok(Vec::new());
-    }
-    let next = AtomicUsize::new(0);
-    let results = Mutex::new(vec![false; candidates.len()]);
-    let errors = Mutex::new(Vec::new());
-    let workers = parallelism.min(candidates.len()).max(1);
-
-    thread::scope(|scope| {
-        for _ in 0..workers {
-            scope.spawn(|| loop {
-                let index = next.fetch_add(1, Ordering::Relaxed);
-                let Some(candidate) = candidates.get(index) else {
-                    break;
-                };
-                let healthy = match candidate.mode {
-                    Mode::Always => true,
-                    Mode::Probe => match probe(nix, &candidate.probe_uri, timeout) {
-                        Ok(true) => true,
-                        Ok(false) => {
-                            eprintln!("nix-dynamic-machines: unavailable: {}", candidate.probe_uri);
-                            false
-                        }
-                        Err(error) => {
-                            errors.lock().expect("errors lock poisoned").push(format!(
-                                "cannot execute probe for {}: {error}",
-                                candidate.probe_uri
-                            ));
-                            false
-                        }
-                    },
-                };
-                results.lock().expect("results lock poisoned")[index] = healthy;
-            });
+    runtime()?.block_on(async {
+        let (_cancel, receiver) = tokio::sync::watch::channel(false);
+        let mut jobs = tokio::task::JoinSet::new();
+        let mut next = 0;
+        let mut results = vec![false; candidates.len()];
+        let mut errors = Vec::new();
+        while next < candidates.len() || !jobs.is_empty() {
+            while next < candidates.len() && jobs.len() < parallelism {
+                let index = next;
+                next += 1;
+                let candidate = candidates[index].clone();
+                let nix = nix.clone();
+                let receiver = receiver.clone();
+                jobs.spawn(async move {
+                    let result = if candidate.mode == Mode::Always {
+                        Ok(true)
+                    } else {
+                        probe_async(&nix, &candidate.probe_uri, timeout, receiver).await
+                    };
+                    (index, result)
+                });
+            }
+            if let Some(result) = jobs.join_next().await {
+                match result {
+                    Ok((index, Ok(healthy))) => results[index] = healthy,
+                    Ok((_, Err(error))) => errors.push(error.to_string()),
+                    Err(error) => errors.push(error.to_string()),
+                }
+            }
         }
-    });
-
-    let errors = errors.into_inner().expect("errors lock poisoned");
-    if !errors.is_empty() {
-        return Err(errors.join("; "));
-    }
-    Ok(results.into_inner().expect("results lock poisoned"))
+        if errors.is_empty() {
+            Ok(results)
+        } else {
+            Err(errors.join("; "))
+        }
+    })
 }
 
+fn runtime() -> Result<tokio::runtime::Runtime, String> {
+    tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .map_err(|e| e.to_string())
+}
+
+#[cfg(test)]
 fn probe(nix: &OsString, uri: &str, timeout: Duration) -> io::Result<bool> {
+    let (_cancel, receiver) = tokio::sync::watch::channel(false);
+    runtime()
+        .map_err(io::Error::other)?
+        .block_on(probe_async(nix, uri, timeout, receiver))
+}
+
+async fn probe_async(
+    nix: &OsString,
+    uri: &str,
+    timeout: Duration,
+    mut cancel: tokio::sync::watch::Receiver<bool>,
+) -> io::Result<bool> {
+    if *cancel.borrow() {
+        return Err(io::Error::new(
+            io::ErrorKind::Interrupted,
+            "probe cancelled",
+        ));
+    }
     let mut command = Command::new(nix);
     command
         .args(["store", "ping", "--store", uri])
@@ -522,13 +545,12 @@ fn probe(nix: &OsString, uri: &str, timeout: Duration) -> io::Result<bool> {
     command.process_group(0);
 
     let mut child = command.spawn()?;
-    // SIGCHLD-backed waiting on Unix; no periodic try_wait wakeups.
-    // Recheck once at the deadline: signal delivery can lag process exit, and
-    // an already-completed child must not be classified as a timeout.
-    let result = child.wait_timeout(timeout).and_then(|status| match status {
-        Some(status) => Ok(Some(status)),
-        None => child.try_wait(),
-    });
+    let result = tokio::select! {
+        biased;
+        _ = cancel.changed() => Err(io::Error::new(io::ErrorKind::Interrupted, "probe cancelled")),
+        status = child.wait() => status.map(Some),
+        _ = tokio::time::sleep(timeout) => child.try_wait(),
+    };
     match result {
         Ok(Some(status)) => {
             if !status.success() {
@@ -538,23 +560,24 @@ fn probe(nix: &OsString, uri: &str, timeout: Duration) -> io::Result<bool> {
         }
         Ok(None) => {
             eprintln!("nix-dynamic-machines: probe timed out after {timeout:?}: {uri}");
-            terminate_process_group(&mut child);
+            terminate_process_group(&mut child).await;
             Ok(false)
         }
         Err(error) => {
-            terminate_process_group(&mut child);
+            terminate_process_group(&mut child).await;
             Err(error)
         }
     }
 }
 
 #[cfg(unix)]
-fn terminate_process_group(child: &mut Child) {
+async fn terminate_process_group(child: &mut Child) {
     unsafe extern "C" {
         fn kill(pid: i32, signal: i32) -> i32;
     }
 
-    let process_group = -(child.id() as i32);
+    let Some(id) = child.id() else { return };
+    let process_group = -(id as i32);
     // SAFETY: The child was placed in a new process group whose ID is its PID.
     // Negative PID targets only that group. Failure is harmless and is followed
     // by Child::kill as a direct-process fallback.
@@ -563,20 +586,20 @@ fn terminate_process_group(child: &mut Child) {
     }
     // Do not reap the leader during the grace period: its PID keeps the group
     // identity reserved even if it exits before a descendant handles SIGTERM.
-    thread::sleep(Duration::from_millis(200));
+    tokio::time::sleep(Duration::from_millis(200)).await;
     // SAFETY: Same process-group argument as above; SIGKILL ensures descendants
     // such as ssh do not survive a timed-out nix process.
     unsafe {
         kill(process_group, 9);
     }
-    let _ = child.kill();
-    let _ = child.wait();
+    let _ = child.start_kill();
+    let _ = child.wait().await;
 }
 
 #[cfg(not(unix))]
-fn terminate_process_group(child: &mut Child) {
-    let _ = child.kill();
-    let _ = child.wait();
+async fn terminate_process_group(child: &mut Child) {
+    let _ = child.start_kill();
+    let _ = child.wait().await;
 }
 
 fn render(candidates: &[Candidate], healthy: &[bool]) -> String {
@@ -623,7 +646,8 @@ fn atomic_write_if_changed(path: &Path, contents: &[u8]) -> io::Result<bool> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::sync::atomic::AtomicU64;
+    use std::sync::atomic::{AtomicU64, Ordering};
+    use std::thread;
     use std::time::Instant;
 
     static NEXT_TEMP: AtomicU64 = AtomicU64::new(0);
@@ -847,7 +871,7 @@ mod tests {
 
     #[cfg(unix)]
     #[test]
-    fn overlapping_runs_share_the_latest_result() {
+    fn overlapping_runs_fail_promptly_then_reuse_the_latest_result() {
         let directory = temp_dir();
         let calls = directory.join("calls");
         let nix = executable(
@@ -859,9 +883,11 @@ mod tests {
         thread::scope(|scope| {
             let first = scope.spawn(|| invoke(&directory, &nix, false));
             let second = scope.spawn(|| invoke(&directory, &nix, false));
-            first.join().unwrap().unwrap();
-            second.join().unwrap().unwrap();
+            let first = first.join().unwrap();
+            let second = second.join().unwrap();
+            assert!(first.is_ok() || second.is_ok());
         });
+        invoke(&directory, &nix, false).unwrap();
         assert_eq!(fs::read(&calls).unwrap(), b"x");
         fs::remove_dir_all(directory).unwrap();
     }

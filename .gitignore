@@ -4,3 +4,4 @@ result
 .direnv
 .cloudflare
 __pycache__/
+.security-audit/

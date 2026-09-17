@@ -1,4 +1,4 @@
-"""Attended TPM provisioning on the installed warbler; never run at activation."""
+"""Idempotent initrd credential provisioning and attended LUKS TPM enrollment."""
 
 import argparse
 import fcntl
@@ -25,7 +25,7 @@ def require(condition, message):
         raise RuntimeError(message)
 
 
-def preflight():
+def preflight(*, require_current_generation=True):
     require(os.geteuid() == 0, "Run with sudo on warbler.")
     require(os.uname().nodename == "warbler", "Run on the installed warbler, not the installer.")
     for name, expected in [("SecureBoot", 1), ("SetupMode", 0)]:
@@ -33,8 +33,11 @@ def preflight():
         require(len(data) == 5 and data[4] == expected,
                 "Boot with Secure Boot enabled and Setup Mode disabled first.")
     require(Path("/dev/tpmrm0").exists(), "No TPM resource manager is available.")
-    require(Path("/run/booted-system").resolve() == Path("/run/current-system").resolve(),
-            "Reboot into the current generation before provisioning TPM state.")
+    # Credential sealing binds only PCR 7 (Secure Boot policy), not the kernel
+    # generation. Disk enrollment still requires the booted measured policy.
+    if require_current_generation:
+        require(Path("/run/booted-system").resolve() == Path("/run/current-system").resolve(),
+                "Reboot into the current generation before provisioning TPM state.")
     source = run("findmnt", "--evaluate", "-n", "-o", "SOURCE", "--mountpoint", "/persist").decode().strip()
     # Btrfs st_dev/MAJ:MIN describes an anonymous filesystem device, not its
     # backing block device. Compare the resolved source after removing subvol.
@@ -59,7 +62,10 @@ def credentials(args, work):
     STORE.mkdir(mode=0o700, parents=True, exist_ok=True)
     os.chmod(STORE, 0o700)
     pending = []
-    for name, supplied in [("wifi", args.wifi_file), ("ssh-host-key", args.ssh_key_file)]:
+    inputs = [("ssh-host-key", args.ssh_key_file)]
+    if not args.ssh_only:
+        inputs.insert(0, ("wifi", args.wifi_file))
+    for name, supplied in inputs:
         plain = work / name
         target = STORE / name
         if supplied:
@@ -68,6 +74,8 @@ def credentials(args, work):
             # Fail rather than silently rotating an identity after TPM/policy loss.
             decrypt(name, target, plain)
         elif name == "ssh-host-key":
+            require(not (STORE / "ssh-host-key.pub").exists(),
+                    "Initrd SSH ciphertext is missing; restore it rather than rotating the saved identity.")
             run("ssh-keygen", "-q", "-t", "ed25519", "-N", "", "-f", str(plain))
         else:
             raise RuntimeError("First setup needs --wifi-file /run/warbler-wifi.conf (mode 0600).")
@@ -75,7 +83,7 @@ def credentials(args, work):
         if name == "ssh-host-key":
             public = run("ssh-keygen", "-y", "-f", str(plain))
             (work / "ssh-host-key.pub").write_bytes(public)
-            if target.exists() and supplied:
+            if supplied and (target.exists() or (STORE / "ssh-host-key.pub").exists()):
                 saved_public = STORE / "ssh-host-key.pub"
                 if saved_public.exists():
                     old_public = saved_public.read_bytes()
@@ -93,7 +101,7 @@ def credentials(args, work):
             decrypt(name, encrypted, check)
             require(check.read_bytes() == plain.read_bytes(), "Credential round-trip failed.")
             pending.append((encrypted, target))
-    # Validate both credentials before publishing any changes. Only ciphertext
+    # Validate all requested credentials before publishing changes. Only ciphertext
     # crosses onto persistent storage; each rename is atomic on that filesystem.
     for source, target in pending:
         with tempfile.NamedTemporaryFile(dir=STORE, prefix=".sealed-", delete=False) as out:
@@ -157,10 +165,13 @@ def main():
     creds = commands.add_parser("credentials", help="Seal or verify initrd SSH/Wi-Fi credentials")
     creds.add_argument("--wifi-file", type=Path)
     creds.add_argument("--ssh-key-file", type=Path, help="Existing key to preserve; otherwise generated once")
+    creds.add_argument("--ssh-only", action="store_true", help="Provision Ethernet SSH without Wi-Fi credentials")
     commands.add_parser("enroll-disk", help="Verify recovery passphrase and add a TPM LUKS token")
     args = parser.parse_args()
     os.umask(0o077)
-    config = preflight()
+    require(not (args.command == "credentials" and args.ssh_only and args.wifi_file),
+            "--ssh-only cannot be combined with --wifi-file.")
+    config = preflight(require_current_generation=args.command == "enroll-disk")
     with open("/run/warbler-tpm-setup.lock", "w") as lock:
         fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
         with tempfile.TemporaryDirectory(prefix="warbler-tpm-", dir="/run") as directory:

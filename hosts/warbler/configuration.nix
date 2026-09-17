@@ -3,7 +3,7 @@ let
   inherit (import ../../nixos/ssh-auth.nix) authorizedKeys;
 in
 {
-  imports = [ ./hardware-configuration.nix ./disko.nix ./reset-root.nix ./wifi.nix ./tpm-setup.nix ./secrets.nix ];
+  imports = [ ./hardware-configuration.nix ./disko.nix ./reset-root.nix ./wifi.nix ./tpm-setup.nix ./secrets.nix ./usbguard.nix ];
 
   options.warbler.tpmUnlock.enable = lib.mkEnableOption "TPM measured-boot unlocking after enrollment";
   options.warbler.rootVolumeKeyId = lib.mkOption {
@@ -18,6 +18,7 @@ in
     default = true;
     description = "TPM-protected initrd SSH and Wi-Fi; disable for initial local-console provisioning";
   };
+  options.warbler.remoteUnlock.wifi.enable = lib.mkEnableOption "Wi-Fi in addition to Ethernet for remote LUKS unlocking";
 
   config = {
     # Public identity of the current installation; replace after reformatting.
@@ -33,6 +34,9 @@ in
 
     # Enable only after Secure Boot is enrolled and pcrlock support is verified.
     warbler.tpmUnlock.enable = lib.mkDefault false;
+    # Enable after firmware Secure Boot is enabled. The credential service and
+    # bootloader hook provision the persistent SSH credential automatically.
+    warbler.remoteUnlock.enable = false;
     boot.loader = {
       systemd-boot.enable = lib.mkForce false;
       systemd-boot.editor = false;

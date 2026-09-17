@@ -10,7 +10,7 @@ let
     RestartSec = "2s";
   };
 in
-lib.mkIf config.warbler.remoteUnlock.enable {
+lib.mkIf (config.warbler.remoteUnlock.enable && config.warbler.remoteUnlock.wifi.enable) {
   # Only TPM-encrypted ciphertext is appended to the initrd. Decryption fails
   # closed: there is no plaintext credential fallback on the ESP.
   boot.initrd.secrets."/etc/credstore.encrypted/wifi" = credentials;

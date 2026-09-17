@@ -4,6 +4,44 @@ Inspected at `nixos@nixos.bed.einic.org`: x86_64 AMD, 64 GB RAM, UEFI,
 TPM 2.0 (`systemd-pcrlock is-supported` returned `yes`), Secure Boot disabled.
 The installer currently uses Wi-Fi `wlp3s0` (rtw89_8852ae); `eno1` is unplugged.
 
+## USB device approval
+
+`usbguard.nix` blocks unfamiliar USB peripherals, including new keyboards.
+The Logitech receiver inspected on 2026-09-16 is allowed by descriptor hash,
+interface set, and port `6-2`. Keep it in that port; moving it or changing USB
+bus numbering requires reviewing its rule over SSH. Root controllers retain
+their state; external hubs require approval. The internal Realtek Bluetooth
+radio and Samsung flash drive are deliberately not allowlisted.
+
+Approve a device temporarily over SSH:
+
+```sh
+sudo usbguard list-devices --blocked
+sudo usbguard allow-device DEVICE_ID
+sudo usbguard list-devices --allowed
+sudo usbguard block-device DEVICE_ID
+```
+
+Use the numeric ID at the start of the listing, and inspect the device before
+approval. Temporary approval does not add an allowlist entry. Reconnecting the
+device or restarting USBGuard reapplies the declarative policy. Permanent
+exceptions belong in `usbguard.nix`; do not use `allow-device --permanent` with
+the immutable Nix policy. Do not blindly import `generate-policy` output: it
+trusts everything currently attached. Unmount storage before blocking it.
+
+This policy takes effect when the normal system's USBGuard service starts.
+It does **not** yet enforce USB authorization in firmware or the initrd. Early
+boot denial is a separate follow-up requiring an attended unlock/recovery test;
+do not add `usbcore.authorized_default=0` alone, which would also block the
+USB unlock keyboard before USBGuard starts. Device descriptors are spoofable;
+this is an allowlist, not cryptographic device authentication.
+
+During deployment on 2026-09-16, no `/persist/credstore.encrypted` directory
+was present, and Secure Boot was disabled. `warbler.remoteUnlock.enable` stays
+explicitly false until Secure Boot is enabled. This preserves local
+passphrase unlocking and avoids generating a boot entry that requires missing
+initrd secrets; the root-volume identity check remains enabled.
+
 ## Physical firmware checklist
 
 User-supplied `lshw` identifies an **HP EliteDesk 805 G8 Desktop Mini PC**,
@@ -41,7 +79,7 @@ database retained. Then follow credential sealing and optional disk enrollment
 below. Firmware/TPM changes after sealing can require recovery and resealing;
 keep the LUKS passphrase and encrypted secret backups available.
 
-Wi-Fi must remain enabled for initrd networking. Firmware PXE/Wi-Fi boot is not
+Wi-Fi must remain enabled if optional initrd Wi-Fi is configured. Firmware PXE/Wi-Fi boot is not
 required: the Linux initrd performs association. CPU virtualization is needed
 for KVM tests, not for LUKS or impermanence; the successful physical-host KVM
 test already establishes that it was usable. Leave the SATA disk untouched.
@@ -139,7 +177,7 @@ are appended to the initrd at installation/rebuild time:
 
 | Source on encrypted storage | Credential name | Consumer |
 | --- | --- | --- |
-| `/persist/credstore.encrypted/wifi` | `wifi` | wpa_supplicant in both boot stages |
+| `/persist/credstore.encrypted/wifi` (optional) | `wifi` | wpa_supplicant in both boot stages |
 | `/persist/credstore.encrypted/ssh-host-key` | `ssh-host-key` | initrd sshd only |
 
 systemd `LoadCredentialEncrypted` decrypts into private runtime memory. There
@@ -400,32 +438,41 @@ the TPM helper. Commands below are instructions, not evidence of installation.
    another cold boot and the same checks. No further BIOS changes are needed
    in the normal flow below.
 
-8. **Secure Boot verified — seal credentials:** in a root shell on this
-   installed system, create a complete wpa_supplicant
-   config in `/run/warbler-wifi.conf` using an editor, with mode 0600:
+8. **Secure Boot verified: automatic credentials:**
+   `warbler-initrd-credentials.service` runs after `/persist` and the TPM are
+   available. It generates a dedicated initrd SSH key once, seals it to TPM PCR
+   7, verifies decryption, and persists only ciphertext and the public key under
+   `/persist/credstore.encrypted` (directory mode 0700, files mode 0600). It is
+   skipped while Secure Boot is disabled. Check it with:
 
-   ```text
-   network={
-     ssid="YOUR_SSID"
-     psk="YOUR_WIFI_PASSWORD"
-   }
+   ```sh
+   sudo systemctl start warbler-initrd-credentials.service
+   sudo systemctl status warbler-initrd-credentials.service
+   sudo ssh-keygen -lf /persist/credstore.encrypted/ssh-host-key.pub
    ```
 
-   The installed helper seals it and generates/seals a dedicated initrd SSH
-   host key. Run this after rebooting into the current installed generation:
+   The default is Ethernet-only; no Wi-Fi input is needed. Repeated runs verify
+   and retain the existing ciphertext and identity. A failed decrypt or missing
+   ciphertext with a saved public identity fails rather than generating a new
+   identity. The bootloader-install hook runs the same provisioning helper
+   **before** Lanzaboote appends secrets when remote unlock is enabled, covering
+   the first rebuild without depending on systemd service activation ordering.
+   Failure prevents bootloader installation; it never falls back to plaintext.
+   Credential provisioning can run after a configuration switch because it binds
+   PCR 7, not a particular kernel generation. LUKS TPM enrollment still requires
+   booting the current generation and explicitly verifying a recovery passphrase.
+
+   For optional Wi-Fi, set `warbler.remoteUnlock.wifi.enable = true` and supply a
+   complete root-owned mode-0600 wpa_supplicant configuration from `/run`:
 
    ```sh
    sudo warbler-tpm-setup credentials --wifi-file /run/warbler-wifi.conf
    ```
 
-   The helper checks Secure Boot, TPM availability, and the encrypted `/persist`
-   mount, round-trips both credentials before publishing ciphertext, and prints
-   the public SSH fingerprint. Existing credentials are verified and retained
-   on repeat runs; omit `--wifi-file` when only checking existing credentials.
-   An existing SSH identity is never silently replaced. Supply
-   `--ssh-key-file /run/existing-initrd-key` to provision an existing identity
-   or reseal it from backup after a TPM/policy change; it must match the saved
-   public key. Supply the Wi-Fi file again when resealing after a policy change.
+   Wi-Fi credentials cannot be generated automatically. For Ethernet-only manual
+   verification or backup recovery use `credentials --ssh-only`. Supply
+   `--ssh-key-file /run/existing-initrd-key` to reseal an existing identity from
+   backup after a TPM/policy change; it must match the saved public key.
 
    Record the public fingerprint on the SSH client. The helper removes its
    temporary plaintext files on exit; supplied `/run` inputs disappear on reboot.
@@ -444,8 +491,8 @@ the TPM helper. Commands below are instructions, not evidence of installation.
    ```
 
    On success, power off and start again with console access available. Unplug
-   Ethernet for this test so it proves Wi-Fi works. From your workstation run
-   `ssh -t -p 2222 root@<wifi-ip>`. Test Wi-Fi association and port 2222, verify
+   Ethernet only if explicitly testing optional Wi-Fi; otherwise keep it connected.
+   From your workstation run `ssh -t -p 2222 root@<warbler-ip>`. Test port 2222, verify
    the recorded host fingerprint, enter the LUKS passphrase, then verify port
    22 and persistence. This cold-boot test is required; evaluation cannot verify
    the physical radio, firmware measurements, DHCP, or TPM decryption in initrd.
@@ -566,7 +613,7 @@ path; software emulation has not been validated end-to-end.
 
 Hardware-specific modules are replaced with virtio devices. `/`, `/nix`, `/persist`,
 and `/home` use the actual encrypted Btrfs layout; immutable Nix store objects
-are shared read-only using 9p, with a writable overlay on encrypted `/nix` for
+are shared read-only using virtiofs, with a writable overlay on encrypted `/nix` for
 generation bookkeeping. Wi-Fi services are
 disabled in the VM: its sealed Wi-Fi credential is decrypted through systemd,
 while SSH traffic uses a private virtual Ethernet network. Actual radio and

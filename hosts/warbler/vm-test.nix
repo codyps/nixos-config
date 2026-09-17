@@ -36,7 +36,7 @@ pkgs.testers.runNixOSTest {
   node.specialArgs = { inherit self; };
   defaults = {
     # Load the emulated hardware drivers before waiting for initrd mounts.
-    boot.initrd.kernelModules = [ "virtio_pci" "virtio_blk" "virtio_net" "9pnet_virtio" ];
+    boot.initrd.kernelModules = [ "virtio_pci" "virtio_blk" "virtio_net" "virtiofs" ];
   };
 
   nodes = {
@@ -78,9 +78,10 @@ pkgs.testers.runNixOSTest {
       };
       fileSystems."/nix/.ro-store" = {
         device = "nix-store";
-        fsType = "9p";
+        # Match the current NixOS VM runner's virtiofs store export.
+        fsType = "virtiofs";
         neededForBoot = true;
-        options = [ "trans=virtio" "version=9p2000.L" "cache=loose" "ro" ];
+        options = [ "ro" ];
       };
       fileSystems."/nix/store" = {
         neededForBoot = true;
@@ -99,6 +100,7 @@ pkgs.testers.runNixOSTest {
       nix.gc.automatic = lib.mkForce false;
       nix.optimise.automatic = lib.mkForce false;
       warbler.remoteUnlock.enable = false;
+      warbler.remoteUnlock.wifi.enable = true;
       warbler.rootVolumeKeyId = lib.mkForce "77e740d9d987a52981ee75ae6ab327c2b70a8b49c6e36258abc426db85c5f831";
       boot.lanzaboote.settings.secure-boot-enroll = "force";
       boot.loader.timeout = 1;
@@ -128,7 +130,7 @@ pkgs.testers.runNixOSTest {
         useDefaultFilesystems = false;
         fileSystems = lib.mkForce { };
         # Same optimisation as disko's own installer tests: /nix state remains
-        # encrypted, but immutable store objects are supplied over read-only 9p.
+        # encrypted, but immutable store objects are supplied over read-only virtiofs.
         # A small encrypted upper layer permits Nix's generation bookkeeping.
         mountHostNixStore = true;
         writableStore = false;
@@ -171,6 +173,7 @@ pkgs.testers.runNixOSTest {
         installer.succeed("nixos-enter --root /mnt --system ${nodes.warbler.system.build.toplevel} -- nix-store --load-db < ${nodes.warbler.system.build.testClosure}/registration")
         installer.succeed("nixos-enter --root /mnt --system ${nodes.warbler.system.build.toplevel} -- nix-env -p /nix/var/nix/profiles/system --set ${nodes.warbler.system.build.toplevel}")
         installer.succeed("NIXOS_INSTALL_BOOTLOADER=1 nixos-enter --root /mnt -- ${nodes.warbler.system.build.toplevel}/bin/switch-to-configuration boot")
+        installer.succeed("rm /mnt/persist/credstore.encrypted/wifi /mnt/persist/credstore.encrypted/ssh-host-key")
         installer.succeed("mkdir -p /mnt/boot/loader/keys/auto; cp ${authVariables}/*.auth /mnt/boot/loader/keys/auto/; sync")
         installer.shutdown()
 
@@ -194,11 +197,16 @@ pkgs.testers.runNixOSTest {
         warbler.succeed("PATH=${lib.makeBinPath [ pkgs.python3 pkgs.cryptsetup pkgs.systemd pkgs.coreutils pkgs.util-linux ]}:$PATH bash ${../../scripts/test-warbler-volume-key.sh}")
 
     with subtest("provision real TPM credentials and preserve SSH identity on rerun"):
-        # Remove only the test placeholders after reaching the installed OS.
-        warbler.succeed("rm /persist/credstore.encrypted/wifi /persist/credstore.encrypted/ssh-host-key")
+        warbler.wait_until_succeeds("test -s /persist/credstore.encrypted/ssh-host-key", timeout=120)
+        warbler.succeed("test -s /persist/credstore.encrypted/ssh-host-key; test ! -e /persist/credstore.encrypted/wifi")
+        automatic_identity = warbler.succeed("cat /persist/credstore.encrypted/ssh-host-key.pub")
+        automatic_blob = warbler.succeed("sha256sum /persist/credstore.encrypted/ssh-host-key")
+        warbler.succeed("systemctl start warbler-initrd-credentials.service")
+        assert automatic_blob == warbler.succeed("sha256sum /persist/credstore.encrypted/ssh-host-key")
         warbler.succeed("umask 077; printf 'network={\n ssid=\"test\"\n psk=\"test-password\"\n}\n' > /run/wifi.conf")
         warbler.succeed("warbler-tpm-setup credentials --wifi-file /run/wifi.conf")
         identity = warbler.succeed("cat /persist/credstore.encrypted/ssh-host-key.pub")
+        assert identity == automatic_identity
         warbler.succeed("warbler-tpm-setup credentials")
         assert identity == warbler.succeed("cat /persist/credstore.encrypted/ssh-host-key.pub")
         warbler.succeed("systemd-run --wait --pipe -p LoadCredentialEncrypted=wifi:/persist/credstore.encrypted/wifi sh -c '${pkgs.diffutils}/bin/cmp \"$CREDENTIALS_DIRECTORY/wifi\" /run/wifi.conf'")

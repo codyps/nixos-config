@@ -31,7 +31,7 @@ class ProvisioningTests(unittest.TestCase):
         self.wifi.write_bytes(b"test wifi configuration")
         self.wifi.chmod(0o600)
         self.calls = []
-        self.args = SimpleNamespace(wifi_file=self.wifi, ssh_key_file=None)
+        self.args = SimpleNamespace(wifi_file=self.wifi, ssh_key_file=None, ssh_only=False)
         self.config = {"diskUnlock": True, "disk": "/dev/test", "policy": str(self.wifi), "pcrlock": "pcrlock"}
         self.metadata = {"keyslots": {"0": {"type": "luks2"}}, "tokens": {}}
         self.enrolled = False
@@ -91,6 +91,27 @@ class ProvisioningTests(unittest.TestCase):
             setup.credentials(self.args, self.work)
         self.assertEqual(list(self.store.iterdir()), [])
 
+    def test_ethernet_only_generates_once_without_wifi(self):
+        self.args.ssh_only = True
+        self.args.wifi_file = None
+        setup.credentials(self.args, self.work)
+        self.assertFalse((self.store / "wifi").exists())
+        before = (self.store / "ssh-host-key").read_bytes()
+        self.calls.clear()
+        setup.credentials(self.args, self.work)
+        self.assertEqual(before, (self.store / "ssh-host-key").read_bytes())
+        self.assertFalse(any(c[:2] in [("ssh-keygen", "-q"), ("systemd-creds", "encrypt")]
+                             for c in self.calls))
+
+    def test_missing_ciphertext_does_not_rotate_saved_identity(self):
+        self.args.ssh_only = True
+        setup.credentials(self.args, self.work)
+        (self.store / "ssh-host-key").unlink()
+        self.calls.clear()
+        with self.assertRaisesRegex(RuntimeError, "ciphertext is missing"):
+            setup.credentials(self.args, self.work)
+        self.assertFalse(any(c[:2] == ("ssh-keygen", "-q") for c in self.calls))
+
     def test_lost_tpm_does_not_rotate_ssh_key(self):
         setup.credentials(self.args, self.work)
         before = (self.store / "ssh-host-key").read_bytes()
@@ -108,6 +129,15 @@ class ProvisioningTests(unittest.TestCase):
     def test_different_ssh_identity_refused(self):
         setup.credentials(self.args, self.work)
         key = self.root / "other-key"
+        key.write_bytes(b"different key")
+        self.args.ssh_key_file = key
+        with self.assertRaisesRegex(RuntimeError, "identity"):
+            setup.credentials(self.args, self.work)
+
+    def test_missing_ciphertext_still_checks_backup_identity(self):
+        setup.credentials(self.args, self.work)
+        (self.store / "ssh-host-key").unlink()
+        key = self.root / "wrong-backup"
         key.write_bytes(b"different key")
         self.args.ssh_key_file = key
         with self.assertRaisesRegex(RuntimeError, "identity"):
@@ -153,6 +183,35 @@ class ProvisioningTests(unittest.TestCase):
                 setup.preflight()
         self.assertEqual(self.calls, [])
         self.assertFalse(self.store.exists())
+
+    def test_only_credential_preflight_allows_a_switched_generation(self):
+        efi = self.root / "efi"
+        efi.mkdir()
+        for name, value in [("SecureBoot", 1), ("SetupMode", 0)]:
+            (efi / f"{name}-{setup.EFI_GUID}").write_bytes(bytes(4) + bytes([value]))
+        tpm = self.root / "tpm"
+        tpm.touch()
+        cfg = self.root / "config.json"
+        cfg.write_text(json.dumps(self.config))
+        paths = {"/dev/tpmrm0": tpm, "/etc/warbler-tpm.json": cfg,
+                 "/run/booted-system": self.root / "old-generation",
+                 "/run/current-system": self.root / "new-generation"}
+        original_stat = setup.os.stat
+
+        def stat(path, *args, **kwargs):
+            if str(path) in ["/dev/test-backing", "/dev/mapper/cryptroot"]:
+                return SimpleNamespace(st_rdev=123)
+            return original_stat(path, *args, **kwargs)
+
+        with patch.object(setup, "EFI", efi), \
+                patch.object(setup, "Path", side_effect=lambda p: paths.get(str(p), Path(p))), \
+                patch.object(setup.os, "geteuid", return_value=0), \
+                patch.object(setup.os, "uname", return_value=SimpleNamespace(nodename="warbler")), \
+                patch.object(setup.os, "stat", side_effect=stat), \
+                patch.object(setup, "run", return_value=b"/dev/test-backing[/persist]\n"):
+            self.assertEqual(setup.preflight(require_current_generation=False), self.config)
+            with self.assertRaisesRegex(RuntimeError, "Reboot into the current generation"):
+                setup.preflight()
 
     def test_installer_host_refused(self):
         with patch.object(setup.os, "geteuid", return_value=0), \

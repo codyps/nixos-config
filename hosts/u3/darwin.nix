@@ -25,13 +25,8 @@ in
     casks = [ ];
   };
 
-  nix.linux-builder.enable = true;
-  # Keep the VM and its cached store available for manual use. Setting enable
-  # to false deletes its working directory in nix-darwin's activation script.
-  launchd.daemons.linux-builder.serviceConfig = {
-    RunAtLoad = lib.mkForce false;
-    KeepAlive = lib.mkForce false;
-  };
+  # Docker and Warbler provide Linux builds; retire the unused QEMU VM.
+  nix.linux-builder.enable = false;
 
   # The small host proxy owns container lifecycle under the primary user's OrbStack.
   launchd.daemons.docker-linux-builder = {

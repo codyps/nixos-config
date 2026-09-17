@@ -139,7 +139,7 @@ in
     networking.firewall.enable = true;
     # Keep this host's tailnet identity across ephemeral-root resets.
     services.tailscale.enable = true;
-    environment.systemPackages = (with pkgs; [ sbctl cryptsetup tpm2-tools neovim htop tmux ]) ++ [
+    environment.systemPackages = (with pkgs; [ sbctl cryptsetup tpm2-tools neovim htop tmux ghostty.terminfo ]) ++ [
       (pkgs.callPackage ./root-volume-key-id.nix {
         device = config.boot.initrd.luks.devices.cryptroot.device;
       })

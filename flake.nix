@@ -161,6 +161,16 @@
         in
         {
           checks = pkgs.lib.optionalAttrs (system == "x86_64-linux") {
+            luks-volume-key-id = pkgs.runCommand "test-luks-volume-key-id" {
+              nativeBuildInputs = [
+                pkgs.cryptsetup
+                self.packages.${system}.luks-volume-key-id
+                self.packages.${system}.warbler-root-volume-key-id
+              ];
+            } ''
+              bash ${./scripts/test-luks-volume-key-id.sh}
+              touch "$out"
+            '';
             warbler-vm = import ./hosts/warbler/vm-test.nix {
               inherit pkgs self disko impermanence lanzaboote sops-nix;
             };
@@ -171,6 +181,8 @@
             caddyFull = pkgs.caddyFull;
             nix-dynamic-machines = pkgs.nix-dynamic-machines;
           } // pkgs.lib.optionalAttrs pkgs.stdenv.hostPlatform.isLinux {
+            luks-volume-key-id = pkgs.callPackage ./scripts/luks-volume-key-id.nix { };
+            warbler-root-volume-key-id = pkgs.callPackage ./hosts/warbler/root-volume-key-id.nix { };
             # Refresh both platform-independent source bundles on Linux CI.
             caddy-source = (import nixpkgs {
               inherit system;
@@ -205,6 +217,9 @@
           warbler-bootstrap = self.nixosConfigurations.warbler.extendModules {
             modules = [
               ({ lib, ... }: {
+                # A fresh format creates a different volume identity. Bootstrap
+                # must remain attended until that identity is pinned.
+                warbler.rootVolumeKeyId = lib.mkForce null;
                 warbler.remoteUnlock.enable = lib.mkForce false;
                 warbler.tpmUnlock.enable = lib.mkForce false;
               })

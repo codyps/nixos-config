@@ -63,6 +63,67 @@ Lanzaboote signs boot artifacts. The EFI partition cannot be encrypted in this
 design; all persistent OS data is inside LUKS. Signing keys stay under
 `/persist/var/lib/sbctl` and are never copied into the initrd.
 
+The normal configuration pins `cryptroot` with systemd's `fixate-volume-key=`
+in the signed initrd. This applies to both passphrase and TPM unlock, before
+the Btrfs root-reset service can mount anything. `warbler.rootVolumeKeyId` is
+the public HMAC-SHA256 identity of the installed volume, derived from its
+volume key and the string `cryptsetup:cryptroot:<LUKS UUID>`; it is not a key
+or the digest stored in the LUKS header. Changing the volume key, UUID, or
+mapper name requires a new pin. Changing the recovery password does not.
+
+`warbler-bootstrap` explicitly sets this identity to null and disables remote
+and TPM disk unlock. Use it only for attended installation of a new volume.
+After reformatting, obtain the new identity on the trusted installed system
+and update `warbler.rootVolumeKeyId` before building the normal configuration.
+The option defaults to `null`; the explicit setting in `configuration.nix`
+retains the known identity of the current installation. Never automatically
+learn the expected identity from a disk during boot. An unpinned configuration
+cannot enable remote or TPM unlock. Pinning authenticates volume identity,
+not every filesystem block or its freshness.
+
+On the trusted installed system (including `warbler-bootstrap`), run:
+
+```sh
+sudo warbler-root-volume-key-id
+```
+
+Or run directly from this checkout on Linux, without installing the command:
+
+```sh
+sudo nix run path:.#warbler-root-volume-key-id
+# Automation with an existing passphrase file:
+sudo nix run path:.#warbler-root-volume-key-id -- --key-file /run/warbler-luks-password
+```
+
+The package includes Python and libcryptsetup; no system Python or cryptsetup
+installation is needed. This command operates on Linux LUKS devices.
+
+For other devices, use the [general LUKS identity command](../../docs/luks-volume-key-id.md)
+with an explicit encrypted device and target mapper name:
+
+```sh
+sudo nix run path:.#luks-volume-key-id -- --device /dev/sdb2 --name data
+```
+
+Enter the LUKS recovery passphrase. The command prints just the 64-character
+public ID to stdout; copy it into `warbler.rootVolumeKeyId` in
+`hosts/warbler/configuration.nix`. It reads the configured LUKS device and
+derives the ID for mapper name `cryptroot`, without opening a mapping,
+changing the header, or writing the raw volume key to a file. The derivation
+matches [systemd's volume-key identity](https://github.com/systemd/systemd/blob/main/src/shared/cryptsetup-util.c).
+For provisioning automation with an existing passphrase file in RAM:
+
+```sh
+sudo warbler-root-volume-key-id --key-file /run/warbler-luks-password
+```
+
+Use `--device /dev/disk/by-partlabel/disk-system-crypt` to override the device
+when needed. From a checkout on Linux with Python 3 and libcryptsetup installed,
+the equivalent command is
+`sudo python3 scripts/luks-volume-key-id.py --device /dev/disk/by-partlabel/disk-system-crypt --name cryptroot`.
+Run this after formatting and before enabling remote or TPM unlock; never
+learn a replacement pin automatically at boot.
+
 ## Unlocking and TPM credentials
 
 `ssh -t -p 2222 root@<warbler-ip>` authenticates with `nixos/ssh-auth.nix` keys
@@ -374,7 +435,8 @@ the TPM helper. Commands below are instructions, not evidence of installation.
    that option only carries the encrypted blobs in this configuration.
 
 9. **Enable remote unlock — rebuild, then cold boot:** in the persisted
-   checkout, restore `warbler.remoteUnlock.enable = true` and leave automatic
+   checkout, record the ID from `sudo warbler-root-volume-key-id` in
+   `warbler.rootVolumeKeyId`, restore `warbler.remoteUnlock.enable = true` and leave automatic
    disk unlock disabled. Run from `/persist/nixos-config`:
 
    ```sh
@@ -389,7 +451,10 @@ the TPM helper. Commands below are instructions, not evidence of installation.
    the physical radio, firmware measurements, DHCP, or TPM decryption in initrd.
    If it fails, unlock locally and reconnect Ethernet for diagnosis; do not
    clear the TPM or repeat formatting. Keep the preceding bootstrap generation
-   available in the boot menu during provisioning.
+   available in the boot menu during provisioning only. Before enrolling
+   unattended unlock, retire unpinned boot artifacts and exclude their
+   measurements from the effective TPM policy; retaining an accepted old
+   unpinned generation provides a route around the new volume check.
 
 ## Optional automatic disk unlock
 
@@ -398,6 +463,10 @@ for LUKS auto-unlock. In `/persist/nixos-config`, set
 `warbler.tpmUnlock.enable = true`, rebuild with `sudo nixos-rebuild boot --flake path:.#warbler`,
 and reboot once using the LUKS passphrase. Lanzaboote generates and persists a
 managed policy for PCRs 0, 4, and 7; eight boot generations are retained.
+Only pinned generations should remain accepted when enrolling. Secure Boot
+must enforce the trusted boot artifacts; a pin in a replaceable initrd does
+not protect against physical tampering. These are deployment checks, not
+properties established by building the configuration.
 
 Then enroll on warbler using the same helper:
 
@@ -433,12 +502,21 @@ nix build path:.#nixosConfigurations.warbler.config.system.build.toplevel --no-l
 nix build path:.#nixosConfigurations.warbler.config.system.build.diskoScript --no-link
 python3 scripts/test-warbler-tpm-setup.py
 python3 scripts/test-warbler-install.py
+nix eval --impure --json --file scripts/test-warbler-volume-key.nix
+nix build path:.#checks.x86_64-linux.luks-volume-key-id --no-link
 ```
 
 Building does not format disks, install/sign the ESP, enroll credentials, or
 activate the configuration. A Linux builder is required on macOS.
 The Python tests mock TPM and disk commands; they validate failure handling,
 repeat runs, identity preservation, and recovery checks, not physical enrollment.
+The Nix pin checks cover manual/TPM configuration, malformed/missing pins,
+and the attended bootstrap exception. On Linux, as root with `python3`,
+`cryptsetup`, and `systemd-cryptsetup` in PATH, run
+`bash scripts/test-warbler-volume-key.sh` to exercise real volume activation
+on disposable images under `/run`: correct identity succeeds, substituted
+key and UUID fail before mapping. The QEMU test runs this check too and uses
+a separate public test volume key and pin for its manual and TPM boots.
 
 ## QEMU integration test
 

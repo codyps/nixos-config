@@ -3,6 +3,9 @@ let
   inherit (pkgs) lib;
   # Public upstream test fixtures, never production identities or signing keys.
   keys = lanzaboote + "/nix/tests/fixtures/uefi-keys";
+  # Deterministic public test key only; never use this for real installations.
+  volumeKey = pkgs.writeText "warbler-test-volume-key" "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
+  volumeUuid = "11111111-2222-3333-4444-555555555555";
   sshKey = pkgs.path + "/nixos/tests/initrd-network-ssh/id_ed25519";
   # Public test identity and deliberately non-secret test data only.
   testSecrets = pkgs.runCommand "warbler-test-secrets.json"
@@ -41,6 +44,12 @@ pkgs.testers.runNixOSTest {
       imports = [ disko.nixosModules.disko ./disko.nix ];
       disko.enableConfig = false;
       disko.devices.disk.system.device = lib.mkForce "/dev/vdb";
+      disko.devices.disk.system.content.partitions.crypt.content.extraFormatArgs = [
+        "--volume-key-file"
+        "${volumeKey}"
+        "--uuid"
+        volumeUuid
+      ];
       virtualisation.emptyDiskImages = [ 8192 ];
       virtualisation.memorySize = 1536;
       environment.systemPackages = [ pkgs.cryptsetup pkgs.nixos-install-tools ];
@@ -90,6 +99,7 @@ pkgs.testers.runNixOSTest {
       nix.gc.automatic = lib.mkForce false;
       nix.optimise.automatic = lib.mkForce false;
       warbler.remoteUnlock.enable = false;
+      warbler.rootVolumeKeyId = lib.mkForce "77e740d9d987a52981ee75ae6ab327c2b70a8b49c6e36258abc426db85c5f831";
       boot.lanzaboote.settings.secure-boot-enroll = "force";
       boot.loader.timeout = 1;
       boot.initrd.network.ssh.authorizedKeys = lib.mkForce [ (builtins.readFile (sshKey + ".pub")) ];
@@ -179,6 +189,9 @@ pkgs.testers.runNixOSTest {
         ssh_identity = warbler.succeed("ssh-keygen -y -f /persist/ssh/ssh_host_ed25519_key")
         for mount, subvol in [("/", "root"), ("/nix", "nix"), ("/home", "home"), ("/persist", "persist")]:
             warbler.succeed(f"test $(findmnt -n -o FSTYPE --mountpoint {mount}) = btrfs && test $(findmnt -n -o FSROOT --mountpoint {mount}) = /{subvol}")
+
+    with subtest("volume pin rejects a substituted key or UUID"):
+        warbler.succeed("PATH=${lib.makeBinPath [ pkgs.python3 pkgs.cryptsetup pkgs.systemd pkgs.coreutils pkgs.util-linux ]}:$PATH bash ${../../scripts/test-warbler-volume-key.sh}")
 
     with subtest("provision real TPM credentials and preserve SSH identity on rerun"):
         # Remove only the test placeholders after reaching the installed OS.

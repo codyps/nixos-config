@@ -6,6 +6,13 @@ in
   imports = [ ./hardware-configuration.nix ./disko.nix ./reset-root.nix ./wifi.nix ./tpm-setup.nix ./secrets.nix ];
 
   options.warbler.tpmUnlock.enable = lib.mkEnableOption "TPM measured-boot unlocking after enrollment";
+  options.warbler.rootVolumeKeyId = lib.mkOption {
+    type = lib.types.nullOr (lib.types.strMatching "[0-9a-f]{64}");
+    # Public HMAC identity of the installed volume, not its encryption key.
+    # Bound to the volume key, LUKS UUID, and mapper name "cryptroot".
+    default = null;
+    description = "Expected cryptroot volume identity from warbler-root-volume-key-id; required for remote or TPM unlock";
+  };
   options.warbler.remoteUnlock.enable = lib.mkOption {
     type = lib.types.bool;
     default = true;
@@ -13,6 +20,13 @@ in
   };
 
   config = {
+    # Public identity of the current installation; replace after reformatting.
+    warbler.rootVolumeKeyId = "4c40134b6c4df2cf83344d7b417e588f70449534f51fccce6fc5e405f8c3ea1c";
+    assertions = [{
+      assertion = config.warbler.rootVolumeKeyId != null
+        || (!config.warbler.tpmUnlock.enable && !config.warbler.remoteUnlock.enable);
+      message = "Warbler requires a pinned rootVolumeKeyId before remote or TPM unlock is enabled.";
+    }];
     networking.hostName = "warbler";
     time.timeZone = "America/New_York";
     system.stateVersion = "26.05";
@@ -40,7 +54,10 @@ in
     boot.initrd = {
       systemd.enable = true;
       systemd.tpm2.enable = true;
-      luks.devices.cryptroot.crypttabExtraOpts = lib.optionals config.warbler.tpmUnlock.enable [
+      # Authenticate the volume before mounting it, including password recovery.
+      luks.devices.cryptroot.crypttabExtraOpts = lib.optional (config.warbler.rootVolumeKeyId != null)
+        "fixate-volume-key=${config.warbler.rootVolumeKeyId}"
+      ++ lib.optionals config.warbler.tpmUnlock.enable [
         "tpm2-device=auto"
         "token-timeout=10s"
       ];
@@ -83,6 +100,7 @@ in
     fileSystems."/persist".neededForBoot = true;
     environment.persistence."/persist" = {
       hideMounts = true;
+      # /var/lib includes Tailscale's state in /var/lib/tailscale.
       directories = [ "/var/lib" "/var/log" "/var/db" "/root" ];
       files = [ "/etc/machine-id" ];
     };
@@ -115,7 +133,13 @@ in
       }];
     };
     networking.firewall.enable = true;
-    environment.systemPackages = with pkgs; [ sbctl cryptsetup tpm2-tools neovim htop tmux ];
+    # Keep this host's tailnet identity across ephemeral-root resets.
+    services.tailscale.enable = true;
+    environment.systemPackages = (with pkgs; [ sbctl cryptsetup tpm2-tools neovim htop tmux ]) ++ [
+      (pkgs.callPackage ./root-volume-key-id.nix {
+        device = config.boot.initrd.luks.devices.cryptroot.device;
+      })
+    ];
 
     # Explicit upgrades while Secure Boot/TPM enrollment is being established.
     system.autoUpgrade.enable = lib.mkForce false;

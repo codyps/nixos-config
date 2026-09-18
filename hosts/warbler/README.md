@@ -58,9 +58,9 @@ sudo warbler-root-volume-key-id
 Or run directly from this checkout on Linux, without installing the command:
 
 ```sh
-sudo nix run path:.#warbler-root-volume-key-id
+sudo nix run .#warbler-root-volume-key-id
 # Automation with an existing passphrase file:
-sudo nix run path:.#warbler-root-volume-key-id -- --key-file /run/warbler-luks-password
+sudo nix run .#warbler-root-volume-key-id -- --key-file /run/warbler-luks-password
 ```
 
 The package includes Python and libcryptsetup; no system Python or cryptsetup
@@ -70,7 +70,7 @@ For other devices, use the [general LUKS identity command](../../docs/luks-volum
 with an explicit encrypted device and target mapper name:
 
 ```sh
-sudo nix run path:.#luks-volume-key-id -- --device /dev/sdb2 --name data
+sudo nix run .#luks-volume-key-id -- --device /dev/sdb2 --name data
 ```
 
 Enter the LUKS recovery passphrase. The command prints just the 64-character
@@ -185,9 +185,7 @@ python3 scripts/warbler-install.py install
   contains the exact password bytes, and `sbctl/` contains `GUID` and
   `keys/{PK,KEK,db}/`. Directories are private and files are mode 0600. A
   defensive `.gitignore` ignores everything in the bundle. **The bundle must
-  remain outside this checkout:** Git ignore rules do not prevent `path:.`
-  from importing ignored files into `/nix/store`. The tool rejects in-checkout
-  secret paths. `--secrets-dir /absolute/external/path` overrides the location.
+  remain outside this checkout.** The tool rejects in-checkout secret paths. `--secrets-dir /absolute/external/path` overrides the location.
 - These local files are plaintext, not a password-manager entry or SOPS
   archive. Protect the Mac's disk with encryption and make a separately
   encrypted offline backup before installing. Retrieve the password privately
@@ -292,16 +290,14 @@ the TPM helper. Commands below are instructions, not evidence of installation.
    through installation. The later BIOS visits only clear keys after backup
    and enable Secure Boot after enrollment.
 
-2. **Live USB — prepare the checkout:** obtain this checkout on the live host,
-   including all uncommitted Warbler files. Enter a root shell (`sudo -i`) and
+2. **Live USB: prepare the checkout:** obtain this flake checkout on the live host. Enter a root shell (`sudo -i`) and
    `cd` to that checkout. All installer commands below run there as root.
    In the `config` attribute of `hosts/warbler/configuration.nix`, set
    `warbler.remoteUnlock.enable = false` temporarily and keep
    `warbler.tpmUnlock.enable = false`. This omits both encrypted
    initrd credentials and Wi-Fi services until credentials can be sealed against
    the final Secure Boot state. Disk unlocking is local-console only during
-   bootstrap; administration after boot is via wired SSH. Use `path:.` in flake
-   commands so untracked host files are included.
+   bootstrap; administration after boot is via wired SSH.
 
 3. **Live USB — inspect, then format the NVMe:** inspect without displaying
    serial numbers:
@@ -310,7 +306,7 @@ the TPM helper. Commands below are instructions, not evidence of installation.
    test -d /sys/firmware/efi
    lsblk -o NAME,PATH,SIZE,MODEL,TYPE,FSTYPE,MOUNTPOINTS
    nix build --accept-flake-config --no-link --print-out-paths \
-     path:.#nixosConfigurations.warbler.config.system.build.diskoScript
+     .#nixosConfigurations.warbler.config.system.build.diskoScript
    ```
 
    Confirm `/dev/nvme0n1` is the intended 512 GB NVMe, not the 4 TB SATA SSD
@@ -353,7 +349,7 @@ the TPM helper. Commands below are instructions, not evidence of installation.
    directory mode 0700, and file mode 0600. Then run on the installer:
 
    ```sh
-   nix shell --inputs-from path:. nixpkgs#python3 nixpkgs#mkpasswd nixpkgs#util-linux --command \
+   nix shell --inputs-from . nixpkgs#python3 nixpkgs#mkpasswd nixpkgs#util-linux --command \
      python3 hosts/warbler/account-passwords.py initialize \
        --root /mnt --password-dir /run/warbler-account-passwords
    rm -r /run/warbler-account-passwords
@@ -365,11 +361,11 @@ the TPM helper. Commands below are instructions, not evidence of installation.
 
    ```sh
    mkdir -p /mnt/persist/var/lib/sbctl
-   nix shell --inputs-from path:. nixpkgs#sbctl --command \
+   nix shell --inputs-from . nixpkgs#sbctl --command \
      sbctl --config /run/warbler-sbctl-install.conf create-keys
    mkdir -p /mnt/persist/nixos-config
    cp -a . /mnt/persist/nixos-config/
-   nixos-install --no-root-passwd --flake path:.#warbler
+   nixos-install --no-root-passwd --flake .#warbler
    ```
 
    Stop on any failure. Lanzaboote needs these keys before installation signs
@@ -503,7 +499,7 @@ the TPM helper. Commands below are instructions, not evidence of installation.
     disk unlock disabled. Run from `/persist/nixos-config`:
 
     ```sh
-    sudo nixos-rebuild boot --flake path:.#warbler
+    sudo nixos-rebuild boot --flake .#warbler
     ```
 
     On success, power off and start again with console access available. Unplug
@@ -523,7 +519,7 @@ the TPM helper. Commands below are instructions, not evidence of installation.
 
 This is step 10, only after step 9 succeeds; there is no additional BIOS toggle
 for LUKS auto-unlock. In `/persist/nixos-config`, set
-`warbler.tpmUnlock.enable = true`, rebuild with `sudo nixos-rebuild boot --flake path:.#warbler`,
+`warbler.tpmUnlock.enable = true`, rebuild with `sudo nixos-rebuild boot --flake .#warbler`,
 and reboot once using the LUKS passphrase. Lanzaboote generates and persists a
 managed policy for PCRs 0, 4, and 7; eight boot generations are retained.
 Only pinned generations should remain accepted when enrolling. Secure Boot
@@ -557,18 +553,18 @@ remove the passphrase slot as a test.
 
 ## Validation
 
-For an uncommitted checkout use `path:.` so Nix includes the new host files:
+Run these checks from the flake checkout:
 
 ```sh
-nix eval --raw path:.#nixosConfigurations.warbler.config.system.build.toplevel.drvPath
-nix build path:.#nixosConfigurations.warbler.config.system.build.toplevel --no-link
-nix build path:.#nixosConfigurations.warbler.config.system.build.diskoScript --no-link
+nix eval --raw .#nixosConfigurations.warbler.config.system.build.toplevel.drvPath
+nix build .#nixosConfigurations.warbler.config.system.build.toplevel --no-link
+nix build .#nixosConfigurations.warbler.config.system.build.diskoScript --no-link
 python3 scripts/test-warbler-tpm-setup.py
 python3 scripts/test-warbler-install.py
 python3 scripts/test-warbler-account-passwords.py
-nix build path:.#checks.x86_64-linux.warbler-account-passwords --no-link
+nix build .#checks.x86_64-linux.warbler-account-passwords --no-link
 nix eval --impure --json --file scripts/test-warbler-volume-key.nix
-nix build path:.#checks.x86_64-linux.luks-volume-key-id --no-link
+nix build .#checks.x86_64-linux.luks-volume-key-id --no-link
 ```
 
 Building does not format disks, install/sign the ESP, enroll credentials, or
@@ -593,7 +589,7 @@ Run the VM test through Nix, including when the builder's SSH key forces
 
 ```sh
 nix build --accept-flake-config --no-link --print-out-paths -L \
-  path:.#checks.x86_64-linux.warbler-vm
+  .#checks.x86_64-linux.warbler-vm
 ```
 
 While the target is running the live CD, use its KVM support as a one-off
@@ -606,7 +602,7 @@ test -n "$warbler_host_key"
 nix build --accept-flake-config --no-link -L \
   --builders "ssh-ng://nixos@nixos.bed.einic.org?remote-program=sudo%20nix-daemon x86_64-linux /Users/cody/.ssh/id_ed25519 4 100 benchmark,big-parallel,kvm,nixos-test - $warbler_host_key" \
   --option builders-use-substitutes true \
-  path:.#checks.x86_64-linux.warbler-vm
+  .#checks.x86_64-linux.warbler-vm
 ```
 
 This does not install Warbler: the live CD's Nix store and temporary build
@@ -640,7 +636,7 @@ disabled in the VM: its sealed Wi-Fi credential is decrypted through systemd,
 while SSH traffic uses a private virtual Ethernet network. Actual radio and
 firmware behavior still need a cold-boot check on warbler.
 
-Read the build log with `nix log path:.#checks.x86_64-linux.warbler-vm`.
+Read the build log with `nix log .#checks.x86_64-linux.warbler-vm`.
 On a Linux machine with local QEMU access, build `checks.x86_64-linux.warbler-vm.driverInteractive` and
 run its `bin/nixos-test-driver --keep-machine-state` for interactive debugging.
 

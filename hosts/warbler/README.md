@@ -65,6 +65,12 @@ documents database backup and the disable/save/re-enter/clear sequence. Physical
 T26 behavior and database restoration remain unverified. The complete action
 sequence is in the initial provisioning instructions below.
 
+On the installed system, sbctl uses its built-in defaults under `/var/lib/sbctl`;
+no configuration file or `--config` flag is needed. The persistent `/var/lib`
+mount exposes the existing keys and GUID stored in `/persist/var/lib/sbctl`.
+Lanzaboote uses that backing path directly so installation can sign boot files
+before persistence mounts are active.
+
 Wi-Fi must remain enabled if optional initrd Wi-Fi is configured. Firmware PXE/Wi-Fi boot is not
 required: the Linux initrd performs association. CPU virtualization is needed
 for KVM tests, not for LUKS or impermanence; the successful physical-host KVM
@@ -246,8 +252,8 @@ python3 scripts/warbler-install.py install
 - `build` runs that same source-transfer/build/preflight path but stops before
   confirmation, secret transfer, or disk changes. Use it to validate the remote
   build path safely before the installation window.
-- The installer persists the checkout at `/persist/nixos-config`, writes the
-  installed sbctl config, cleans up remote temporary secrets on normal exit,
+- The installer persists the checkout at `/persist/nixos-config`,
+  cleans up remote temporary secrets on normal exit,
   and **does not reboot or enroll firmware/TPM keys**. If SSH is lost, cleanup
   cannot be guaranteed until the live environment is rebooted. Do not reboot
   or blindly rerun after failure: the disk may be partially installed. This
@@ -401,7 +407,7 @@ the TPM helper. Commands below are instructions, not evidence of installation.
    run:
 
    ```sh
-   sbctl --config /etc/warbler-sbctl.conf verify
+   sbctl verify
    ```
 
    Inspect unsigned-file reports before proceeding. It's expected that the initramfs is unsigned.
@@ -436,7 +442,7 @@ the TPM helper. Commands below are instructions, not evidence of installation.
 9.  **Enroll the existing Warbler signing keys and Microsoft certificates:**
 
     ```sh
-    sbctl --config /etc/warbler-sbctl.conf enroll-keys --microsoft
+    sbctl enroll-keys --microsoft
     ```
 
 10. **Enable Secure Boot:** restart into **F10 → Security → Secure Boot
@@ -449,7 +455,7 @@ the TPM helper. Commands below are instructions, not evidence of installation.
     ```sh
     sudo bootctl status
     sudo sbctl status
-    sudo sbctl --config /etc/warbler-sbctl.conf verify
+    sudo sbctl verify
     ```
 
     Require Secure Boot enabled in user mode, Setup Mode disabled, and valid

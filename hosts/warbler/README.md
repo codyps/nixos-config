@@ -42,7 +42,7 @@ explicitly false until Secure Boot is enabled. This preserves local
 passphrase unlocking and avoids generating a boot entry that requires missing
 initrd secrets; the root-volume identity check remains enabled.
 
-## Physical firmware checklist
+## Hardware and firmware references
 
 User-supplied `lshw` identifies an **HP EliteDesk 805 G8 Desktop Mini PC**,
 SKU `63C34UC#ABA`, motherboard `8881`, BIOS **T26 02.14.00**, dated
@@ -50,34 +50,20 @@ SKU `63C34UC#ABA`, motherboard `8881`, BIOS **T26 02.14.00**, dated
 BIOS administrator authentication is enabled; have that password and local
 keyboard/display access before provisioning. No firmware changes have been made.
 
-HP's [commercial BIOS guide, June 2023](https://ftp.hp.com/pub/caps-softpaq/cmit/whitepapers/HPBIOSSetup.pdf)
-explicitly includes the 805 G8 DM (page 8). It describes a superset of settings;
-the following menu locations must still be checked on this T26 firmware:
+HP's [805 G8 Mini Maintenance and Service Guide](https://kaas.hpcloud.hp.com/pdf-public/pdf_10300705_en-US-1.pdf)
+is listed on the [EliteDesk 805 G8 Desktop Mini support page](https://support.hp.com/us-en/product/setup-user-guides/hp-elitedesk-805-g8-desktop-mini-pc/2100378016)
+under the title **HP Elite Mini 805 G8 Desktop PC**. Printed pages 67–68
+(PDF pages 74–75) describe Sure Start and Secure Boot key management;
+printed page 105 (PDF page 112) describes clearing custom keys. The
+[commercial BIOS guide, June 2023](https://ftp.hp.com/pub/caps-softpaq/cmit/whitepapers/HPBIOSSetup.pdf)
+also lists the 805 G8 DM but covers a superset of firmware settings.
 
-| Location | Warbler requirement / action |
-| --- | --- |
-| F10 during startup | Enter firmware setup using administrator credentials. |
-| Security → TPM submenu | `TPM Device`: available; `TPM State`: enabled. Do not schedule a TPM clear. |
-| Security → BIOS Sure Start | Review `Sure Start Secure Boot Keys Protection` before custom-key enrollment. It backs up and restores keys; plan to disable this specific protection during enrollment, not unrelated firmware protections. Confirm custom keys survive reboot before considering re-enabling it. |
-| Security → Secure Boot Configuration | Secure Boot must ultimately enforce Warbler's enrolled signing keys. Merely switching it off does not prove Setup Mode. |
-| Advanced → boot options | Use the NVMe's UEFI boot entry after installation. This model family is UEFI-only; no legacy/CSM setup is needed. |
-
-Menu references: HP guide pages 23–26 and 35. These are desired settings,
-not a readback of the current firmware configuration.
-
-**Enrollment checkpoint:** the exact safe Setup Mode operation on T26 02.14.00
-is not yet verified. Prefer a platform-key-only removal if the firmware offers
-one. Do not blindly use an all-key clearing action: it can also remove `dbx`,
-the revoked-signature database. If the UI only offers wholesale clearing or
-key import, stop and establish a backed-up, dbx-preserving enrollment procedure
-before proceeding. Do not restore factory keys after enrolling Warbler's keys.
-These cautions follow the [Lanzaboote enrollment guide](https://nix-community.github.io/lanzaboote/getting-started/enable-secure-boot.html).
-
-After enrollment, cold boot and verify Secure Boot enabled in user mode,
-Setup Mode disabled, the intended signing keys present, and the revocation
-database retained. Then follow credential sealing and optional disk enrollment
-below. Firmware/TPM changes after sealing can require recovery and resealing;
-keep the LUKS passphrase and encrypted secret backups available.
+The G8 manual documents key clearing but does not explicitly call the result
+Setup Mode or guarantee that `dbx` survives. HP's older
+[Secure Boot Customization Guide](https://h10032.www1.hp.com/ctg/Manual/c05649759.pdf#page=8)
+documents database backup and the disable/save/re-enter/clear sequence. Physical
+T26 behavior and database restoration remain unverified. The complete action
+sequence is in the initial provisioning instructions below.
 
 Wi-Fi must remain enabled if optional initrd Wi-Fi is configured. Firmware PXE/Wi-Fi boot is not
 required: the Linux initrd performs association. CPU virtualization is needed
@@ -268,7 +254,7 @@ temporary forced-off remote/TPM unlock settings without editing the checkout.
 The later rebuild to `.#warbler` happens only after credentials exist.
 
 This automates installation preparation, transfer, formatting, and signing—not
-the unresolved safe T26 Setup Mode operation. Have someone at the local console
+the attended T26 firmware-key operation and Setup Mode verification. Have someone at the local console
 for the firmware steps and first unlock. Local key layout follows
 [sbctl's file backend](https://github.com/Foxboron/sbctl/blob/0.18/backend/file.go).
 
@@ -312,15 +298,24 @@ secrets. See [sops-nix's SSH/age integration](https://github.com/Mic92/sops-nix)
 Follow these steps in order; BIOS actions are manual and are not performed by
 the TPM helper. Commands below are instructions, not evidence of installation.
 
-1. **Before disk changes — local console / BIOS:** have backups, the BIOS
-   administrator password, keyboard/display, an installer USB, and the SSH
-   private key corresponding to an authorized key in `nixos/ssh-auth.nix`.
-   Plug in Ethernet; bootstrap has no installed Wi-Fi service. Enter F10,
-   confirm TPM availability/access and Wi-Fi enabled using the checklist above.
-   Leave Secure Boot disabled for the unsigned installer/bootstrap. Do not
-   clear the TPM or change Secure Boot keys yet. Save and boot the live USB
-   in UEFI mode. If firmware updates are planned, finish them before enrollment
-   and recheck settings; this runbook does not prescribe a BIOS update.
+1. **Configure BIOS before installation:** have backups, the BIOS administrator
+   password, keyboard/display, an installer USB, and the SSH private key
+   corresponding to an authorized key in `nixos/ssh-auth.nix`. Plug in Ethernet
+   (bootstrap has no installed Wi-Fi service). If firmware updates are planned,
+   finish them first; this runbook does not prescribe a BIOS update. Press
+   **F10**, authenticate, and apply all these settings in this visit:
+
+   | Location | Setting / action |
+   | --- | --- |
+   | Security → TPM | Set **TPM Device to Available** and **TPM State to Enabled**. Leave **Clear TPM** unselected. |
+   | Security → BIOS Sure Start | **Disable Sure Start Secure Boot Keys Protection** (required to change Secure Boot keys). Leave other Sure Start protections unchanged. |
+   | Security → Secure Boot Configuration | **Disable Secure Boot** (allows the unsigned installer and bootstrap to boot). |
+   | Security → Secure Boot Configuration → Secure Boot Key Management | Leave **Clear Secure Boot keys**, **Import Custom Secure Boot Keys**, and **Reset Secure Boot keys to factory defaults** unselected (back up the existing keys before clearing them). |
+   | Wi-Fi device setting, if using optional initrd Wi-Fi | **Enable Wi-Fi** (the Linux initrd needs the device). |
+
+   **Save changes and boot the installer USB in UEFI mode.** Keep these settings
+   through installation. The later BIOS visits only clear keys after backup
+   and enable Secure Boot after enrollment.
 
 2. **Live USB — prepare the checkout:** obtain this checkout on the live host,
    including all uncommitted Warbler files. Enter a root shell (`sudo -i`) and
@@ -391,117 +386,134 @@ the TPM helper. Commands below are instructions, not evidence of installation.
    separately encrypted offline storage. Remove the temporary passphrase file
    after successful installation (`rm /tmp/warbler-luks-password`).
 
-5. **First installed boot — BIOS then OS:** reboot, enter F10 if necessary,
-   select the NVMe UEFI entry, and keep Secure Boot disabled for this bootstrap
-   check. Remove the USB or put NVMe ahead of it. Unlock LUKS at the console.
-   From your workstation, SSH as `cody@<wired-ip>`, then `sudo -i` and
-   `cd /persist/nixos-config`. Console account passwords are locked; the LUKS
-   prompt is not an account login. Verify `hostname` is `warbler`, the expected
-   mounts are present, and `bootctl status` identifies the installed bootloader.
-   Create `/persist/warbler-sbctl.conf`, root-owned mode 0600, containing:
+5. **First installed boot: BIOS then OS:**
+   reboot, keep Secure Boot disabled, and boot the OS. Unlock LUKS at the console.
+   SSH as `root@<wired-ip>`, and `cd /persist/nixos-config`.
 
-   ```yaml
-   keydir: /persist/var/lib/sbctl/keys
-   guid: /persist/var/lib/sbctl/GUID
-   ```
-
-   Run `sbctl --config /persist/warbler-sbctl.conf verify` and inspect any
-   unsigned-file reports before proceeding. Do not regenerate signing keys.
-
-6. **Second BIOS visit — prepare enrollment:** reboot into F10. Review the
-   Sure Start key-protection setting from the checklist; disable that specific
-   protection for custom-key enrollment if present. Resolve the T26 Setup Mode
-   checkpoint above: do not use wholesale key clearing or factory reset as a
-   substitute. Preserve/back up existing public firmware key databases and
-   `dbx` before any change. If a safe operation cannot be established, **stop
-   here**, leaving the working passphrase-unlocked bootstrap available.
-   After the verified Setup Mode operation, save and boot the installed NVMe
-   again. Unlock LUKS locally and reconnect over wired SSH.
-
-7. **Installed OS — enroll, then return to BIOS:** in a root shell, confirm
-   `sbctl status` reports Setup Mode enabled. Enroll using the existing keys:
+   run:
 
    ```sh
-   sbctl --config /persist/warbler-sbctl.conf enroll-keys --microsoft
+   sbctl --config /etc/warbler-sbctl.conf verify
    ```
 
-   Review whether HP firmware certificates also need retaining before running
-   enrollment; Microsoft certificates alone are not a backup of all vendor
-   keys. Reboot into F10, enable Secure Boot enforcement if not already enabled,
-   and save. Do not restore factory keys. Keep the enrollment-time Sure Start
-   setting unchanged until custom-key survival is verified. Boot the NVMe and
-   unlock locally once more. Verify `bootctl status` reports Secure Boot
-   enabled in user mode, `sbctl status` reports Setup Mode disabled, and run
-   `sbctl --config /persist/warbler-sbctl.conf verify`. Check the intended keys
-   and retained `dbx`; stop if firmware restored or rejected the custom keys.
-   Any later attempt to re-enable key protection belongs before sealing, with
-   another cold boot and the same checks. No further BIOS changes are needed
-   in the normal flow below.
+   Inspect unsigned-file reports before proceeding. It's expected that the initramfs is unsigned.
 
-8. **Secure Boot verified: automatic credentials:**
-   `warbler-initrd-credentials.service` runs after `/persist` and the TPM are
-   available. It generates a dedicated initrd SSH key once, seals it to TPM PCR
-   7, verifies decryption, and persists only ciphertext and the public key under
-   `/persist/credstore.encrypted` (directory mode 0700, files mode 0600). It is
-   skipped while Secure Boot is disabled. Check it with:
+6. **Back up PK, KEK, db, and dbx before changing firmware keys:** run:
 
    ```sh
-   sudo systemctl start warbler-initrd-credentials.service
-   sudo systemctl status warbler-initrd-credentials.service
-   sudo ssh-keygen -lf /persist/credstore.encrypted/ssh-host-key.pub
+   sudo warbler-secure-boot-backup
    ```
 
-   The default is Ethernet-only; no Wi-Fi input is needed. Repeated runs verify
-   and retain the existing ciphertext and identity. A failed decrypt or missing
-   ciphertext with a saved public identity fails rather than generating a new
-   identity. The bootloader-install hook runs the same provisioning helper
-   **before** Lanzaboote appends secrets when remote unlock is enabled, covering
-   the first rebuild without depending on systemd service activation ordering.
-   Failure prevents bootloader installation; it never falls back to plaintext.
-   Credential provisioning can run after a configuration switch because it binds
-   PCR 7, not a particular kernel generation. LUKS TPM enrollment still requires
-   booting the current generation and explicitly verifying a recovery passphrase.
+   The command reads firmware databases and creates a root-only directory such
+   as `/persist/secure-boot-backup/2026-09-17T18-30-00Z-a1b2c3d4` (UTC date/time
+   plus a unique suffix). It saves all four `.esl` exports, readable `.txt`
+   listings, boot status, and `SHA256SUMS`. A `COMPLETE` marker is written after all four nonempty
+   exports pass checksum verification.
 
-   For optional Wi-Fi, set `warbler.remoteUnlock.wifi.enable = true` and supply a
-   complete root-owned mode-0600 wpa_supplicant configuration from `/run`:
+7. **Clear the backed-up Secure Boot keys:** restart, press **F10** (or **ESC** then go to Setup), and
+   authenticate. Under **Security → Secure Boot Configuration → Secure Boot
+   Key Management**, **select Clear Secure Boot keys**. Leave **Import Custom
+   Secure Boot Keys** and **Reset Secure Boot keys to factory defaults**
+   unselected. Save changes and accept the firmware confirmation.
 
-   ```sh
-   sudo warbler-tpm-setup credentials --wifi-file /run/warbler-wifi.conf
-   ```
+8.  **Boot the installed NVMe UEFI entry** and unlock LUKS locally. Reconnect
+    over wired SSH and run:
 
-   Wi-Fi credentials cannot be generated automatically. For Ethernet-only manual
-   verification or backup recovery use `credentials --ssh-only`. Supply
-   `--ssh-key-file /run/existing-initrd-key` to reseal an existing identity from
-   backup after a TPM/policy change; it must match the saved public key.
+    ```sh
+    sbctl status
+    ```
 
-   Record the public fingerprint on the SSH client. The helper removes its
-   temporary plaintext files on exit; supplied `/run` inputs disappear on reboot.
-   Back up the generated SSH identity to separately encrypted offline storage
-   before clearing the TPM (decrypt it on the working host into a private `/run`
-   file for backup). Do not put Wi-Fi or SSH private keys in `boot.initrd.secrets`;
-   that option only carries the encrypted blobs in this configuration.
+    Require **Setup Mode: Enabled**. If not in setup mode, revisit BIOS to clear secure boot keys.
 
-9. **Enable remote unlock — rebuild, then cold boot:** in the persisted
-   checkout, record the ID from `sudo warbler-root-volume-key-id` in
-   `warbler.rootVolumeKeyId`, restore `warbler.remoteUnlock.enable = true` and leave automatic
-   disk unlock disabled. Run from `/persist/nixos-config`:
+9.  **Enroll the existing Warbler signing keys and Microsoft certificates:**
 
-   ```sh
-   sudo nixos-rebuild boot --flake path:.#warbler
-   ```
+    ```sh
+    sbctl --config /etc/warbler-sbctl.conf enroll-keys --microsoft
+    ```
 
-   On success, power off and start again with console access available. Unplug
-   Ethernet only if explicitly testing optional Wi-Fi; otherwise keep it connected.
-   From your workstation run `ssh -t -p 2222 root@<warbler-ip>`. Test port 2222, verify
-   the recorded host fingerprint, enter the LUKS passphrase, then verify port
-   22 and persistence. This cold-boot test is required; evaluation cannot verify
-   the physical radio, firmware measurements, DHCP, or TPM decryption in initrd.
-   If it fails, unlock locally and reconnect Ethernet for diagnosis; do not
-   clear the TPM or repeat formatting. Keep the preceding bootstrap generation
-   available in the boot menu during provisioning only. Before enrolling
-   unattended unlock, retire unpinned boot artifacts and exclude their
-   measurements from the effective TPM policy; retaining an accepted old
-   unpinned generation provides a route around the new volume check.
+10. **Enable Secure Boot:** restart into **F10 → Security → Secure Boot
+    Configuration** and enable **Secure Boot** (enforces the enrolled signing
+    keys). Save changes, shut down, and power on again.
+
+11. **Verify the cold boot:** boot the NVMe, unlock LUKS locally, reconnect
+    over wired SSH, and run:
+
+    ```sh
+    sudo bootctl status
+    sudo sbctl status
+    sudo sbctl --config /etc/warbler-sbctl.conf verify
+    ```
+
+    Require Secure Boot enabled in user mode, Setup Mode disabled, and valid
+    signatures on the active bootloader and UKI. Stop if firmware restored or
+    rejected the custom keys. Complete any later
+    BIOS changes and repeat this cold-boot verification before sealing TPM
+    credentials. Keep the recovery passphrase and backups available.
+
+12. **Secure Boot verified: automatic credentials:**
+    `warbler-initrd-credentials.service` runs after `/persist` and the TPM are
+    available. It generates a dedicated initrd SSH key once, seals it to TPM PCR
+    7, verifies decryption, and persists only ciphertext and the public key under
+    `/persist/credstore.encrypted` (directory mode 0700, files mode 0600). It is
+    skipped while Secure Boot is disabled. Check it with:
+
+    ```sh
+    sudo systemctl start warbler-initrd-credentials.service
+    sudo systemctl status warbler-initrd-credentials.service
+    sudo ssh-keygen -lf /persist/credstore.encrypted/ssh-host-key.pub
+    ```
+
+    The default is Ethernet-only; no Wi-Fi input is needed. Repeated runs verify
+    and retain the existing ciphertext and identity. A failed decrypt or missing
+    ciphertext with a saved public identity fails rather than generating a new
+    identity. The bootloader-install hook runs the same provisioning helper
+    **before** Lanzaboote appends secrets when remote unlock is enabled, covering
+    the first rebuild without depending on systemd service activation ordering.
+    Failure prevents bootloader installation; it never falls back to plaintext.
+    Credential provisioning can run after a configuration switch because it binds
+    PCR 7, not a particular kernel generation. LUKS TPM enrollment still requires
+    booting the current generation and explicitly verifying a recovery passphrase.
+
+    For optional Wi-Fi, set `warbler.remoteUnlock.wifi.enable = true` and supply a
+    complete root-owned mode-0600 wpa_supplicant configuration from `/run`:
+
+    ```sh
+    sudo warbler-tpm-setup credentials --wifi-file /run/warbler-wifi.conf
+    ```
+
+    Wi-Fi credentials cannot be generated automatically. For Ethernet-only manual
+    verification or backup recovery use `credentials --ssh-only`. Supply
+    `--ssh-key-file /run/existing-initrd-key` to reseal an existing identity from
+    backup after a TPM/policy change; it must match the saved public key.
+
+    Record the public fingerprint on the SSH client. The helper removes its
+    temporary plaintext files on exit; supplied `/run` inputs disappear on reboot.
+    Back up the generated SSH identity to separately encrypted offline storage
+    before clearing the TPM (decrypt it on the working host into a private `/run`
+    file for backup). Do not put Wi-Fi or SSH private keys in `boot.initrd.secrets`;
+    that option only carries the encrypted blobs in this configuration.
+
+13. **Enable remote unlock: rebuild, then cold boot:** in the persisted
+    checkout, record the ID from `sudo warbler-root-volume-key-id` in
+    `warbler.rootVolumeKeyId`, restore `warbler.remoteUnlock.enable = true` and leave automatic
+    disk unlock disabled. Run from `/persist/nixos-config`:
+
+    ```sh
+    sudo nixos-rebuild boot --flake path:.#warbler
+    ```
+
+    On success, power off and start again with console access available. Unplug
+    Ethernet only if explicitly testing optional Wi-Fi; otherwise keep it connected.
+    From your workstation run `ssh -t -p 2222 root@<warbler-ip>`. Test port 2222, verify
+    the recorded host fingerprint, enter the LUKS passphrase, then verify port
+    22 and persistence. This cold-boot test is required; evaluation cannot verify
+    the physical radio, firmware measurements, DHCP, or TPM decryption in initrd.
+    If it fails, unlock locally and reconnect Ethernet for diagnosis; do not
+    clear the TPM or repeat formatting. Keep the preceding bootstrap generation
+    available in the boot menu during provisioning only. Before enrolling
+    unattended unlock, retire unpinned boot artifacts and exclude their
+    measurements from the effective TPM policy; retaining an accepted old
+    unpinned generation provides a route around the new volume check.
 
 ## Optional automatic disk unlock
 

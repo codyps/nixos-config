@@ -265,14 +265,12 @@ mkdir -p /mnt/persist/var/lib/sbctl /mnt/persist/nixos-config /mnt/persist/ssh
 cp -a {q}/secrets/sbctl/. /mnt/persist/var/lib/sbctl/
 cp -a {q}/secrets/ssh/. /mnt/persist/ssh/
 cp -a {q}/source/. /mnt/persist/nixos-config/
-printf 'keydir: /persist/var/lib/sbctl/keys\\nguid: /persist/var/lib/sbctl/GUID\\n' > /mnt/persist/warbler-sbctl.conf
-chmod 600 /mnt/persist/warbler-sbctl.conf
 nixos-install --no-root-passwd --system {shlex.quote(outputs[0])}
 sync
 """
         print("Installing to the confirmed NVMe; no automatic reboot...", flush=True)
         ssh(script)
-        print("Bootstrap installed. Follow README step 5 (first NVMe boot), then BIOS enrollment steps 6–7.")
+        print("Bootstrap installed. Follow README step 5 (first NVMe boot), then continue the Secure Boot setup sequence.")
     finally:
         # Exact per-run mktemp directory validated above, never a broad path.
         ssh(f"rm -rf -- {q}")

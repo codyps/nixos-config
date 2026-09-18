@@ -53,6 +53,10 @@ in
         pcrlockPolicy = "/persist/var/lib/systemd/pcrlock.json";
       };
     };
+    environment.etc."warbler-sbctl.conf".text = ''
+      keydir: ${config.boot.lanzaboote.pkiBundle}/keys
+      guid: ${config.boot.lanzaboote.pkiBundle}/GUID
+    '';
     # TPM credentials are required even when disk auto-unlock is disabled.
     security.tpm2.enable = true;
     boot.initrd = {
@@ -140,6 +144,7 @@ in
     # Keep this host's tailnet identity across ephemeral-root resets.
     services.tailscale.enable = true;
     environment.systemPackages = (with pkgs; [ sbctl cryptsetup tpm2-tools neovim htop tmux ghostty.terminfo ]) ++ [
+      (pkgs.callPackage ./secure-boot-backup.nix { })
       (pkgs.callPackage ./root-volume-key-id.nix {
         device = config.boot.initrd.luks.devices.cryptroot.device;
       })

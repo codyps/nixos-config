@@ -27,12 +27,6 @@ sequence is in the initial provisioning instructions below.
 
 ## Setup
 
-On the installed system, sbctl uses its built-in defaults under `/var/lib/sbctl`;
-no configuration file or `--config` flag is needed. The persistent `/var/lib`
-mount exposes the existing keys and GUID stored in `/persist/var/lib/sbctl`.
-Lanzaboote uses that backing path directly so installation can sign boot files
-before persistence mounts are active.
-
  - EFI part, and Luks2 partition. btrfs on luks2.
  - luks2 partition pined with `fixate-volume-key` in initrd
 

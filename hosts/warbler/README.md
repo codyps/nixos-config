@@ -4,51 +4,11 @@ Inspected at `nixos@nixos.bed.einic.org`: x86_64 AMD, 64 GB RAM, UEFI,
 TPM 2.0 (`systemd-pcrlock is-supported` returned `yes`), Secure Boot disabled.
 The installer currently uses Wi-Fi `wlp3s0` (rtw89_8852ae); `eno1` is unplugged.
 
-## USB device approval
-
-`usbguard.nix` blocks unfamiliar USB peripherals, including new keyboards.
-The Logitech receiver inspected on 2026-09-16 is allowed by descriptor hash,
-interface set, and port `6-2`. Keep it in that port; moving it or changing USB
-bus numbering requires reviewing its rule over SSH. Root controllers retain
-their state; external hubs require approval. The internal Realtek Bluetooth
-radio and Samsung flash drive are deliberately not allowlisted.
-
-Approve a device temporarily over SSH:
-
-```sh
-sudo usbguard list-devices --blocked
-sudo usbguard allow-device DEVICE_ID
-sudo usbguard list-devices --allowed
-sudo usbguard block-device DEVICE_ID
-```
-
-Use the numeric ID at the start of the listing, and inspect the device before
-approval. Temporary approval does not add an allowlist entry. Reconnecting the
-device or restarting USBGuard reapplies the declarative policy. Permanent
-exceptions belong in `usbguard.nix`; do not use `allow-device --permanent` with
-the immutable Nix policy. Do not blindly import `generate-policy` output: it
-trusts everything currently attached. Unmount storage before blocking it.
-
-This policy takes effect when the normal system's USBGuard service starts.
-It does **not** yet enforce USB authorization in firmware or the initrd. Early
-boot denial is a separate follow-up requiring an attended unlock/recovery test;
-do not add `usbcore.authorized_default=0` alone, which would also block the
-USB unlock keyboard before USBGuard starts. Device descriptors are spoofable;
-this is an allowlist, not cryptographic device authentication.
-
-During deployment on 2026-09-16, no `/persist/credstore.encrypted` directory
-was present, and Secure Boot was disabled. `warbler.remoteUnlock.enable` stays
-explicitly false until Secure Boot is enabled. This preserves local
-passphrase unlocking and avoids generating a boot entry that requires missing
-initrd secrets; the root-volume identity check remains enabled.
-
 ## Hardware and firmware references
 
 User-supplied `lshw` identifies an **HP EliteDesk 805 G8 Desktop Mini PC**,
 SKU `63C34UC#ABA`, motherboard `8881`, BIOS **T26 02.14.00**, dated
-2024-11-21. This records the installed version, not a claim that it is current.
-BIOS administrator authentication is enabled; have that password and local
-keyboard/display access before provisioning. No firmware changes have been made.
+2024-11-21.
 
 HP's [805 G8 Mini Maintenance and Service Guide](https://kaas.hpcloud.hp.com/pdf-public/pdf_10300705_en-US-1.pdf)
 is listed on the [EliteDesk 805 G8 Desktop Mini support page](https://support.hp.com/us-en/product/setup-user-guides/hp-elitedesk-805-g8-desktop-mini-pc/2100378016)
@@ -65,33 +25,17 @@ documents database backup and the disable/save/re-enter/clear sequence. Physical
 T26 behavior and database restoration remain unverified. The complete action
 sequence is in the initial provisioning instructions below.
 
+## Setup
+
 On the installed system, sbctl uses its built-in defaults under `/var/lib/sbctl`;
 no configuration file or `--config` flag is needed. The persistent `/var/lib`
 mount exposes the existing keys and GUID stored in `/persist/var/lib/sbctl`.
 Lanzaboote uses that backing path directly so installation can sign boot files
 before persistence mounts are active.
 
-Wi-Fi must remain enabled if optional initrd Wi-Fi is configured. Firmware PXE/Wi-Fi boot is not
-required: the Linux initrd performs association. CPU virtualization is needed
-for KVM tests, not for LUKS or impermanence; the successful physical-host KVM
-test already establishes that it was usable. Leave the SATA disk untouched.
+ - EFI part, and Luks2 partition. btrfs on luks2.
+ - luks2 partition pined with `fixate-volume-key` in initrd
 
-Disko targets the SK hynix 512 GB NVMe at `/dev/nvme0n1`.
-Reconfirm its model and capacity before installation: device enumeration can
-change if hardware is added. No hardware serial numbers are recorded here.
-The TEAM 4 TB SATA SSD and installer USB are not in the disk configuration.
-The NVMe gets a 2 GiB unencrypted EFI partition and a LUKS2 container with
-Btrfs sibling subvolumes `root`, `nix`, `persist`, and `home`, mounted at `/`,
-`/nix`, `/persist`, and `/home`. The systemd initrd deletes and recreates only
-`root` after LUKS unlock and before mounting `/`; it is not tmpfs. Nested root
-subvolumes are deleted too, with no old-root retention. A reset failure blocks
-the root mount. This adapts the [impermanence Btrfs example](https://github.com/nix-community/impermanence#system-setup)
-to systemd initrd. `/var/lib`, `/var/log`, `/var/db`, `/root`, and machine-id
-persist; other root changes disappear. Swap is RAM-only zram.
-
-Lanzaboote signs boot artifacts. The EFI partition cannot be encrypted in this
-design; all persistent OS data is inside LUKS. Signing keys stay under
-`/persist/var/lib/sbctl` and are never copied into the initrd.
 
 The normal configuration pins `cryptroot` with systemd's `fixate-volume-key=`
 in the signed initrd. This applies to both passphrase and TPM unlock, before

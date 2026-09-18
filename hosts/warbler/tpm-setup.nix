@@ -7,7 +7,8 @@ let
       exec python3 ${./tpm-setup.py} "$@"
     '';
   };
-  provision = "${setup}/bin/warbler-tpm-setup credentials --ssh-only";
+  provision = "${setup}/bin/warbler-tpm-setup credentials"
+    + lib.optionalString (!config.warbler.remoteUnlock.wifi.enable) " --ssh-only";
 in
 {
   # A normal activation script runs too late: switch installs boot files first.

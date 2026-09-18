@@ -25,6 +25,7 @@ class ProvisioningTests(unittest.TestCase):
         self.addCleanup(self.temp.cleanup)
         self.root = Path(self.temp.name)
         self.store = self.root / "persist"
+        self.plain_store = self.root / "plain"
         self.work = self.root / "work"
         self.work.mkdir()
         self.wifi = self.root / "wifi"
@@ -36,7 +37,7 @@ class ProvisioningTests(unittest.TestCase):
         self.metadata = {"keyslots": {"0": {"type": "luks2"}}, "tokens": {}}
         self.enrolled = False
         self.fail = None
-        for target, value in [("STORE", self.store), ("run", self.fake_run),
+        for target, value in [("STORE", self.store), ("PLAIN_STORE", self.plain_store), ("run", self.fake_run),
                               ("private_input", lambda p: Path(p))]:
             mock = patch.object(setup, target, value)
             mock.start()
@@ -107,6 +108,7 @@ class ProvisioningTests(unittest.TestCase):
         self.args.ssh_only = True
         setup.credentials(self.args, self.work)
         (self.store / "ssh-host-key").unlink()
+        (self.plain_store / "ssh-host-key").unlink()
         self.calls.clear()
         with self.assertRaisesRegex(RuntimeError, "ciphertext is missing"):
             setup.credentials(self.args, self.work)
@@ -142,6 +144,61 @@ class ProvisioningTests(unittest.TestCase):
         self.args.ssh_key_file = key
         with self.assertRaisesRegex(RuntimeError, "identity"):
             setup.credentials(self.args, self.work)
+
+    def test_reseal_persistent_inputs_after_policy_change(self):
+        setup.credentials(self.args, self.work)
+        identity = (self.store / "ssh-host-key.pub").read_bytes()
+        self.args.wifi_file = None
+        self.fail = lambda a: a[:2] == ("systemd-creds", "decrypt") and str(self.store) in a[-2]
+        setup.credentials(self.args, self.work)
+        self.assertEqual(identity, (self.store / "ssh-host-key.pub").read_bytes())
+        self.assertTrue((self.plain_store / "ssh-host-key").is_file())
+        self.assertTrue((self.plain_store / "wifi").is_file())
+
+    def test_changed_wifi_input_reseals_without_rotating_ssh(self):
+        setup.credentials(self.args, self.work)
+        ssh = (self.store / "ssh-host-key").read_bytes()
+        (self.plain_store / "wifi").write_bytes(b"changed wifi")
+        self.args.wifi_file = None
+        setup.credentials(self.args, self.work)
+        self.assertEqual((self.store / "wifi").read_bytes(), b"sealed:changed wifi")
+        self.assertEqual((self.store / "ssh-host-key").read_bytes(), ssh)
+
+    def test_missing_ciphertext_recreated_from_plaintext(self):
+        setup.credentials(self.args, self.work)
+        before = (self.store / "ssh-host-key").read_bytes()
+        (self.store / "ssh-host-key").unlink()
+        self.args.wifi_file = None
+        setup.credentials(self.args, self.work)
+        self.assertEqual(before, (self.store / "ssh-host-key").read_bytes())
+
+    def test_sealed_only_installation_migrates_without_rotation(self):
+        setup.credentials(self.args, self.work)
+        before = (self.store / "ssh-host-key").read_bytes()
+        for path in self.plain_store.iterdir():
+            path.unlink()
+        self.args.wifi_file = None
+        setup.credentials(self.args, self.work)
+        self.assertEqual(before, (self.store / "ssh-host-key").read_bytes())
+        self.assertTrue((self.plain_store / "ssh-host-key").is_file())
+        self.assertTrue((self.plain_store / "wifi").is_file())
+
+    def test_failed_reseal_keeps_previous_outputs(self):
+        setup.credentials(self.args, self.work)
+        before = {p.name: p.read_bytes() for p in self.store.iterdir()}
+        (self.plain_store / "wifi").write_bytes(b"updated wifi")
+        self.args.wifi_file = None
+        self.fail = lambda a: a[:2] == ("systemd-creds", "encrypt")
+        with self.assertRaises(subprocess.CalledProcessError):
+            setup.credentials(self.args, self.work)
+        self.assertEqual(before, {p.name: p.read_bytes() for p in self.store.iterdir()})
+
+    def test_missing_wifi_input_fails_before_ssh_generation(self):
+        self.args.wifi_file = None
+        with self.assertRaisesRegex(RuntimeError, "/persist/credstore/wifi"):
+            setup.credentials(self.args, self.work)
+        self.assertFalse(any(c[:2] == ("ssh-keygen", "-q") for c in self.calls))
+        self.assertEqual(list(self.store.iterdir()), [])
 
     def test_wrong_recovery_password_never_enrolls(self):
         self.fail = lambda a: a[:2] == ("cryptsetup", "open")
@@ -219,6 +276,26 @@ class ProvisioningTests(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, "installed warbler"):
                 setup.preflight()
         self.assertEqual(self.calls, [])
+
+
+class InputPermissionTests(unittest.TestCase):
+    def test_symlink_input_is_rejected(self):
+        with tempfile.TemporaryDirectory() as directory:
+            source = Path(directory) / "source"
+            source.write_bytes(b"test fixture")
+            source.chmod(0o600)
+            link = Path(directory) / "link"
+            link.symlink_to(source)
+            with self.assertRaisesRegex(RuntimeError, "symlink"):
+                setup.private_input(link)
+
+    def test_readable_by_others_is_rejected(self):
+        with tempfile.TemporaryDirectory() as directory:
+            source = Path(directory) / "source"
+            source.write_bytes(b"test fixture")
+            source.chmod(0o644)
+            with self.assertRaisesRegex(RuntimeError, "0600"):
+                setup.private_input(source)
 
 
 if __name__ == "__main__":

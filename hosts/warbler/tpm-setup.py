@@ -10,6 +10,7 @@ import subprocess
 import sys
 import tempfile
 
+PLAIN_STORE = Path("/persist/credstore")
 STORE = Path("/persist/credstore.encrypted")
 EFI = Path("/sys/firmware/efi/efivars")
 EFI_GUID = "8be4df61-93ca-11d2-aa0d-00e098032b8c"
@@ -48,6 +49,7 @@ def preflight(*, require_current_generation=True):
 
 def private_input(path):
     path = Path(path)
+    require(not path.is_symlink(), f"Input must not be a symlink: {path}")
     info = path.stat()
     require(path.is_file() and info.st_uid == 0 and info.st_mode & 0o077 == 0,
             f"Input must be a root-owned file with mode 0600: {path}")
@@ -58,42 +60,71 @@ def decrypt(name, source, destination):
     run("systemd-creds", "decrypt", f"--name={name}", str(source), str(destination))
 
 
+def publish(source, target):
+    with tempfile.NamedTemporaryFile(dir=target.parent, prefix=".credential-", delete=False) as out:
+        staged = Path(out.name)
+        try:
+            out.write(source.read_bytes())
+            out.flush()
+            os.fsync(out.fileno())
+            os.replace(staged, target)
+        finally:
+            staged.unlink(missing_ok=True)
+
+
 def credentials(args, work):
-    STORE.mkdir(mode=0o700, parents=True, exist_ok=True)
-    os.chmod(STORE, 0o700)
+    for directory in (PLAIN_STORE, STORE):
+        require(not directory.is_symlink(), f"Credential directory must not be a symlink: {directory}")
+        directory.mkdir(mode=0o700, parents=True, exist_ok=True)
+        require(directory.stat().st_uid == os.geteuid(), "Credential directory has the wrong owner.")
+        os.chmod(directory, 0o700)
     pending = []
     inputs = [("ssh-host-key", args.ssh_key_file)]
     if not args.ssh_only:
         inputs.insert(0, ("wifi", args.wifi_file))
     for name, supplied in inputs:
         plain = work / name
+        source = PLAIN_STORE / name
         target = STORE / name
         if supplied:
             plain.write_bytes(private_input(supplied).read_bytes())
+        elif source.exists() or source.is_symlink():
+            plain.write_bytes(private_input(source).read_bytes())
         elif target.exists():
-            # Fail rather than silently rotating an identity after TPM/policy loss.
+            # Migrate an existing sealed-only credential without changing identity.
             decrypt(name, target, plain)
         elif name == "ssh-host-key":
             require(not (STORE / "ssh-host-key.pub").exists(),
-                    "Initrd SSH ciphertext is missing; restore it rather than rotating the saved identity.")
+                    "Initrd SSH ciphertext is missing; restore the plaintext key rather than rotating identity.")
             run("ssh-keygen", "-q", "-t", "ed25519", "-N", "", "-f", str(plain))
         else:
-            raise RuntimeError("First setup needs --wifi-file /run/warbler-wifi.conf (mode 0600).")
+            raise RuntimeError("Install a root-owned mode-0600 Wi-Fi config at /persist/credstore/wifi.")
         require(plain.stat().st_size > 0, f"Empty {name} credential.")
         if name == "ssh-host-key":
             public = run("ssh-keygen", "-y", "-f", str(plain))
             (work / "ssh-host-key.pub").write_bytes(public)
-            if supplied and (target.exists() or (STORE / "ssh-host-key.pub").exists()):
-                saved_public = STORE / "ssh-host-key.pub"
-                if saved_public.exists():
-                    old_public = saved_public.read_bytes()
-                else:
-                    previous = work / "previous-host-key"
-                    decrypt(name, target, previous)
-                    old_public = run("ssh-keygen", "-y", "-f", str(previous))
-                require(old_public.split()[:2] == public.split()[:2],
-                        "Refusing to replace the existing initrd SSH identity.")
-        if supplied or not target.exists():
+            saved_public = STORE / "ssh-host-key.pub"
+            if saved_public.exists():
+                old_public = saved_public.read_bytes()
+            elif target.exists():
+                previous = work / "previous-host-key"
+                decrypt(name, target, previous)
+                old_public = run("ssh-keygen", "-y", "-f", str(previous))
+            else:
+                old_public = public
+            require(old_public.split()[:2] == public.split()[:2],
+                    "Refusing to replace the existing initrd SSH identity.")
+        # Keep ciphertext if it still decrypts to the authoritative input.
+        # Otherwise reseal from plaintext under the verified current PCR 7 policy.
+        reusable = False
+        if target.exists():
+            try:
+                previous = work / f"{name}.previous"
+                decrypt(name, target, previous)
+                reusable = previous.read_bytes() == plain.read_bytes()
+            except subprocess.CalledProcessError:
+                pass
+        if not reusable:
             encrypted = work / f"{name}.encrypted"
             run("systemd-creds", "encrypt", "--with-key=tpm2", "--tpm2-device=auto",
                 "--tpm2-pcrs=7", f"--name={name}", str(plain), str(encrypted))
@@ -101,21 +132,15 @@ def credentials(args, work):
             decrypt(name, encrypted, check)
             require(check.read_bytes() == plain.read_bytes(), "Credential round-trip failed.")
             pending.append((encrypted, target))
-    # Validate all requested credentials before publishing changes. Only ciphertext
-    # crosses onto persistent storage; each rename is atomic on that filesystem.
+        if supplied or not source.exists():
+            pending.append((plain, source))
+    # Validate every requested credential before publishing. Each file replacement
+    # is atomic; plaintext stays on cryptroot, only ciphertext enters the initrd.
     for source, target in pending:
-        with tempfile.NamedTemporaryFile(dir=STORE, prefix=".sealed-", delete=False) as out:
-            staged = Path(out.name)
-            try:
-                out.write(source.read_bytes())
-                out.flush()
-                os.fsync(out.fileno())
-                os.replace(staged, target)
-            finally:
-                staged.unlink(missing_ok=True)
-    (STORE / "ssh-host-key.pub").write_bytes((work / "ssh-host-key.pub").read_bytes())
+        publish(source, target)
+    publish(work / "ssh-host-key.pub", STORE / "ssh-host-key.pub")
     print(run("ssh-keygen", "-lf", str(STORE / "ssh-host-key.pub")).decode().strip())
-    print("Credentials verified. Enable remoteUnlock and rebuild boot files to include them.")
+    print("Credentials sealed from /persist/credstore. Rebuild boot files to include changes.")
 
 
 def recovery_slots(metadata):
@@ -164,7 +189,7 @@ def main():
     commands = parser.add_subparsers(dest="command", required=True)
     creds = commands.add_parser("credentials", help="Seal or verify initrd SSH/Wi-Fi credentials")
     creds.add_argument("--wifi-file", type=Path)
-    creds.add_argument("--ssh-key-file", type=Path, help="Existing key to preserve; otherwise generated once")
+    creds.add_argument("--ssh-key-file", type=Path, help="Import an existing key into /persist/credstore; otherwise reuse or generate once")
     creds.add_argument("--ssh-only", action="store_true", help="Provision Ethernet SSH without Wi-Fi credentials")
     commands.add_parser("enroll-disk", help="Verify recovery passphrase and add a TPM LUKS token")
     args = parser.parse_args()

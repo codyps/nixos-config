@@ -157,6 +157,14 @@ Stage 2 SSH uses port 22 and a separate persistent host key. Both root and cody
 accept authorized SSH keys; cody has passwordless sudo. Account passwords are
 locked. The LUKS passphrase is independent of SSH account authentication.
 
+Store the authoritative plaintext inputs in root-owned mode-0600 files
+`/persist/credstore/ssh-host-key` and, when Wi-Fi is enabled,
+`/persist/credstore/wifi`. Keep the directory mode 0700. `/persist` is inside
+LUKS-encrypted cryptroot; these inputs never enter the Nix store or initrd.
+The boot service and bootloader-install hook seal them into
+`/persist/credstore.encrypted`, reusing unchanged decryptable blobs and
+resealing changed inputs or blobs that no longer decrypt.
+
 Early Wi-Fi and SSH **always require TPM-encrypted credentials**, even when
 `warbler.tpmUnlock.enable = false` (the default). Only these ciphertext files
 are appended to the initrd at installation/rebuild time:
@@ -450,12 +458,33 @@ the TPM helper. Commands below are instructions, not evidence of installation.
     BIOS changes and repeat this cold-boot verification before sealing TPM
     credentials. Keep the recovery passphrase and backups available.
 
-12. **Secure Boot verified: automatic credentials:**
-    `warbler-initrd-credentials.service` runs after `/persist` and the TPM are
-    available. It generates a dedicated initrd SSH key once, seals it to TPM PCR
-    7, verifies decryption, and persists only ciphertext and the public key under
-    `/persist/credstore.encrypted` (directory mode 0700, files mode 0600). It is
-    skipped while Secure Boot is disabled. Check it with:
+12. **Prepare persistent initramfs credentials:** create the root-only source
+    directory on the encrypted root filesystem:
+
+    ```sh
+    sudo install -d -m 0700 /persist/credstore
+    ```
+
+    For optional Wi-Fi, set `warbler.remoteUnlock.wifi.enable = true` and install
+    your complete wpa_supplicant configuration as a root-owned mode-0600 file:
+
+    ```sh
+    sudo install -o root -g root -m 0600 /run/warbler-wifi.conf /persist/credstore/wifi
+    ```
+
+    To use an existing initramfs SSH identity, install its private key before
+    the first provisioning run:
+
+    ```sh
+    sudo install -o root -g root -m 0600 /run/existing-initrd-key /persist/credstore/ssh-host-key
+    ```
+
+    Otherwise let the hook generate a dedicated SSH key once and retain it in
+    `/persist/credstore/ssh-host-key`. Existing sealed-only installations migrate
+    by decrypting the existing key into that file; the identity is preserved.
+    Do not replace it with a different key after provisioning.
+
+    **Run the hook and record the public fingerprint:**
 
     ```sh
     sudo systemctl start warbler-initrd-credentials.service
@@ -463,35 +492,26 @@ the TPM helper. Commands below are instructions, not evidence of installation.
     sudo ssh-keygen -lf /persist/credstore.encrypted/ssh-host-key.pub
     ```
 
-    The default is Ethernet-only; no Wi-Fi input is needed. Repeated runs verify
-    and retain the existing ciphertext and identity. A failed decrypt or missing
-    ciphertext with a saved public identity fails rather than generating a new
-    identity. The bootloader-install hook runs the same provisioning helper
-    **before** Lanzaboote appends secrets when remote unlock is enabled, covering
-    the first rebuild without depending on systemd service activation ordering.
-    Failure prevents bootloader installation; it never falls back to plaintext.
-    Credential provisioning can run after a configuration switch because it binds
-    PCR 7, not a particular kernel generation. LUKS TPM enrollment still requires
-    booting the current generation and explicitly verifying a recovery passphrase.
+    The service runs automatically at boot after `/persist` and the TPM are
+    available, and skips while Secure Boot is disabled. With Wi-Fi enabled it
+    seals both inputs; otherwise it seals only SSH. When changing the Wi-Fi
+    option in the checkout, rebuild to apply it to the service.
 
-    For optional Wi-Fi, set `warbler.remoteUnlock.wifi.enable = true` and supply a
-    complete root-owned mode-0600 wpa_supplicant configuration from `/run`:
+    The bootloader-install hook runs the same helper before Lanzaboote appends
+    credentials to the initrd. It seals plaintext with TPM PCR 7, verifies a
+    decryption round trip, and atomically replaces each output under
+    `/persist/credstore.encrypted`. Unchanged decryptable ciphertext is reused;
+    changed inputs or a changed TPM policy cause resealing from the retained
+    plaintext. A different SSH identity is rejected. Missing Wi-Fi input, bad
+    permissions, or failed sealing stops bootloader installation.
 
-    ```sh
-    sudo warbler-tpm-setup credentials --wifi-file /run/warbler-wifi.conf
-    ```
-
-    Wi-Fi credentials cannot be generated automatically. For Ethernet-only manual
-    verification or backup recovery use `credentials --ssh-only`. Supply
-    `--ssh-key-file /run/existing-initrd-key` to reseal an existing identity from
-    backup after a TPM/policy change; it must match the saved public key.
-
-    Record the public fingerprint on the SSH client. The helper removes its
-    temporary plaintext files on exit; supplied `/run` inputs disappear on reboot.
-    Back up the generated SSH identity to separately encrypted offline storage
-    before clearing the TPM (decrypt it on the working host into a private `/run`
-    file for backup). Do not put Wi-Fi or SSH private keys in `boot.initrd.secrets`;
-    that option only carries the encrypted blobs in this configuration.
+    **Rebuild after changing plaintext inputs** to include their newly sealed
+    copies in the initrd. Starting the service alone updates the copies on
+    `/persist`, not an already-built initrd. Back up `/persist/credstore` to
+    separately encrypted offline storage. Keep private keys and Wi-Fi inputs
+    out of Git, the Nix store, and `boot.initrd.secrets`; only sealed output
+    belongs in that option. LUKS TPM disk enrollment remains a separate,
+    attended operation.
 
 13. **Enable remote unlock: rebuild, then cold boot:** in the persisted
     checkout, record the ID from `sudo warbler-root-volume-key-id` in

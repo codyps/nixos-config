@@ -197,8 +197,11 @@ pkgs.testers.runNixOSTest {
         warbler.succeed("PATH=${lib.makeBinPath [ pkgs.python3 pkgs.cryptsetup pkgs.systemd pkgs.coreutils pkgs.util-linux ]}:$PATH bash ${../../scripts/test-warbler-volume-key.sh}")
 
     with subtest("provision real TPM credentials and preserve SSH identity on rerun"):
+        warbler.succeed("install -d -m 700 /persist/credstore")
+        warbler.succeed("umask 077; printf 'network={\n ssid=\"test\"\n psk=\"test-password\"\n}\n' > /persist/credstore/wifi")
+        warbler.succeed("systemctl start warbler-initrd-credentials.service")
         warbler.wait_until_succeeds("test -s /persist/credstore.encrypted/ssh-host-key", timeout=120)
-        warbler.succeed("test -s /persist/credstore.encrypted/ssh-host-key; test ! -e /persist/credstore.encrypted/wifi")
+        warbler.succeed("test -s /persist/credstore.encrypted/ssh-host-key; test -s /persist/credstore.encrypted/wifi; test -s /persist/credstore/ssh-host-key")
         automatic_identity = warbler.succeed("cat /persist/credstore.encrypted/ssh-host-key.pub")
         automatic_blob = warbler.succeed("sha256sum /persist/credstore.encrypted/ssh-host-key")
         warbler.succeed("systemctl start warbler-initrd-credentials.service")
@@ -249,8 +252,11 @@ pkgs.testers.runNixOSTest {
     with subtest("sealed credentials reject a changed PCR 7"):
         blobs = warbler.succeed("sha256sum /persist/credstore.encrypted/wifi /persist/credstore.encrypted/ssh-host-key")
         warbler.succeed("tpm2_pcrextend 7:sha256=" + "01" * 32)
-        warbler.fail("warbler-tpm-setup credentials")
+        warbler.fail("systemd-creds decrypt --name=ssh-host-key /persist/credstore.encrypted/ssh-host-key /run/rejected-key")
         assert blobs == warbler.succeed("sha256sum /persist/credstore.encrypted/wifi /persist/credstore.encrypted/ssh-host-key")
+        warbler.succeed("systemctl start warbler-initrd-credentials.service")
+        assert identity == warbler.succeed("cat /persist/credstore.encrypted/ssh-host-key.pub")
+        warbler.succeed("systemd-creds decrypt --name=ssh-host-key /persist/credstore.encrypted/ssh-host-key /run/resealed-key; cmp /run/resealed-key /persist/credstore/ssh-host-key; rm /run/resealed-key")
 
     with subtest("missing TPM token falls back to SSH passphrase unlock"):
         # Test-only mutation of the virtual LUKS token, never production state.

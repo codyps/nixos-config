@@ -33,13 +33,14 @@ lib.mkIf (config.warbler.remoteUnlock.enable && config.warbler.remoteUnlock.wifi
     };
   };
 
-  # Reuse the same TPM credential after switching root; never write plaintext
-  # Wi-Fi credentials to a persistent filesystem.
+  # Reuse the sealed copy after switching root. The authoritative plaintext
+  # input stays on encrypted cryptroot under /persist/credstore.
   systemd.services.warbler-wifi = {
     description = "Wi-Fi with TPM-encrypted credentials";
     wantedBy = [ "multi-user.target" ];
     wants = [ "tpm2.target" ];
-    after = [ deviceUnit "tpm2.target" ];
+    requires = [ "warbler-initrd-credentials.service" ];
+    after = [ deviceUnit "tpm2.target" "warbler-initrd-credentials.service" ];
     bindsTo = [ deviceUnit ];
     unitConfig.RequiresMountsFor = [ "/persist" ];
     serviceConfig = serviceConfig // {

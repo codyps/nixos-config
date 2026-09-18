@@ -78,6 +78,8 @@ def validate_bundle(directory, *, require_ssh=True):
         run(["openssl", "x509", "-in", str(cert), "-checkend", "86400", "-noout"])
     if require_ssh or (directory / "ssh").exists():
         validate_host_key(directory / "ssh")
+    if (directory / "account-passwords").exists():
+        validate_account_passwords(directory / "account-passwords")
     return directory
 
 
@@ -110,6 +112,33 @@ def ensure_host_key(directory):
         stage.rename(destination)
 
 
+def ensure_account_passwords(directory):
+    destination = directory / "account-passwords"
+    if destination.exists() or destination.is_symlink():
+        validate_account_passwords(destination)
+        return
+    with tempfile.TemporaryDirectory(prefix=".accounts-prepare-", dir=directory) as temporary:
+        stage = Path(temporary) / "account-passwords"
+        stage.mkdir(mode=0o700)
+        for account in ("root", "cody"):
+            write_private(stage / account, run(["apple-password-gen"]).strip())
+        validate_account_passwords(stage)
+        stage.rename(destination)
+
+
+def validate_account_passwords(directory):
+    for path in (directory, directory / "root", directory / "cody"):
+        if path.is_symlink() or not path.exists():
+            raise RuntimeError("Incomplete account-password bundle; refusing replacement")
+        info = path.stat()
+        if info.st_uid != os.getuid() or info.st_mode & 0o077:
+            raise RuntimeError("Account-password bundle must have private permissions")
+    for account in ("root", "cody"):
+        password = (directory / account).read_bytes()
+        if len(password) < 20 or not re.fullmatch(rb"[A-Za-z0-9-]+", password):
+            raise RuntimeError("Unexpected apple-password-gen account password output")
+
+
 def verify_registered_host_key(directory):
     registered = (REPO / "hosts/warbler/ssh-host-key.pub").read_bytes().split()[:2]
     supplied = (directory / "ssh/ssh_host_ed25519_key.pub").read_bytes().split()[:2]
@@ -122,6 +151,7 @@ def prepare(directory):
     if directory.exists():
         validate_bundle(directory, require_ssh=False)
         ensure_host_key(directory)
+        ensure_account_passwords(directory)
         validate_bundle(directory)
         print(f"Existing bundle verified and retained: {directory}")
         return
@@ -145,6 +175,7 @@ def prepare(directory):
         # Defense if this directory is ever copied under a Git worktree.
         write_private(stage / ".gitignore", b"*\n")
         ensure_host_key(stage)
+        ensure_account_passwords(stage)
         validate_bundle(stage)
         if directory.exists():
             raise RuntimeError("Destination appeared during preparation; refusing overwrite")
@@ -205,11 +236,16 @@ def secret_archive(directory):
         archive.add(directory / "luks-password", arcname="luks-password")
         archive.add(directory / "sbctl", arcname="sbctl")
         archive.add(directory / "ssh", arcname="ssh")
+        archive.add(directory / "account-passwords", arcname="account-passwords")
     return buffer.getvalue()
 
 
 def install(directory, *, build_only=False):
     directory = validate_bundle(directory)
+    if not build_only:
+        ensure_account_passwords(directory)
+        validate_account_passwords(directory / "account-passwords")
+        print(f"Initial account passwords retained locally: {directory / 'account-passwords'} (not printed)")
     verify_registered_host_key(directory)
     inspect_target()
     # Nothing secret goes in source or the Nix input. Stage only in live RAM.
@@ -265,6 +301,7 @@ mkdir -p /mnt/persist/var/lib/sbctl /mnt/persist/nixos-config /mnt/persist/ssh
 cp -a {q}/secrets/sbctl/. /mnt/persist/var/lib/sbctl/
 cp -a {q}/secrets/ssh/. /mnt/persist/ssh/
 cp -a {q}/source/. /mnt/persist/nixos-config/
+{shlex.quote(outputs[0])}/sw/bin/warbler-account-passwords initialize --root /mnt --password-dir {q}/secrets/account-passwords
 nixos-install --no-root-passwd --system {shlex.quote(outputs[0])}
 sync
 """

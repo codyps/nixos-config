@@ -38,11 +38,41 @@ class InstallTests(unittest.TestCase):
             with patch.object(installer, "private_path", return_value=Path(temporary)), \
                     patch.object(installer, "validate_bundle") as validate, \
                     patch.object(installer, "ensure_host_key") as host_key, \
+                    patch.object(installer, "ensure_account_passwords") as accounts, \
                     patch.object(installer, "run") as run:
                 installer.prepare(temporary)
                 self.assertEqual(validate.call_count, 2)
                 host_key.assert_called_once()
+                accounts.assert_called_once()
                 run.assert_not_called()
+
+    def test_account_passwords_generated_once_and_retained(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            directory = Path(temporary)
+            with patch.object(installer, "run", side_effect=[b"Abcdef-ghijkl-mnopq7-RS", b"Tuvwxy-zabcde-fghij8-KL"]) as generate:
+                installer.ensure_account_passwords(directory)
+                original = {p.name: p.read_bytes() for p in (directory / "account-passwords").iterdir()}
+                installer.ensure_account_passwords(directory)
+                self.assertEqual(generate.call_count, 2)
+                self.assertEqual(original, {p.name: p.read_bytes() for p in (directory / "account-passwords").iterdir()})
+                self.assertNotEqual(original["root"], original["cody"])
+
+    def test_partial_account_passwords_are_not_overwritten(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            directory = Path(temporary)
+            (directory / "account-passwords").mkdir(mode=0o700)
+            with patch.object(installer, "run") as generate:
+                with self.assertRaisesRegex(RuntimeError, "Incomplete account-password"):
+                    installer.ensure_account_passwords(directory)
+                generate.assert_not_called()
+
+    def test_invalid_generated_password_does_not_publish_bundle(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            directory = Path(temporary)
+            with patch.object(installer, "run", return_value=b"bad"):
+                with self.assertRaisesRegex(RuntimeError, "Unexpected"):
+                    installer.ensure_account_passwords(directory)
+            self.assertFalse((directory / "account-passwords").exists())
 
     def test_source_inventory_excludes_unlisted_secret(self):
         with tempfile.TemporaryDirectory() as temporary:
@@ -142,6 +172,8 @@ class InstallTests(unittest.TestCase):
             return b""
         with patch.object(installer, "validate_bundle", return_value=Path("/external")), \
                 patch.object(installer, "verify_registered_host_key"), \
+                patch.object(installer, "validate_account_passwords"), \
+                patch.object(installer, "ensure_account_passwords") as accounts, \
                 patch.object(installer, "inspect_target"), \
                 patch.object(installer, "source_archive", return_value=b"source"), \
                 patch.object(installer, "secret_archive", return_value=b"secrets") as secrets, \
@@ -150,6 +182,7 @@ class InstallTests(unittest.TestCase):
             if build_only:
                 installer.install("/external", build_only=True)
                 secrets.assert_not_called()
+                accounts.assert_not_called()
                 self.assertFalse(any("nixos-install --" in cmd for cmd in calls))
             elif not answer:
                 with self.assertRaisesRegex(RuntimeError, "cancelled"):
@@ -164,6 +197,8 @@ class InstallTests(unittest.TestCase):
                 self.assertLess(build, transfer)
                 self.assertLess(transfer, installation)
                 self.assertIn("--system /nix/store/", calls[installation])
+                self.assertLess(calls[installation].index("warbler-account-passwords initialize"),
+                                calls[installation].index("nixos-install --"))
             self.assertEqual(calls[-1], "rm -rf -- /run/warbler-install.12345678")
 
     def test_cancel_never_transfers_secrets_or_formats(self):

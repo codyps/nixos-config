@@ -171,6 +171,7 @@
               bash ${./scripts/test-luks-volume-key-id.sh}
               touch "$out"
             '';
+            warbler-account-passwords = import ./hosts/warbler/account-passwords-test.nix { inherit pkgs; };
             warbler-vm = import ./hosts/warbler/vm-test.nix {
               inherit pkgs self disko impermanence lanzaboote sops-nix;
             };

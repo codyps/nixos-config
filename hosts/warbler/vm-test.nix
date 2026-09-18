@@ -172,6 +172,8 @@ pkgs.testers.runNixOSTest {
         installer.succeed("touch /mnt/etc/NIXOS; mkdir -p /mnt/nix/var/nix/profiles")
         installer.succeed("nixos-enter --root /mnt --system ${nodes.warbler.system.build.toplevel} -- nix-store --load-db < ${nodes.warbler.system.build.testClosure}/registration")
         installer.succeed("nixos-enter --root /mnt --system ${nodes.warbler.system.build.toplevel} -- nix-env -p /nix/var/nix/profiles/system --set ${nodes.warbler.system.build.toplevel}")
+        installer.succeed("install -d -m 700 /run/account-passwords; umask 077; printf %s Abcdef-ghijkl-mnopq7-RS > /run/account-passwords/root; printf %s Tuvwxy-zabcde-fghij8-KL > /run/account-passwords/cody")
+        installer.succeed("${nodes.warbler.system.build.toplevel}/sw/bin/warbler-account-passwords initialize --root /mnt --password-dir /run/account-passwords")
         installer.succeed("NIXOS_INSTALL_BOOTLOADER=1 nixos-enter --root /mnt -- ${nodes.warbler.system.build.toplevel}/bin/switch-to-configuration boot")
         installer.succeed("rm /mnt/persist/credstore.encrypted/wifi /mnt/persist/credstore.encrypted/ssh-host-key")
         installer.succeed("mkdir -p /mnt/boot/loader/keys/auto; cp ${authVariables}/*.auth /mnt/boot/loader/keys/auto/; sync")

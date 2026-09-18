@@ -3,7 +3,7 @@ let
   inherit (import ../../nixos/ssh-auth.nix) authorizedKeys;
 in
 {
-  imports = [ ./hardware-configuration.nix ./disko.nix ./reset-root.nix ./wifi.nix ./tpm-setup.nix ./secrets.nix ./usbguard.nix ];
+  imports = [ ./hardware-configuration.nix ./disko.nix ./reset-root.nix ./wifi.nix ./tpm-setup.nix ./secrets.nix ./usbguard.nix ./account-passwords.nix ];
 
   options.warbler.tpmUnlock.enable = lib.mkEnableOption "TPM measured-boot unlocking after enrollment";
   options.warbler.rootVolumeKeyId = lib.mkOption {
@@ -113,18 +113,15 @@ in
     # /nix, /home and /persist live inside LUKS. No disk swap or hibernation.
     zramSwap.enable = true;
 
-    users.mutableUsers = false;
     users.users.root = {
-      hashedPassword = "!";
       openssh.authorizedKeys.keys = authorizedKeys;
     };
     users.users.cody = {
       isNormalUser = true;
       extraGroups = [ "wheel" ];
-      hashedPassword = "!";
       openssh.authorizedKeys.keys = authorizedKeys;
     };
-    # Administration uses authorized SSH keys; no account password is embedded.
+    # SSH administration remains key-only; console passwords live in /persist/shadow.d.
     security.sudo.wheelNeedsPassword = false;
     services.openssh = {
       enable = true;

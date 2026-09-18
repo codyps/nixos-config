@@ -160,8 +160,26 @@ learn a replacement pin automatically at boot.
 and presents the LUKS passphrase prompt. Use the actual DHCP address or arrange
 a reservation/DNS entry; this configuration does not create DNS records.
 Stage 2 SSH uses port 22 and a separate persistent host key. Both root and cody
-accept authorized SSH keys; cody has passwordless sudo. Account passwords are
-locked. The LUKS passphrase is independent of SSH account authentication.
+accept authorized SSH keys; cody has passwordless sudo. Root and cody have
+installer-generated console passwords. SSH password authentication stays disabled.
+The LUKS passphrase is separate from both account passwords.
+
+The installer retains the initial plaintext passwords only in its private local
+bundle, `~/.local/share/warbler-install/account-passwords/{root,cody}`. Warbler
+stores yescrypt hashes in root-owned mode-0600 `/persist/shadow.d/{root,cody}`
+(directory mode 0700). This is a host-specific hash directory consumed through
+NixOS `hashedPasswordFile`, not a replacement for the standard `/etc/shadow`.
+No passwords or hashes are evaluated by Nix or embedded in the Nix store.
+
+**Change your password with `passwd`**; administrators can use `sudo passwd cody`
+or `sudo passwd root`. The PAM hook saves the resulting hash before reporting
+success. Rebuilds and ephemeral-root resets reuse that hash while
+`users.mutableUsers = false` continues to enforce account definitions. PAM-based
+`chpasswd` is supported too when invoked from the shadow package. Administrative
+lock/delete flags, direct `/etc/shadow` edits, `chpasswd -e`, and `usermod -p`
+bypass the hook and are not persistent password-change interfaces.
+The installing machine's saved initial password becomes stale after a user
+changes it; later installs/retries do not overwrite an existing hash.
 
 Store the authoritative plaintext inputs in root-owned mode-0600 files
 `/persist/credstore/ssh-host-key` and, when Wi-Fi is enabled,
@@ -221,9 +239,10 @@ python3 scripts/warbler-install.py install
   generates RSA-4096 PK, KEK, and db keys/certificates with local OpenSSL. It
   checks key/certificate matches and uses sbctl-compatible PKCS#8 keys. Repeat
   runs validate and retain the existing bundle, never silently rotate it.
-  It also creates a separate Ed25519 stage-2 SSH/SOPS identity under `ssh/`.
-  Older bundles gain that identity on `prepare` without rotating their LUKS
-  password or signing keys. Partial SSH identities are rejected, not replaced.
+  It also generates distinct root and cody account passwords under
+  `account-passwords/`, and a separate Ed25519 stage-2 SSH/SOPS identity under `ssh/`.
+  Older bundles gain missing account passwords and SSH identity on `prepare`
+  without rotating existing credentials. Partial bundles are rejected, not replaced.
 - Local storage defaults to `~/.local/share/warbler-install`: `luks-password`
   contains the exact password bytes, and `sbctl/` contains `GUID` and
   `keys/{PK,KEK,db}/`. Directories are private and files are mode 0600. A
@@ -239,7 +258,8 @@ python3 scripts/warbler-install.py install
 - `check` validates the bundle and performs read-only host/disk checks. It
   requires existing trusted SSH host keys, key authentication, and passwordless
   sudo. It displays model/capacity, not hardware serial numbers.
-- `install` sends a source-only snapshot (tracked plus nonignored untracked
+- `install` first generates missing account passwords in the local bundle,
+  retaining any existing ones. It sends a source-only snapshot (tracked plus nonignored untracked
   files), builds `warbler-bootstrap` and disko **without any secrets**, and
   rechecks the expected empty NVMe. It then requires the exact typed erase
   confirmation. Only afterward are secrets sent over SSH to a separate,
@@ -248,6 +268,9 @@ python3 scripts/warbler-install.py install
   bootloader signing. The local password is not a Nix argument or store input.
   The stage-2 SSH host key is installed at `/persist/ssh/ssh_host_ed25519_key`
   before `nixos-install`, so early SOPS secrets can decrypt on first activation.
+  The installer hashes the account passwords into `/mnt/persist/shadow.d` before
+  account activation. Plaintext account inputs remain in live RAM until cleanup;
+  the installer retains its private local copy.
   `check`, `build`, and `install` require it to match `ssh-host-key.pub` here.
 - `build` runs that same source-transfer/build/preflight path but stops before
   confirmation, secret transfer, or disk changes. Use it to validate the remote
@@ -384,6 +407,23 @@ the TPM helper. Commands below are instructions, not evidence of installation.
    root-owned with directory mode 0700 and file mode 0600. Do not generate a
    different key on the LiveCD: it would not match the SOPS recipient. The
    remote installer performs this step automatically.
+
+   **Provision initial account passwords:** on the installing machine, run
+   `python3 scripts/warbler-install.py prepare` to generate or retain its private
+   bundle. Copy that bundle's `account-passwords/` directory to
+   `/run/warbler-account-passwords` on the installer with root ownership,
+   directory mode 0700, and file mode 0600. Then run on the installer:
+
+   ```sh
+   nix shell --inputs-from path:. nixpkgs#python3 nixpkgs#mkpasswd nixpkgs#util-linux --command \
+     python3 hosts/warbler/account-passwords.py initialize \
+       --root /mnt --password-dir /run/warbler-account-passwords
+   rm -r /run/warbler-account-passwords
+   ```
+
+   This creates only missing `/mnt/persist/shadow.d/{root,cody}` hashes and
+   never resets a current password. The remote installer does this automatically.
+   Keep the original local bundle to retrieve the initial console passwords.
 
    ```sh
    mkdir -p /mnt/persist/var/lib/sbctl
@@ -587,13 +627,18 @@ nix build path:.#nixosConfigurations.warbler.config.system.build.toplevel --no-l
 nix build path:.#nixosConfigurations.warbler.config.system.build.diskoScript --no-link
 python3 scripts/test-warbler-tpm-setup.py
 python3 scripts/test-warbler-install.py
+python3 scripts/test-warbler-account-passwords.py
+nix build path:.#checks.x86_64-linux.warbler-account-passwords --no-link
 nix eval --impure --json --file scripts/test-warbler-volume-key.nix
 nix build path:.#checks.x86_64-linux.luks-volume-key-id --no-link
 ```
 
 Building does not format disks, install/sign the ESP, enroll credentials, or
 activate the configuration. A Linux builder is required on macOS.
-The Python tests mock TPM and disk commands; they validate failure handling,
+The account-password VM test exercises ordinary `passwd`, administrative
+`chpasswd`, repeat initialization, immutable-user activation, shadow recreation,
+and password login after reboot using synthetic credentials.
+The Python tests mock TPM, password hashing, and disk commands; they validate failure handling,
 repeat runs, identity preservation, and recovery checks, not physical enrollment.
 The Nix pin checks cover manual/TPM configuration, malformed/missing pins,
 and the attended bootstrap exception. On Linux, as root with `python3`,

@@ -36,7 +36,7 @@ in
     warbler.tpmUnlock.enable = lib.mkDefault false;
     # Enable after firmware Secure Boot is enabled. The credential service and
     # bootloader hook provision the persistent SSH credential automatically.
-    warbler.remoteUnlock.enable = false;
+    warbler.remoteUnlock.enable = true;
     boot.loader = {
       systemd-boot.enable = lib.mkForce false;
       systemd-boot.editor = false;

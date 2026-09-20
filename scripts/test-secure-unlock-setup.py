@@ -11,7 +11,7 @@ import sys
 import tempfile
 from types import SimpleNamespace
 import unittest
-from unittest.mock import patch
+from unittest.mock import patch, MagicMock
 
 sys.dont_write_bytecode = True
 spec = importlib.util.spec_from_file_location(
@@ -86,6 +86,101 @@ class ProvisioningTests(unittest.TestCase):
         self.assertEqual(blobs, {p.name: p.read_bytes() for p in self.store.iterdir()})
         self.assertFalse(any(c[:2] == ("systemd-creds", "encrypt") for c in self.calls))
         self.assertTrue(all(p.stat().st_mode & 0o077 == 0 for p in self.store.iterdir()))
+
+    def test_tailscale_missing_state_fails_before_publishing(self):
+        self.args.tailscale = True
+        self.args.ssh_only = True
+        with self.assertRaisesRegex(RuntimeError, "enroll-tailscale"):
+            setup.credentials(self.args, self.work)
+        self.assertEqual(list(self.store.iterdir()), [])
+        self.assertFalse(any(c[:2] == ("ssh-keygen", "-q") for c in self.calls))
+
+    def test_tailscale_snapshot_is_sealed_and_reused(self):
+        self.plain_store.mkdir()
+        (self.plain_store / "tailscale-state").write_bytes(b"dedicated test node state")
+        self.args.tailscale = True
+        setup.credentials(self.args, self.work)
+        blob = (self.store / "tailscale-state").read_bytes()
+        self.assertEqual(blob, b"sealed:dedicated test node state")
+        self.calls.clear()
+        setup.credentials(self.args, self.work)
+        self.assertFalse(any(c[:2] == ("systemd-creds", "encrypt") for c in self.calls))
+        self.assertEqual(blob, (self.store / "tailscale-state").read_bytes())
+
+    def test_tailscale_sealing_failure_keeps_previous_outputs(self):
+        self.plain_store.mkdir()
+        (self.plain_store / "tailscale-state").write_bytes(b"dedicated test node state")
+        self.args.tailscale = True
+        setup.credentials(self.args, self.work)
+        before = {p.name: p.read_bytes() for p in self.store.iterdir()}
+        (self.plain_store / "tailscale-state").write_bytes(b"updated test node state")
+        self.fail = lambda a: a[:2] == ("systemd-creds", "encrypt") and "--name=tailscale-state" in a
+        with self.assertRaises(subprocess.CalledProcessError):
+            setup.credentials(self.args, self.work)
+        self.assertEqual(before, {p.name: p.read_bytes() for p in self.store.iterdir()})
+
+    def test_tailscale_enrollment_uses_separate_daemon_and_stops_before_sealing(self):
+        self.config.update(tailscale=True, tailscaleHostName="test-unlock", wifi=False,
+                           stateDirectory=str(self.root))
+        daemon = MagicMock()
+        daemon.poll.return_value = None
+        def spawn(argv, **kwargs):
+            self.assertIn("--tun=userspace-networking", argv)
+            self.assertIn("--encrypt-state=false", argv)
+            self.assertIn(f"--socket={self.work}/tailscaled.sock", argv)
+            self.assertIn(f"--state={self.root}/tailscale-initrd/tailscaled.state", argv)
+            (self.work / "tailscaled.sock").touch()
+            (self.root / "tailscale-initrd/tailscaled.state").write_bytes(b"separate node")
+            return daemon
+        def run(*args):
+            if args[0] == "tailscale":
+                return json.dumps({"BackendState": "Running", "Self": {"ID": "test-node"}}).encode()
+            daemon.wait.assert_called_once()
+            return self.fake_run(*args)
+        with patch.object(setup.subprocess, "Popen", side_effect=spawn), \
+                patch.object(setup.subprocess, "run") as up, patch.object(setup, "run", side_effect=run):
+            setup.enroll_tailscale(self.config, self.work)
+        daemon.terminate.assert_called_once()
+        self.assertIn("--hostname=test-unlock", up.call_args.args[0])
+        self.assertIn("--accept-dns=false", up.call_args.args[0])
+        self.assertEqual((self.store / "tailscale-state").read_bytes(), b"sealed:separate node")
+
+    def test_tailscale_requires_running_non_expiring_node(self):
+        for expiry in [None, "0001-01-01T00:00:00Z"]:
+            setup.validate_tailscale_status({"BackendState": "Running", "Self": {"ID": "node", "KeyExpiry": expiry}})
+        with self.assertRaisesRegex(RuntimeError, "Disable key expiry"):
+            setup.validate_tailscale_status({"BackendState": "Running", "Self": {"ID": "node", "KeyExpiry": "2027-01-01T00:00:00Z"}})
+        with self.assertRaisesRegex(RuntimeError, "authenticated"):
+            setup.validate_tailscale_status({"BackendState": "NeedsLogin"})
+
+    def test_tailscale_failed_login_stops_daemon_without_publishing(self):
+        self.config.update(tailscale=True, tailscaleHostName="test-unlock", wifi=False,
+                           stateDirectory=str(self.root))
+        daemon = MagicMock()
+        daemon.poll.return_value = None
+        (self.work / "tailscaled.sock").touch()
+        with patch.object(setup.subprocess, "Popen", return_value=daemon), \
+                patch.object(setup.subprocess, "run", side_effect=subprocess.CalledProcessError(1, "tailscale")):
+            with self.assertRaises(subprocess.CalledProcessError):
+                setup.enroll_tailscale(self.config, self.work)
+        daemon.terminate.assert_called_once()
+        daemon.wait.assert_called_once()
+        self.assertFalse(self.plain_store.exists())
+        self.assertFalse(self.store.exists())
+
+    def test_tailscale_enrollment_restores_existing_snapshot_before_login(self):
+        self.config.update(tailscale=True, tailscaleHostName="test-unlock", wifi=False,
+                           stateDirectory=str(self.root))
+        self.plain_store.mkdir()
+        (self.plain_store / "tailscale-state").write_bytes(b"existing dedicated identity")
+        daemon = MagicMock()
+        daemon.poll.return_value = 1
+        with patch.object(setup.subprocess, "Popen", return_value=daemon):
+            with self.assertRaisesRegex(RuntimeError, "daemon exited"):
+                setup.enroll_tailscale(self.config, self.work)
+        self.assertEqual((self.root / "tailscale-initrd/tailscaled.state").read_bytes(),
+                         b"existing dedicated identity")
+        daemon.terminate.assert_called_once()
 
     def test_second_credential_failure_publishes_nothing(self):
         self.fail = lambda a: a[:2] == ("systemd-creds", "encrypt") and "--name=ssh-host-key" in a

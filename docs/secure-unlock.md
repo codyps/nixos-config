@@ -84,6 +84,74 @@ the detailed firmware and bootstrap-policy cleanup procedure. The Warbler
 installer, partition layout, root reset, account setup and firmware backup remain
 host-specific.
 
+## Separate Tailscale identity in the initrd
+
+Set `boot.secureUnlock.remoteUnlock.tailscale.enable = true`. The default node
+name is `<hostname>-unlock`; `tailscale.hostName` overrides it. Warbler enables
+this as `warbler-unlock`. This does not change `services.tailscale` or its state.
+
+Tailscale starts only when passphrase recovery starts, alongside SSH and DNS.
+It uses a dedicated socket, TUN interface and state directory in root-only RAM.
+The existing OpenSSH server still handles authentication on the configured
+recovery port (2222 on Warbler); Tailscale SSH is disabled. Configure tailnet
+grants/ACLs to allow only your recovery clients to reach that node's recovery
+port. The existing wired SSH recovery path remains available.
+
+Provision the identity before installing the new boot generation:
+
+1. Build the new system without activation and copy its closure to the host.
+   Run the helper from that new closure so it uses the new configuration:
+
+   ```sh
+   sudo /nix/store/NEW-SYSTEM/sw/bin/secure-unlock-setup enroll-tailscale
+   ```
+
+2. Complete the printed Tailscale login URL, registering the dedicated
+   `<hostname>-unlock` node. This is a normal, non-ephemeral registration.
+   In the Tailscale admin console, disable **key expiry** for that node.
+   If the helper reports expiry is still enabled, disable it and rerun the
+   same command. Its private provisioning state is retained for retries.
+3. Once the helper succeeds, install the new boot generation with
+   `nixos-rebuild boot`, or the remote boot-install workflow, and cold-boot
+   with console access available. When a passphrase is requested, test:
+
+   ```sh
+   ssh -t -p 2222 root@warbler-unlock
+   ```
+
+   Verify the initrd SSH fingerprint through a trusted channel first.
+   Use the node's Tailscale IP if MagicDNS is unavailable on your workstation.
+   After unlock, reconnect to the main host's separate `warbler` identity.
+   A successful TPM disk unlock deliberately skips all recovery networking.
+
+Enrollment runs an isolated userspace daemon, never the normal host daemon.
+Its state is kept under `stateDirectory/tailscale-initrd` on encrypted root;
+the approved snapshot is `stateDirectory/credstore/tailscale-state`.
+The helper validates authentication and disabled expiry, stops that daemon,
+then seals the snapshot using `systemd-creds --with-key=tpm2 --tpm2-pcrs=7`.
+Only `credstore.encrypted/tailscale-state` is appended to the initrd; plaintext
+and auth keys must never be placed in the checkout or Nix store.
+Native Tailscale state encryption is disabled for these isolated daemons:
+the provisioning copy is on encrypted root and the initrd copy is TPM-unsealed
+into RAM. This avoids layering a second, different TPM policy over PCR 7.
+
+Each boot restores the same non-expiring identity snapshot into writable RAM.
+Runtime changes are discarded at switch-root, where the daemon stops and its
+runtime directory is removed. There is no automatic copy back from initrd.
+Repeat `enroll-tailscale` and rebuild to refresh the snapshot after deliberate
+registration changes. Deleting/revoking the node or changing Secure Boot policy
+can prevent recovery through Tailscale; retain local-console recovery and an
+encrypted offline backup of the credential sources. PCR 7 binds Secure Boot
+policy, not an exact kernel generation.
+
+Validate repeated cold boots from the unchanged snapshot on the real tailnet
+before relying on this path. The automated VM test uses a public test snapshot
+and a substitute daemon to test TPM credential delivery and service lifecycle;
+it does not prove Tailscale coordination, ACLs, or unchanged-snapshot reconnects.
+
+References: [tailscaled flags](https://tailscale.com/docs/reference/tailscaled),
+[node key expiry](https://tailscale.com/docs/features/access-control/key-expiry).
+
 ## Validation
 
 ```sh

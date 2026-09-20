@@ -507,6 +507,20 @@ the TPM helper. Commands below are instructions, not evidence of installation.
    and reconnect Ethernet for diagnosis; do not clear the TPM or reformat.
    Keep the preceding bootstrap generation available during provisioning only.
 
+## Tailscale recovery identity
+
+Warbler enables `boot.secureUnlock.remoteUnlock.tailscale.enable` for a separate
+`warbler-unlock` node in the initrd. Follow the
+[Tailscale provisioning procedure](../../docs/secure-unlock.md#separate-tailscale-identity-in-the-initrd)
+before installing this configuration's boot files. Run the new system closure's
+`secure-unlock-setup enroll-tailscale`, authenticate the separate node and disable
+its key expiry, then install the boot generation. Its state is sealed to TPM
+PCR 7; the normal host's `warbler` identity and state remain separate.
+
+When a disk passphrase is requested, connect with
+`ssh -t -p 2222 root@warbler-unlock`. Automatic TPM disk unlock skips recovery
+networking. Test this path with console access before relying on it.
+
 ## Optional automatic disk unlock
 
 After step 9 succeeds, the installed generation is already prepared for TPM

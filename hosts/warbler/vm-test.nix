@@ -1,6 +1,16 @@
 { pkgs, self, disko, impermanence, lanzaboote, sops-nix }:
 let
   inherit (pkgs) lib;
+  tailscaleProbe = pkgs.writeShellScript "test-initrd-tailscale-state" ''
+    set -eu
+    ${pkgs.tailscale}/bin/tailscaled --version > /dev/null
+    ${pkgs.iproute2}/bin/ip link show > /dev/null
+    state=/run/secure-unlock-tailscale/tailscaled.state
+    test "$(${pkgs.coreutils}/bin/cat "$state")" = public-test-tailscale-snapshot
+    test "$(${pkgs.coreutils}/bin/stat -c %a "$state")" = 600
+    test ! -e /var/lib/tailscale/tailscaled.state
+    ${pkgs.coreutils}/bin/touch /run/warbler-initrd-tailscale-started
+  '';
   # Public upstream test fixtures, never production identities or signing keys.
   keys = lanzaboote + "/nix/tests/fixtures/uefi-keys";
   # Deterministic public test key only; never use this for real installations.
@@ -126,6 +136,18 @@ pkgs.testers.runNixOSTest {
           "+${pkgs.coreutils}/bin/touch /run/warbler-initrd-networkd-started";
         boot.initrd.systemd.services.sshd.serviceConfig.ExecStartPre =
           "+${pkgs.coreutils}/bin/touch /run/warbler-initrd-sshd-started";
+        # Exercise real TPM credential loading and service lifecycle without
+        # registering a test node with an external tailnet.
+        boot.initrd.systemd.services.secure-unlock-tailscale.serviceConfig.Type = lib.mkForce "oneshot";
+        boot.initrd.systemd.services.secure-unlock-tailscale.serviceConfig.RemainAfterExit = true;
+        boot.initrd.systemd.services.secure-unlock-tailscale.serviceConfig.ExecStart = lib.mkForce tailscaleProbe;
+        boot.initrd.systemd.storePaths = [
+          tailscaleProbe
+          "${pkgs.bash}/bin/bash"
+          "${pkgs.coreutils}/bin/cat"
+          "${pkgs.coreutils}/bin/stat"
+          "${pkgs.coreutils}/bin/touch"
+        ];
       };
 
       virtualisation = {
@@ -177,6 +199,7 @@ pkgs.testers.runNixOSTest {
         # The not-yet-selected remote specialisation needs placeholder blobs
         # for initial signing. They cannot decrypt and contain no real secrets.
         installer.succeed("echo unprovisioned > /mnt/persist/credstore.encrypted/wifi; echo unprovisioned > /mnt/persist/credstore.encrypted/ssh-host-key")
+        installer.succeed("echo unprovisioned > /mnt/persist/credstore.encrypted/tailscale-state")
         installer.succeed("touch /mnt/etc/NIXOS; mkdir -p /mnt/nix/var/nix/profiles")
         installer.succeed("nixos-enter --root /mnt --system ${nodes.warbler.system.build.toplevel} -- nix-store --load-db < ${nodes.warbler.system.build.testClosure}/registration")
         installer.succeed("nixos-enter --root /mnt --system ${nodes.warbler.system.build.toplevel} -- nix-env -p /nix/var/nix/profiles/system --set ${nodes.warbler.system.build.toplevel}")
@@ -184,6 +207,7 @@ pkgs.testers.runNixOSTest {
         installer.succeed("${nodes.warbler.system.build.toplevel}/sw/bin/warbler-account-passwords initialize --root /mnt --password-dir /run/account-passwords")
         installer.succeed("NIXOS_INSTALL_BOOTLOADER=1 nixos-enter --root /mnt -- ${nodes.warbler.system.build.toplevel}/bin/switch-to-configuration boot")
         installer.succeed("rm /mnt/persist/credstore.encrypted/wifi /mnt/persist/credstore.encrypted/ssh-host-key")
+        installer.succeed("rm /mnt/persist/credstore.encrypted/tailscale-state")
         installer.succeed("mkdir -p /mnt/boot/loader/keys/auto; cp ${authVariables}/*.auth /mnt/boot/loader/keys/auto/; sync")
         installer.shutdown()
 
@@ -208,6 +232,7 @@ pkgs.testers.runNixOSTest {
 
     with subtest("provision real TPM credentials and preserve SSH identity on rerun"):
         warbler.succeed("install -d -m 700 /persist/credstore")
+        warbler.succeed("umask 077; printf public-test-tailscale-snapshot > /persist/credstore/tailscale-state")
         warbler.succeed("umask 077; printf 'network={\n ssid=\"test\"\n psk=\"test-password\"\n}\n' > /persist/credstore/wifi")
         warbler.succeed("systemctl start secure-unlock-credentials.service")
         warbler.wait_until_succeeds("test -s /persist/credstore.encrypted/ssh-host-key", timeout=120)
@@ -235,12 +260,14 @@ pkgs.testers.runNixOSTest {
         warbler.shutdown()
         warbler.start()
         client.wait_until_succeeds("nc -z 192.168.1.3 2222")
+        warbler.wait_for_console_text("(Started|Finished) Separate Tailscale identity")
         # A real SSH PTY exercises the restricted ask-password-agent shell.
         ssh = "ssh -tt -i /etc/test-ssh-key -o StrictHostKeyChecking=yes -o UserKnownHostsFile=/etc/test-known-hosts -p 2222 root@192.168.1.3"
         script = f"import pexpect; p=pexpect.spawn({ssh!r}, encoding='utf-8', timeout=120); p.expect('passphrase'); p.sendline({password!r}); p.expect(pexpect.EOF)"
         client.succeed("python3 -c " + shlex.quote(script))
         warbler.wait_for_unit("multi-user.target")
         warbler.succeed("test -e /run/warbler-initrd-networkd-started && test -e /run/warbler-initrd-sshd-started")
+        warbler.succeed("test -e /run/warbler-initrd-tailscale-started && test ! -e /run/secure-unlock-tailscale")
 
     with subtest("enroll TPM with a verified recovery passphrase"):
         warbler.wait_for_unit("systemd-pcrlock-make-policy.service")
@@ -255,6 +282,7 @@ pkgs.testers.runNixOSTest {
         warbler.start()
         warbler.wait_for_unit("multi-user.target")
         warbler.succeed("test ! -e /run/warbler-initrd-networkd-started && test ! -e /run/warbler-initrd-sshd-started")
+        warbler.succeed("test ! -e /run/warbler-initrd-tailscale-started")
         warbler.succeed("test ! -e /ephemeral-marker && test ! -e /ephemeral-subvol && test -e /persist/persistent-marker && test -e /home/home-marker && test -e /nix/nix-marker")
         assert root_id != warbler.succeed("btrfs inspect-internal rootid /")
         warbler.succeed("test $(cat ${nodes.warbler.sops.secrets.vm-probe.path}) = warbler-sops-test")
@@ -265,6 +293,7 @@ pkgs.testers.runNixOSTest {
         blobs = warbler.succeed("sha256sum /persist/credstore.encrypted/wifi /persist/credstore.encrypted/ssh-host-key")
         warbler.succeed("tpm2_pcrextend 7:sha256=" + "01" * 32)
         warbler.fail("systemd-creds decrypt --name=ssh-host-key /persist/credstore.encrypted/ssh-host-key /run/rejected-key")
+        warbler.fail("systemd-creds decrypt --name=tailscale-state /persist/credstore.encrypted/tailscale-state /run/rejected-tailscale")
         assert blobs == warbler.succeed("sha256sum /persist/credstore.encrypted/wifi /persist/credstore.encrypted/ssh-host-key")
         warbler.succeed("systemctl start secure-unlock-credentials.service")
         assert identity == warbler.succeed("cat /persist/credstore.encrypted/ssh-host-key.pub")
@@ -276,9 +305,11 @@ pkgs.testers.runNixOSTest {
         warbler.shutdown()
         warbler.start()
         client.wait_until_succeeds("nc -z 192.168.1.3 2222")
+        warbler.wait_for_console_text("(Started|Finished) Separate Tailscale identity")
         script = f"import pexpect; p=pexpect.spawn({ssh!r}, encoding='utf-8', timeout=120); p.expect('passphrase'); p.sendline({password!r}); p.expect(pexpect.EOF)"
         client.succeed("python3 -c " + shlex.quote(script))
         warbler.wait_for_unit("multi-user.target")
         warbler.succeed("test -e /run/warbler-initrd-networkd-started && test -e /run/warbler-initrd-sshd-started")
+        warbler.succeed("test -e /run/warbler-initrd-tailscale-started && test ! -e /run/secure-unlock-tailscale")
   '';
 }

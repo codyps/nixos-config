@@ -21,6 +21,7 @@ let
             port = 2200;
             authorizedKeys = [ "ssh-ed25519 PUBLIC-TEST-FIXTURE" ];
             wifi = { enable = true; interface = "wlp2s0"; };
+            tailscale.enable = true;
           };
           tpmUnlock.enable = true;
         };
@@ -58,6 +59,17 @@ assert initrd.systemd.services.systemd-networkd.wantedBy == target;
 assert initrd.systemd.services.systemd-network-generator.wantedBy == target;
 assert initrd.systemd.sockets.systemd-networkd.wantedBy == [ ];
 assert initrd.systemd.services.secure-unlock-wifi.wantedBy == target;
+assert initrd.systemd.services.secure-unlock-tailscale.wantedBy == target;
+assert initrd.systemd.services.systemd-resolved.wantedBy == target;
+assert initrd.systemd.services.secure-unlock-tailscale.conflicts == [ "initrd-switch-root.target" ];
+assert initrd.systemd.services.secure-unlock-tailscale.serviceConfig.LoadCredentialEncrypted == [
+  "tailscale-state:/etc/credstore.encrypted/tailscale-state"
+];
+assert lib.hasInfix "--state=/run/secure-unlock-tailscale/tailscaled.state" initrd.systemd.services.secure-unlock-tailscale.serviceConfig.ExecStart;
+assert initrd.secrets."/etc/credstore.encrypted/tailscale-state" == "/state/credstore.encrypted/tailscale-state";
+assert cfg.boot.secureUnlock.remoteUnlock.tailscale.hostName == "other-host-unlock";
+assert !cfg.services.tailscale.enable;
+assert !(bootstrap.boot.initrd.systemd.services ? secure-unlock-tailscale);
 assert initrd.systemd.network.networks."20-wifi".matchConfig.Name == "wlp2s0";
 assert cfg.systemd.services.secure-unlock-credentials.unitConfig.RequiresMountsFor == [ "/state" ];
 assert cfg.boot.lanzaboote.measuredBoot.pcrlockPolicy == "/state/pcrlock.json";
@@ -69,6 +81,7 @@ assert !disabled.boot.lanzaboote.enable;
 {
   alternateHost = true;
   recoveryOnlyNetworking = true;
+  separateSealedTailscale = true;
   bootstrap = true;
   disabled = true;
   missingKeysRejected = true;

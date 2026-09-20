@@ -9,6 +9,7 @@ from pathlib import Path
 import subprocess
 import sys
 import tempfile
+import time
 
 PLAIN_STORE = None
 STORE = None
@@ -81,6 +82,8 @@ def credentials(args, work):
         os.chmod(directory, 0o700)
     pending = []
     inputs = [("ssh-host-key", args.ssh_key_file)]
+    if getattr(args, "tailscale", False):
+        inputs.insert(0, ("tailscale-state", None))
     if not args.ssh_only:
         inputs.insert(0, ("wifi", args.wifi_file))
     for name, supplied in inputs:
@@ -99,6 +102,8 @@ def credentials(args, work):
                     "Initrd SSH ciphertext is missing; restore the plaintext key rather than rotating identity.")
             run("ssh-keygen", "-q", "-t", "ed25519", "-N", "", "-f", str(plain))
         else:
+            if name == "tailscale-state":
+                raise RuntimeError("Run secure-unlock-setup enroll-tailscale before installing boot files.")
             raise RuntimeError(f"Install a root-owned mode-0600 Wi-Fi config at {PLAIN_STORE / 'wifi'}.")
         require(plain.stat().st_size > 0, f"Empty {name} credential.")
         if name == "ssh-host-key":
@@ -142,6 +147,69 @@ def credentials(args, work):
     publish(work / "ssh-host-key.pub", STORE / "ssh-host-key.pub")
     print(run("ssh-keygen", "-lf", str(STORE / "ssh-host-key.pub")).decode().strip())
     print(f"Credentials sealed from {PLAIN_STORE}. Rebuild boot files to include changes.")
+
+
+def validate_tailscale_status(status):
+    require(status.get("BackendState") == "Running" and status.get("Self", {}).get("ID"),
+            "The initrd Tailscale node must be authenticated and running.")
+    expiry = status["Self"].get("KeyExpiry")
+    require(expiry is None or expiry == "0001-01-01T00:00:00Z",
+            "Disable key expiry for the initrd node in the Tailscale admin console, then rerun enroll-tailscale.")
+
+
+def enroll_tailscale(config, work):
+    require(config.get("tailscale"), "Enable boot.secureUnlock.remoteUnlock.tailscale.enable first.")
+    # A separate persistent workspace permits retrying authentication without
+    # rotating identity. Never read or copy the main host's Tailscale state.
+    directory = Path(config["stateDirectory"]) / "tailscale-initrd"
+    require(not directory.is_symlink(), "Initrd Tailscale directory must not be a symlink.")
+    directory.mkdir(mode=0o700, exist_ok=True)
+    require(directory.stat().st_uid == os.geteuid(), "Initrd Tailscale directory must be root-owned.")
+    directory.chmod(0o700)
+    state = directory / "tailscaled.state"
+    source = PLAIN_STORE / "tailscale-state"
+    if state.exists() or state.is_symlink():
+        private_input(state)
+    elif source.exists():
+        publish(private_input(source), state)
+    elif (STORE / "tailscale-state").exists():
+        decrypt("tailscale-state", STORE / "tailscale-state", state)
+    socket = work / "tailscaled.sock"
+    cli = ("tailscale", f"--socket={socket}")
+    daemon = subprocess.Popen(
+        ["tailscaled", f"--state={state}", f"--statedir={directory}", f"--socket={socket}",
+         "--tun=userspace-networking", "--port=0", "--encrypt-state=false"],
+        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    try:
+        for _ in range(100):
+            require(daemon.poll() is None, "The isolated Tailscale provisioning daemon exited.")
+            if socket.exists():
+                break
+            time.sleep(0.1)
+        require(socket.exists(), "The isolated Tailscale provisioning socket did not appear.")
+        # Interactive login URL goes only to the operator. No auth key is stored
+        # in Nix or passed to the normal host's daemon.
+        subprocess.run([*cli, "up", f"--hostname={config['tailscaleHostName']}",
+                        "--accept-dns=false", "--accept-routes=false", "--netfilter-mode=off",
+                        "--ssh=false", "--timeout=5m"], check=True)
+        status = json.loads(run(*cli, "status", "--json"))
+        validate_tailscale_status(status)
+    finally:
+        daemon.terminate()
+        try:
+            daemon.wait(timeout=10)
+        except subprocess.TimeoutExpired:
+            daemon.kill()
+            daemon.wait()
+    require(not PLAIN_STORE.is_symlink(), "Credential directory must not be a symlink.")
+    PLAIN_STORE.mkdir(mode=0o700, parents=True, exist_ok=True)
+    require(PLAIN_STORE.stat().st_uid == os.geteuid(), "Credential directory must be root-owned.")
+    PLAIN_STORE.chmod(0o700)
+    publish(private_input(state), source)
+    args = argparse.Namespace(ssh_key_file=None, wifi_file=None,
+                              ssh_only=not config["wifi"], tailscale=True)
+    credentials(args, work)
+    print(f"Separate initrd Tailscale node {config['tailscaleHostName']} sealed. Rebuild boot files before testing.")
 
 
 def recovery_slots(metadata):
@@ -194,11 +262,14 @@ def main():
     creds.add_argument("--ssh-key-file", type=Path, help="Import an existing key into the configured credential store; otherwise reuse or generate once")
     creds.add_argument("--ssh-only", action="store_true", help="Provision Ethernet SSH without Wi-Fi credentials")
     commands.add_parser("enroll-disk", help="Verify recovery passphrase and add a TPM LUKS token")
+    commands.add_parser("enroll-tailscale", help="Register and seal a separate non-expiring initrd Tailscale node")
     args = parser.parse_args()
     os.umask(0o077)
     require(not (args.command == "credentials" and args.ssh_only and args.wifi_file),
             "--ssh-only cannot be combined with --wifi-file.")
     config = json.loads(args.config.read_text())
+    if args.command == "credentials":
+        args.tailscale = config.get("tailscale", False)
     if args.command == "credentials" and not config["wifi"]:
         require(not args.wifi_file, "Enable Wi-Fi in the host configuration before supplying credentials.")
         args.ssh_only = True
@@ -212,6 +283,8 @@ def main():
             work = Path(directory)
             if args.command == "credentials":
                 credentials(args, work)
+            elif args.command == "enroll-tailscale":
+                enroll_tailscale(config, work)
             else:
                 enroll_disk(config, work)
 

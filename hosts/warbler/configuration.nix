@@ -29,6 +29,7 @@ in
     boot.secureUnlock.remoteUnlock.wifi.interface = "wlp3s0";
     boot.secureUnlock.tpmUnlock.enable = true;
     boot.secureUnlock.remoteUnlock.enable = true;
+    boot.secureUnlock.remoteUnlock.tailscale.enable = true;
 
     boot.loader = {
       efi.canTouchEfiVariables = true;

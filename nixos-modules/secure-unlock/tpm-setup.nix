@@ -6,13 +6,16 @@ let
     hostName = config.networking.hostName;
     inherit (cfg) mapperName stateDirectory;
     wifi = cfg.remoteUnlock.wifi.enable;
+    tailscale = cfg.remoteUnlock.enable && cfg.remoteUnlock.tailscale.enable;
+    tailscaleHostName = cfg.remoteUnlock.tailscale.hostName;
     policy = config.boot.lanzaboote.measuredBoot.pcrlockPolicy;
     diskUnlock = config.boot.secureUnlock.tpmUnlock.enable;
     pcrlock = "${config.systemd.package}/lib/systemd/systemd-pcrlock";
   });
   setup = pkgs.writeShellApplication {
     name = "secure-unlock-setup";
-    runtimeInputs = with pkgs; [ python3 config.systemd.package cryptsetup openssh util-linux ];
+    runtimeInputs = with pkgs; [ python3 config.systemd.package cryptsetup openssh util-linux ]
+      ++ lib.optional cfg.remoteUnlock.tailscale.enable pkgs.tailscale;
     text = ''
       exec python3 ${./tpm-setup.py} --config ${setupConfig} "$@"
     '';

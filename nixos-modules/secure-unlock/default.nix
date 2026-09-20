@@ -4,7 +4,7 @@ let
   inherit (lib) mkOption types;
 in
 {
-  imports = [ ./remote-unlock.nix ./wifi.nix ./tpm-setup.nix ];
+  imports = [ ./remote-unlock.nix ./wifi.nix ./tailscale.nix ./tpm-setup.nix ];
 
   options.boot.secureUnlock = {
     enable = lib.mkEnableOption "pinned LUKS root with Secure Boot, remote recovery and optional TPM unlocking";
@@ -35,6 +35,14 @@ in
         type = types.port;
         default = 2222;
         description = "Initrd recovery SSH port.";
+      };
+      tailscale = {
+        enable = lib.mkEnableOption "a separate TPM-sealed Tailscale identity for initrd recovery";
+        hostName = mkOption {
+          type = types.strMatching "[a-zA-Z0-9][a-zA-Z0-9-]*";
+          default = "${config.networking.hostName}-unlock";
+          description = "Hostname of the separately registered, non-expiring initrd Tailscale node.";
+        };
       };
       wifi = {
         enable = lib.mkEnableOption "Wi-Fi for initrd recovery and the running system";

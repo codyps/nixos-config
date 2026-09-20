@@ -4,6 +4,7 @@ import contextlib
 import importlib.util
 import io
 import json
+import os
 from pathlib import Path
 import subprocess
 import sys
@@ -14,7 +15,7 @@ from unittest.mock import patch
 
 sys.dont_write_bytecode = True
 spec = importlib.util.spec_from_file_location(
-    "setup", Path(__file__).resolve().parents[1] / "hosts/warbler/tpm-setup.py")
+    "setup", os.environ.get("SECURE_UNLOCK_SCRIPT", Path(__file__).resolve().parents[1] / "nixos-modules/secure-unlock/tpm-setup.py"))
 setup = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(setup)
 
@@ -33,7 +34,7 @@ class ProvisioningTests(unittest.TestCase):
         self.wifi.chmod(0o600)
         self.calls = []
         self.args = SimpleNamespace(wifi_file=self.wifi, ssh_key_file=None, ssh_only=False)
-        self.config = {"diskUnlock": True, "disk": "/dev/test", "policy": str(self.wifi), "pcrlock": "pcrlock"}
+        self.config = {"hostName": "other-host", "mapperName": "system-root", "stateDirectory": "/state", "diskUnlock": True, "disk": "/dev/test", "policy": str(self.wifi), "pcrlock": "pcrlock"}
         self.metadata = {"keyslots": {"0": {"type": "luks2"}}, "tokens": {}}
         self.enrolled = False
         self.fail = None
@@ -195,7 +196,7 @@ class ProvisioningTests(unittest.TestCase):
 
     def test_missing_wifi_input_fails_before_ssh_generation(self):
         self.args.wifi_file = None
-        with self.assertRaisesRegex(RuntimeError, "/persist/credstore/wifi"):
+        with self.assertRaisesRegex(RuntimeError, "mode-0600 Wi-Fi config"):
             setup.credentials(self.args, self.work)
         self.assertFalse(any(c[:2] == ("ssh-keygen", "-q") for c in self.calls))
         self.assertEqual(list(self.store.iterdir()), [])
@@ -227,7 +228,7 @@ class ProvisioningTests(unittest.TestCase):
 
     def test_disabled_disk_unlock_refused(self):
         self.config["diskUnlock"] = False
-        with self.assertRaisesRegex(RuntimeError, "Enable warbler.tpmUnlock"):
+        with self.assertRaisesRegex(RuntimeError, "Enable boot.secureUnlock.tpmUnlock"):
             setup.enroll_disk(self.config, self.work)
 
     def test_secure_boot_off_refused_before_tools_or_writes(self):
@@ -235,9 +236,9 @@ class ProvisioningTests(unittest.TestCase):
         efi.mkdir()
         (efi / f"SecureBoot-{setup.EFI_GUID}").write_bytes(bytes(5))
         with patch.object(setup, "EFI", efi), patch.object(setup.os, "geteuid", return_value=0), \
-                patch.object(setup.os, "uname", return_value=SimpleNamespace(nodename="warbler")):
+                patch.object(setup.os, "uname", return_value=SimpleNamespace(nodename="other-host")):
             with self.assertRaisesRegex(RuntimeError, "Secure Boot"):
-                setup.preflight()
+                setup.preflight(self.config)
         self.assertEqual(self.calls, [])
         self.assertFalse(self.store.exists())
 
@@ -248,33 +249,36 @@ class ProvisioningTests(unittest.TestCase):
             (efi / f"{name}-{setup.EFI_GUID}").write_bytes(bytes(4) + bytes([value]))
         tpm = self.root / "tpm"
         tpm.touch()
-        cfg = self.root / "config.json"
-        cfg.write_text(json.dumps(self.config))
-        paths = {"/dev/tpmrm0": tpm, "/etc/warbler-tpm.json": cfg,
+        paths = {"/dev/tpmrm0": tpm,
                  "/run/booted-system": self.root / "old-generation",
                  "/run/current-system": self.root / "new-generation"}
         original_stat = setup.os.stat
 
         def stat(path, *args, **kwargs):
-            if str(path) in ["/dev/test-backing", "/dev/mapper/cryptroot"]:
+            if str(path) in ["/dev/test-backing", "/dev/mapper/system-root"]:
                 return SimpleNamespace(st_rdev=123)
             return original_stat(path, *args, **kwargs)
 
         with patch.object(setup, "EFI", efi), \
                 patch.object(setup, "Path", side_effect=lambda p: paths.get(str(p), Path(p))), \
                 patch.object(setup.os, "geteuid", return_value=0), \
-                patch.object(setup.os, "uname", return_value=SimpleNamespace(nodename="warbler")), \
+                patch.object(setup.os, "uname", return_value=SimpleNamespace(nodename="other-host")), \
                 patch.object(setup.os, "stat", side_effect=stat), \
-                patch.object(setup, "run", return_value=b"/dev/test-backing[/persist]\n"):
-            self.assertEqual(setup.preflight(require_current_generation=False), self.config)
+                patch.object(setup, "run", return_value=b"/dev/test-backing[/state]\n") as findmnt:
+            self.assertEqual(setup.preflight(self.config, require_current_generation=False), self.config)
+            findmnt.assert_called_with("findmnt", "--evaluate", "-n", "-o", "SOURCE", "--target", "/state")
+            with patch.object(setup.os, "stat", side_effect=lambda p: SimpleNamespace(
+                    st_rdev=123 if str(p) == "/dev/mapper/system-root" else 456)):
+                with self.assertRaisesRegex(RuntimeError, "configured encrypted root"):
+                    setup.preflight(self.config, require_current_generation=False)
             with self.assertRaisesRegex(RuntimeError, "Reboot into the current generation"):
-                setup.preflight()
+                setup.preflight(self.config)
 
     def test_installer_host_refused(self):
         with patch.object(setup.os, "geteuid", return_value=0), \
                 patch.object(setup.os, "uname", return_value=SimpleNamespace(nodename="nixos")):
-            with self.assertRaisesRegex(RuntimeError, "installed warbler"):
-                setup.preflight()
+            with self.assertRaisesRegex(RuntimeError, "installed other-host"):
+                setup.preflight(self.config)
         self.assertEqual(self.calls, [])
 
 

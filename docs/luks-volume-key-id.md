@@ -30,9 +30,8 @@ LUKS UUID, and mapper name. It is neither the UUID nor the raw encryption key.
 Obtain it on a trusted system after formatting; record it explicitly in the
 configuration rather than learning a replacement from disk during boot.
 
-Warbler retains `nix run path:.#warbler-root-volume-key-id` as a shortcut with
-its device and `cryptroot` mapper name supplied. `--device` and `--name` can
-override those defaults. Its known configured pin is unchanged.
+Systems using [the secure-unlock module](secure-unlock.md) get a
+`root-volume-key-id` command configured for their LUKS device and mapper name.
 
 ## Validation
 
@@ -41,5 +40,5 @@ nix build path:.#checks.x86_64-linux.luks-volume-key-id --no-link
 ```
 
 The check uses disposable LUKS1 and LUKS2 images to verify the known ID,
-mapper-name binding, the Warbler shortcut, rejection of invalid inputs, and
+mapper-name binding, the configured shortcut, rejection of invalid inputs, and
 unchanged image contents.

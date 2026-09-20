@@ -220,7 +220,7 @@ class InstallTests(unittest.TestCase):
     def test_record_fresh_volume_identity(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary) / "paths with spaces"
-            helper = root / "system/sw/bin/warbler-root-volume-key-id"
+            helper = root / "system/sw/bin/root-volume-key-id"
             helper.parent.mkdir(parents=True)
             output = root / "checkout/hosts/warbler/volume-identity.nix"
             output.parent.mkdir(parents=True)

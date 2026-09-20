@@ -242,7 +242,7 @@ def secret_archive(directory):
 
 def volume_identity_script(system, checkout):
     """Pin only the freshly installed volume, using its existing recovery input."""
-    helper = shlex.quote(str(Path(system) / "sw/bin/warbler-root-volume-key-id"))
+    helper = shlex.quote(str(Path(system) / "sw/bin/root-volume-key-id"))
     output = shlex.quote(str(Path(checkout) / "hosts/warbler/volume-identity.nix"))
     return f"""
 warbler_volume_key_id=$({helper} --key-file /tmp/warbler-luks-password)

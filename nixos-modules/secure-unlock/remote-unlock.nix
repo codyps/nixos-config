@@ -1,9 +1,9 @@
 { config, lib, ... }:
-lib.mkIf config.warbler.remoteUnlock.enable {
+lib.mkIf (config.boot.secureUnlock.enable && config.boot.secureUnlock.remoteUnlock.enable) {
   boot.initrd.systemd = {
     # cryptsetup stays active while asking for a passphrase, so OnFailure
     # cannot trigger recovery. TPM auto-unlock does not create an ask.* file.
-    paths.warbler-remote-unlock = {
+    paths.secure-unlock-recovery = {
       description = "Watch for an initrd disk passphrase request";
       wantedBy = [ "initrd.target" ];
       before = [ "initrd-switch-root.target" ];
@@ -11,7 +11,7 @@ lib.mkIf config.warbler.remoteUnlock.enable {
       unitConfig.DefaultDependencies = false;
       pathConfig.PathExistsGlob = "/run/systemd/ask-password/ask.*";
     };
-    services.warbler-remote-unlock = {
+    services.secure-unlock-recovery = {
       description = "Start recovery networking when a disk passphrase is needed";
       before = [ "initrd-switch-root.target" ];
       conflicts = [ "initrd-switch-root.target" ];
@@ -23,20 +23,20 @@ lib.mkIf config.warbler.remoteUnlock.enable {
       # A console answer may have unlocked root since the path fired. Keep
       # this service active even when skipping, to avoid retriggering it.
       script = ''
-        if [ ! -e /dev/mapper/cryptroot ]; then
-          systemctl --no-block start warbler-remote-unlock.target
+        if [ ! -e /dev/mapper/${config.boot.secureUnlock.mapperName} ]; then
+          systemctl --no-block start secure-unlock-recovery.target
         fi
       '';
     };
-    targets.warbler-remote-unlock = {
+    targets.secure-unlock-recovery = {
       description = "Initrd recovery networking";
       before = [ "initrd-switch-root.target" ];
       conflicts = [ "initrd-switch-root.target" ];
       unitConfig.DefaultDependencies = false;
     };
-    services.sshd.wantedBy = lib.mkForce [ "warbler-remote-unlock.target" ];
-    services.systemd-networkd.wantedBy = lib.mkForce [ "warbler-remote-unlock.target" ];
-    services.systemd-network-generator.wantedBy = lib.mkForce [ "warbler-remote-unlock.target" ];
+    services.sshd.wantedBy = lib.mkForce [ "secure-unlock-recovery.target" ];
+    services.systemd-networkd.wantedBy = lib.mkForce [ "secure-unlock-recovery.target" ];
+    services.systemd-network-generator.wantedBy = lib.mkForce [ "secure-unlock-recovery.target" ];
     # Otherwise netlink traffic can activate networkd before recovery starts.
     sockets.systemd-networkd.wantedBy = lib.mkForce [ ];
   };

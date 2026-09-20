@@ -1,5 +1,7 @@
 # Warbler
 
+The reusable module and setup commands are documented in [Secure unlock](../../docs/secure-unlock.md).
+
 Inspected at `nixos@nixos.bed.einic.org`: x86_64 AMD, 64 GB RAM, UEFI,
 TPM 2.0 (`systemd-pcrlock is-supported` returned `yes`), Secure Boot disabled.
 The installer currently uses Wi-Fi `wlp3s0` (rtw89_8852ae); `eno1` is unplugged.
@@ -33,7 +35,7 @@ sequence is in the initial provisioning instructions below.
 
 The normal configuration pins `cryptroot` with systemd's `fixate-volume-key=`
 in the signed initrd. This applies to both passphrase and TPM unlock, before
-the Btrfs root-reset service can mount anything. `warbler.rootVolumeKeyId` is
+the Btrfs root-reset service can mount anything. `boot.secureUnlock.rootVolumeKeyId` is
 the public HMAC-SHA256 identity of the installed volume, derived from its
 volume key and the string `cryptsetup:cryptroot:<LUKS UUID>`; it is not a key
 or the digest stored in the LUKS header. Changing the volume key, UUID, or
@@ -45,7 +47,7 @@ The remote installer records the freshly formatted volume's identity in
 `hosts/warbler/volume-identity.nix` in the installed checkout. For a manual
 installation, obtain the identity on the trusted installed system and update
 that file before building the normal configuration. `configuration.nix` imports
-it as `warbler.rootVolumeKeyId`; the repository retains the current installation's
+it as `boot.secureUnlock.rootVolumeKeyId`; the repository retains the current installation's
 known identity. Never automatically
 learn the expected identity from a disk during boot. An unpinned configuration
 cannot enable remote or TPM unlock. Pinning authenticates volume identity,
@@ -54,15 +56,15 @@ not every filesystem block or its freshness.
 On the trusted installed system (including `warbler-bootstrap`), run:
 
 ```sh
-sudo warbler-root-volume-key-id
+sudo root-volume-key-id
 ```
 
 Or run directly from this checkout on Linux, without installing the command:
 
 ```sh
-sudo nix run .#warbler-root-volume-key-id
+sudo nix run .#luks-volume-key-id -- --device /dev/disk/by-partlabel/disk-system-crypt --name cryptroot
 # Automation with an existing passphrase file:
-sudo nix run .#warbler-root-volume-key-id -- --key-file /run/warbler-luks-password
+sudo nix run .#luks-volume-key-id -- --device /dev/disk/by-partlabel/disk-system-crypt --name cryptroot --key-file /run/warbler-luks-password
 ```
 
 The package includes Python and libcryptsetup; no system Python or cryptsetup
@@ -84,7 +86,7 @@ matches [systemd's volume-key identity](https://github.com/systemd/systemd/blob/
 For provisioning automation with an existing passphrase file in RAM:
 
 ```sh
-sudo warbler-root-volume-key-id --key-file /run/warbler-luks-password
+sudo root-volume-key-id --key-file /run/warbler-luks-password
 ```
 
 Use `--device /dev/disk/by-partlabel/disk-system-crypt` to override the device
@@ -139,7 +141,7 @@ normal boot. Recovery therefore includes the time needed to establish the
 network connection. The local console passphrase prompt remains available.
 
 Early Wi-Fi and SSH **always require TPM-encrypted credentials**, even when
-`warbler.tpmUnlock.enable = false`. Only these ciphertext files
+`boot.secureUnlock.tpmUnlock.enable = false`. Only these ciphertext files
 are appended to the initrd at installation/rebuild time:
 
 | Source on encrypted storage | Credential name | Consumer |
@@ -456,14 +458,14 @@ the TPM helper. Commands below are instructions, not evidence of installation.
 9. **Prepare remote unlock and optional disk enrollment in one rebuild.**
    Work from `/persist/nixos-config`. The remote installer has already recorded
    the new volume identity in `hosts/warbler/volume-identity.nix`. For a manual
-   install, run `sudo warbler-root-volume-key-id` and save the returned ID as a
+   install, run `sudo root-volume-key-id` and save the returned ID as a
    quoted Nix string in that file. Never reuse the previous installation's pin.
 
    Keep these normal configuration settings enabled:
 
    ```nix
-   warbler.remoteUnlock.enable = true;
-   warbler.tpmUnlock.enable = true;
+   boot.secureUnlock.remoteUnlock.enable = true;
+   boot.secureUnlock.tpmUnlock.enable = true;
    ```
 
    The second setting prepares measured boot and TPM unlocking support; it
@@ -474,7 +476,7 @@ the TPM helper. Commands below are instructions, not evidence of installation.
 
    Ethernet needs no credential preparation: the hook creates and retains the
    dedicated initrd SSH identity automatically. For optional Wi-Fi, set
-   `warbler.remoteUnlock.wifi.enable = true` and install the complete
+   `boot.secureUnlock.remoteUnlock.wifi.enable = true` and install the complete
    wpa_supplicant configuration before rebuilding:
 
    ```sh
@@ -523,7 +525,7 @@ perform it. Secure Boot must enforce the trusted boot artifacts.
 Then run on Warbler:
 
 ```sh
-sudo warbler-tpm-setup enroll-disk
+sudo secure-unlock-setup enroll-disk
 ```
 
 The helper prompts for the existing recovery passphrase, verifies it against
@@ -540,7 +542,7 @@ TPM or remove the passphrase slot as a test.
 
 Lanzaboote maintains the managed PCR 0, 4, and 7 policy on subsequent bootloader
 updates; eight boot generations are retained. If using an older installation
-with `warbler.tpmUnlock.enable = false`, enable it, rebuild, and boot that
+with `boot.secureUnlock.tpmUnlock.enable = false`, enable it, rebuild, and boot that
 configuration before enrollment. The helper never rebuilds, changes firmware,
 or reboots the machine itself.
 
@@ -552,7 +554,7 @@ Run these checks from the flake checkout:
 nix eval --raw .#nixosConfigurations.warbler.config.system.build.toplevel.drvPath
 nix build .#nixosConfigurations.warbler.config.system.build.toplevel --no-link
 nix build .#nixosConfigurations.warbler.config.system.build.diskoScript --no-link
-python3 scripts/test-warbler-tpm-setup.py
+python3 scripts/test-secure-unlock-setup.py
 python3 scripts/test-warbler-install.py
 python3 scripts/test-warbler-account-passwords.py
 nix build .#checks.x86_64-linux.warbler-account-passwords --no-link

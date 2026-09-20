@@ -15,7 +15,7 @@ for format in luks1 luks2; do
   before=$(sha256sum "$image")
   pin=$(luks-volume-key-id --device "$image" --name cryptroot --key-file "$work/password")
   test "$pin" = 77e740d9d987a52981ee75ae6ab327c2b70a8b49c6e36258abc426db85c5f831
-  test "$(warbler-root-volume-key-id --device "$image" --key-file "$work/password")" = "$pin"
+  test "$(root-volume-key-id --device "$image" --key-file "$work/password")" = "$pin"
   other=$(luks-volume-key-id --device "$image" --name other --key-file "$work/password")
   test "$other" != "$pin"
   if luks-volume-key-id --device "$image" --name cryptroot --key-file "$work/wrong-password" > "$work/output"; then
@@ -40,5 +40,5 @@ if luks-volume-key-id --device "$work/plain.img" --name root --key-file "$work/p
 fi
 test ! -s "$work/output"
 luks-volume-key-id --help > /dev/null
-warbler-root-volume-key-id --help > /dev/null
-echo 'PASS: LUKS1/2 IDs, Warbler shortcut, mapper binding, invalid inputs, and unchanged images.'
+root-volume-key-id --help > /dev/null
+echo 'PASS: LUKS1/2 IDs, configured shortcut, mapper binding, invalid inputs, and unchanged images.'

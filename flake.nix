@@ -161,14 +161,26 @@
         in
         {
           checks = pkgs.lib.optionalAttrs (system == "x86_64-linux") {
-            luks-volume-key-id = pkgs.runCommand "test-luks-volume-key-id" {
-              nativeBuildInputs = [
-                pkgs.cryptsetup
-                self.packages.${system}.luks-volume-key-id
-                self.packages.${system}.warbler-root-volume-key-id
-              ];
-            } ''
+            luks-volume-key-id = pkgs.runCommand "test-luks-volume-key-id"
+              {
+                nativeBuildInputs = [
+                  pkgs.cryptsetup
+                  self.packages.${system}.luks-volume-key-id
+                  (pkgs.callPackage ./nixos-modules/secure-unlock/root-volume-key-id.nix {
+                    device = "/dev/test-volume";
+                  })
+                ];
+              } ''
               bash ${./scripts/test-luks-volume-key-id.sh}
+              touch "$out"
+            '';
+            secure-unlock = assert builtins.deepSeq
+              (import ./nixos-modules/secure-unlock/test.nix {
+                inherit nixpkgs;
+                module = self.nixosModules.secure-unlock;
+              })
+              true; pkgs.runCommand "secure-unlock-tests" { nativeBuildInputs = [ pkgs.python3 ]; } ''
+              SECURE_UNLOCK_SCRIPT=${./nixos-modules/secure-unlock/tpm-setup.py} python3 ${./scripts/test-secure-unlock-setup.py}
               touch "$out"
             '';
             warbler-account-passwords = import ./hosts/warbler/account-passwords-test.nix { inherit pkgs; };
@@ -183,7 +195,6 @@
             nix-dynamic-machines = pkgs.nix-dynamic-machines;
           } // pkgs.lib.optionalAttrs pkgs.stdenv.hostPlatform.isLinux {
             luks-volume-key-id = pkgs.callPackage ./scripts/luks-volume-key-id.nix { };
-            warbler-root-volume-key-id = pkgs.callPackage ./hosts/warbler/root-volume-key-id.nix { };
             # Refresh both platform-independent source bundles on Linux CI.
             caddy-source = (import nixpkgs {
               inherit system;
@@ -212,6 +223,9 @@
         nixosSystem = withCache nixpkgs.lib.nixosSystem;
       in
       {
+        nixosModules.secure-unlock = {
+          imports = [ lanzaboote.nixosModules.lanzaboote ./nixos-modules/secure-unlock ];
+        };
         nixosModules.nix-dynamic-machines = import ./nixos-modules/nix-dynamic-machines.nix;
         darwinModules.nix-dynamic-machines = import ./nix-darwin/modules/nix-dynamic-machines.nix;
         nixosConfigurations = {
@@ -220,9 +234,9 @@
               ({ lib, ... }: {
                 # A fresh format creates a different volume identity. Bootstrap
                 # must remain attended until that identity is pinned.
-                warbler.rootVolumeKeyId = lib.mkForce null;
-                warbler.remoteUnlock.enable = lib.mkForce false;
-                warbler.tpmUnlock.enable = lib.mkForce false;
+                boot.secureUnlock.rootVolumeKeyId = lib.mkForce null;
+                boot.secureUnlock.remoteUnlock.enable = lib.mkForce false;
+                boot.secureUnlock.tpmUnlock.enable = lib.mkForce false;
               })
             ];
           };

@@ -101,10 +101,10 @@ pkgs.testers.runNixOSTest {
       nix.optimise.automatic = lib.mkForce false;
       # Override the production setting, while allowing the remote
       # specialisation's mkForce to enable recovery on subsequent boots.
-      warbler.remoteUnlock.enable = lib.mkOverride 60 false;
-      warbler.tpmUnlock.enable = lib.mkOverride 60 false;
-      warbler.remoteUnlock.wifi.enable = true;
-      warbler.rootVolumeKeyId = lib.mkForce "77e740d9d987a52981ee75ae6ab327c2b70a8b49c6e36258abc426db85c5f831";
+      boot.secureUnlock.remoteUnlock.enable = lib.mkOverride 60 false;
+      boot.secureUnlock.tpmUnlock.enable = lib.mkOverride 60 false;
+      boot.secureUnlock.remoteUnlock.wifi.enable = true;
+      boot.secureUnlock.rootVolumeKeyId = lib.mkForce "77e740d9d987a52981ee75ae6ab327c2b70a8b49c6e36258abc426db85c5f831";
       boot.lanzaboote.settings.secure-boot-enroll = "force";
       boot.loader.timeout = 1;
       boot.initrd.network.ssh.authorizedKeys = lib.mkForce [ (builtins.readFile (sshKey + ".pub")) ];
@@ -115,12 +115,12 @@ pkgs.testers.runNixOSTest {
       };
       # Test network addressing must agree in both boot stages.
       networking.interfaces.eth1.ipv4.addresses = lib.mkForce [{ address = "192.168.1.3"; prefixLength = 24; }];
-      boot.initrd.systemd.services.warbler-wifi.enable = lib.mkForce false;
-      systemd.services.warbler-wifi.enable = lib.mkForce false;
+      boot.initrd.systemd.services.secure-unlock-wifi.enable = lib.mkForce false;
+      systemd.services.secure-unlock-wifi.enable = lib.mkForce false;
 
       specialisation.remote.configuration = {
-        warbler.remoteUnlock.enable = lib.mkForce true;
-        warbler.tpmUnlock.enable = lib.mkForce true;
+        boot.secureUnlock.remoteUnlock.enable = lib.mkForce true;
+        boot.secureUnlock.tpmUnlock.enable = lib.mkForce true;
         # /run survives switch-root, recording even briefly started services.
         boot.initrd.systemd.services.systemd-networkd.serviceConfig.ExecStartPre =
           "+${pkgs.coreutils}/bin/touch /run/warbler-initrd-networkd-started";
@@ -209,18 +209,18 @@ pkgs.testers.runNixOSTest {
     with subtest("provision real TPM credentials and preserve SSH identity on rerun"):
         warbler.succeed("install -d -m 700 /persist/credstore")
         warbler.succeed("umask 077; printf 'network={\n ssid=\"test\"\n psk=\"test-password\"\n}\n' > /persist/credstore/wifi")
-        warbler.succeed("systemctl start warbler-initrd-credentials.service")
+        warbler.succeed("systemctl start secure-unlock-credentials.service")
         warbler.wait_until_succeeds("test -s /persist/credstore.encrypted/ssh-host-key", timeout=120)
         warbler.succeed("test -s /persist/credstore.encrypted/ssh-host-key; test -s /persist/credstore.encrypted/wifi; test -s /persist/credstore/ssh-host-key")
         automatic_identity = warbler.succeed("cat /persist/credstore.encrypted/ssh-host-key.pub")
         automatic_blob = warbler.succeed("sha256sum /persist/credstore.encrypted/ssh-host-key")
-        warbler.succeed("systemctl start warbler-initrd-credentials.service")
+        warbler.succeed("systemctl start secure-unlock-credentials.service")
         assert automatic_blob == warbler.succeed("sha256sum /persist/credstore.encrypted/ssh-host-key")
         warbler.succeed("umask 077; printf 'network={\n ssid=\"test\"\n psk=\"test-password\"\n}\n' > /run/wifi.conf")
-        warbler.succeed("warbler-tpm-setup credentials --wifi-file /run/wifi.conf")
+        warbler.succeed("secure-unlock-setup credentials --wifi-file /run/wifi.conf")
         identity = warbler.succeed("cat /persist/credstore.encrypted/ssh-host-key.pub")
         assert identity == automatic_identity
-        warbler.succeed("warbler-tpm-setup credentials")
+        warbler.succeed("secure-unlock-setup credentials")
         assert identity == warbler.succeed("cat /persist/credstore.encrypted/ssh-host-key.pub")
         warbler.succeed("systemd-run --wait --pipe -p LoadCredentialEncrypted=wifi:/persist/credstore.encrypted/wifi sh -c '${pkgs.diffutils}/bin/cmp \"$CREDENTIALS_DIRECTORY/wifi\" /run/wifi.conf'")
         client.succeed("printf %s " + shlex.quote("[192.168.1.3]:2222 " + identity) + " > /etc/test-known-hosts")
@@ -244,9 +244,9 @@ pkgs.testers.runNixOSTest {
 
     with subtest("enroll TPM with a verified recovery passphrase"):
         warbler.wait_for_unit("systemd-pcrlock-make-policy.service")
-        script = f"import pexpect; p=pexpect.spawn('warbler-tpm-setup enroll-disk', encoding='utf-8', timeout=120); p.expect('passphrase:'); p.sendline({password!r}); p.expect('TPM enrolled'); p.expect(pexpect.EOF); p.close(); assert p.exitstatus == 0"
+        script = f"import pexpect; p=pexpect.spawn('secure-unlock-setup enroll-disk', encoding='utf-8', timeout=120); p.expect('passphrase:'); p.sendline({password!r}); p.expect('TPM enrolled'); p.expect(pexpect.EOF); p.close(); assert p.exitstatus == 0"
         warbler.succeed("python3 -c " + shlex.quote(script))
-        warbler.succeed("warbler-tpm-setup enroll-disk")
+        warbler.succeed("secure-unlock-setup enroll-disk")
         warbler.succeed("touch /ephemeral-marker /persist/persistent-marker /home/home-marker /nix/nix-marker")
         warbler.succeed("btrfs subvolume create /ephemeral-subvol; btrfs subvolume create /ephemeral-subvol/nested; touch /ephemeral-subvol/nested/marker")
         root_id = warbler.succeed("btrfs inspect-internal rootid /")
@@ -266,7 +266,7 @@ pkgs.testers.runNixOSTest {
         warbler.succeed("tpm2_pcrextend 7:sha256=" + "01" * 32)
         warbler.fail("systemd-creds decrypt --name=ssh-host-key /persist/credstore.encrypted/ssh-host-key /run/rejected-key")
         assert blobs == warbler.succeed("sha256sum /persist/credstore.encrypted/wifi /persist/credstore.encrypted/ssh-host-key")
-        warbler.succeed("systemctl start warbler-initrd-credentials.service")
+        warbler.succeed("systemctl start secure-unlock-credentials.service")
         assert identity == warbler.succeed("cat /persist/credstore.encrypted/ssh-host-key.pub")
         warbler.succeed("systemd-creds decrypt --name=ssh-host-key /persist/credstore.encrypted/ssh-host-key /run/resealed-key; cmp /run/resealed-key /persist/credstore/ssh-host-key; rm /run/resealed-key")
 

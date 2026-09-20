@@ -10,8 +10,8 @@ import subprocess
 import sys
 import tempfile
 
-PLAIN_STORE = Path("/persist/credstore")
-STORE = Path("/persist/credstore.encrypted")
+PLAIN_STORE = None
+STORE = None
 EFI = Path("/sys/firmware/efi/efivars")
 EFI_GUID = "8be4df61-93ca-11d2-aa0d-00e098032b8c"
 
@@ -26,9 +26,10 @@ def require(condition, message):
         raise RuntimeError(message)
 
 
-def preflight(*, require_current_generation=True):
-    require(os.geteuid() == 0, "Run with sudo on warbler.")
-    require(os.uname().nodename == "warbler", "Run on the installed warbler, not the installer.")
+def preflight(config, *, require_current_generation=True):
+    require(os.geteuid() == 0, "Run with sudo on the installed host.")
+    require(os.uname().nodename == config["hostName"],
+            f"Run on the installed {config['hostName']}, not the installer.")
     for name, expected in [("SecureBoot", 1), ("SetupMode", 0)]:
         data = (EFI / f"{name}-{EFI_GUID}").read_bytes()
         require(len(data) == 5 and data[4] == expected,
@@ -39,12 +40,12 @@ def preflight(*, require_current_generation=True):
     if require_current_generation:
         require(Path("/run/booted-system").resolve() == Path("/run/current-system").resolve(),
                 "Reboot into the current generation before provisioning TPM state.")
-    source = run("findmnt", "--evaluate", "-n", "-o", "SOURCE", "--mountpoint", "/persist").decode().strip()
+    source = run("findmnt", "--evaluate", "-n", "-o", "SOURCE", "--target", config["stateDirectory"]).decode().strip()
     # Btrfs st_dev/MAJ:MIN describes an anonymous filesystem device, not its
     # backing block device. Compare the resolved source after removing subvol.
-    require(os.stat(source.split("[", 1)[0]).st_rdev == os.stat("/dev/mapper/cryptroot").st_rdev,
-            "/persist must be mounted from cryptroot.")
-    return json.loads(Path("/etc/warbler-tpm.json").read_text())
+    require(os.stat(source.split("[", 1)[0]).st_rdev == os.stat(f"/dev/mapper/{config['mapperName']}").st_rdev,
+            "The state directory must be on the configured encrypted root mapping.")
+    return config
 
 
 def private_input(path):
@@ -98,7 +99,7 @@ def credentials(args, work):
                     "Initrd SSH ciphertext is missing; restore the plaintext key rather than rotating identity.")
             run("ssh-keygen", "-q", "-t", "ed25519", "-N", "", "-f", str(plain))
         else:
-            raise RuntimeError("Install a root-owned mode-0600 Wi-Fi config at /persist/credstore/wifi.")
+            raise RuntimeError(f"Install a root-owned mode-0600 Wi-Fi config at {PLAIN_STORE / 'wifi'}.")
         require(plain.stat().st_size > 0, f"Empty {name} credential.")
         if name == "ssh-host-key":
             public = run("ssh-keygen", "-y", "-f", str(plain))
@@ -135,12 +136,12 @@ def credentials(args, work):
         if supplied or not source.exists():
             pending.append((plain, source))
     # Validate every requested credential before publishing. Each file replacement
-    # is atomic; plaintext stays on cryptroot, only ciphertext enters the initrd.
+    # is atomic; plaintext stays on encrypted root, only ciphertext enters the initrd.
     for source, target in pending:
         publish(source, target)
     publish(work / "ssh-host-key.pub", STORE / "ssh-host-key.pub")
     print(run("ssh-keygen", "-lf", str(STORE / "ssh-host-key.pub")).decode().strip())
-    print("Credentials sealed from /persist/credstore. Rebuild boot files to include changes.")
+    print(f"Credentials sealed from {PLAIN_STORE}. Rebuild boot files to include changes.")
 
 
 def recovery_slots(metadata):
@@ -149,7 +150,7 @@ def recovery_slots(metadata):
 
 
 def enroll_disk(config, work):
-    require(config["diskUnlock"], "Enable warbler.tpmUnlock.enable, rebuild boot files, then reboot first.")
+    require(config["diskUnlock"], "Enable boot.secureUnlock.tpmUnlock.enable, rebuild boot files, then reboot first.")
     require(run(config["pcrlock"], "is-supported").strip() == b"yes", "pcrlock is unsupported.")
     require(Path(config["policy"]).is_file(), "No pcrlock policy; finish the measured-boot setup first.")
     disk = config["disk"]
@@ -186,20 +187,28 @@ def enroll_disk(config, work):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--config", type=Path, default=Path("/etc/secure-unlock.json"))
     commands = parser.add_subparsers(dest="command", required=True)
     creds = commands.add_parser("credentials", help="Seal or verify initrd SSH/Wi-Fi credentials")
     creds.add_argument("--wifi-file", type=Path)
-    creds.add_argument("--ssh-key-file", type=Path, help="Import an existing key into /persist/credstore; otherwise reuse or generate once")
+    creds.add_argument("--ssh-key-file", type=Path, help="Import an existing key into the configured credential store; otherwise reuse or generate once")
     creds.add_argument("--ssh-only", action="store_true", help="Provision Ethernet SSH without Wi-Fi credentials")
     commands.add_parser("enroll-disk", help="Verify recovery passphrase and add a TPM LUKS token")
     args = parser.parse_args()
     os.umask(0o077)
     require(not (args.command == "credentials" and args.ssh_only and args.wifi_file),
             "--ssh-only cannot be combined with --wifi-file.")
-    config = preflight(require_current_generation=args.command == "enroll-disk")
-    with open("/run/warbler-tpm-setup.lock", "w") as lock:
+    config = json.loads(args.config.read_text())
+    if args.command == "credentials" and not config["wifi"]:
+        require(not args.wifi_file, "Enable Wi-Fi in the host configuration before supplying credentials.")
+        args.ssh_only = True
+    global PLAIN_STORE, STORE
+    PLAIN_STORE = Path(config["stateDirectory"]) / "credstore"
+    STORE = Path(config["stateDirectory"]) / "credstore.encrypted"
+    preflight(config, require_current_generation=args.command == "enroll-disk")
+    with open("/run/secure-unlock-setup.lock", "w") as lock:
         fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
-        with tempfile.TemporaryDirectory(prefix="warbler-tpm-", dir="/run") as directory:
+        with tempfile.TemporaryDirectory(prefix="secure-unlock-", dir="/run") as directory:
             work = Path(directory)
             if args.command == "credentials":
                 credentials(args, work)

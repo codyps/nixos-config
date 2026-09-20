@@ -127,6 +127,11 @@ The boot service and bootloader-install hook seal them into
 `/persist/credstore.encrypted`, reusing unchanged decryptable blobs and
 resealing changed inputs or blobs that no longer decrypt.
 
+Initrd Ethernet, SSH, and optional Wi-Fi start only when systemd requests a
+disk passphrase. Successful TPM auto-unlock leaves these services idle until
+normal boot. Recovery therefore includes the time needed to establish the
+network connection. The local console passphrase prompt remains available.
+
 Early Wi-Fi and SSH **always require TPM-encrypted credentials**, even when
 `warbler.tpmUnlock.enable = false` (the default). Only these ciphertext files
 are appended to the initrd at installation/rebuild time:

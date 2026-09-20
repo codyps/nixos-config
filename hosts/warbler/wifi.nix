@@ -18,7 +18,7 @@ lib.mkIf (config.warbler.remoteUnlock.enable && config.warbler.remoteUnlock.wifi
     storePaths = [ "${pkgs.wpa_supplicant}/bin/wpa_supplicant" ];
     services.warbler-wifi = {
       description = "Wi-Fi for remote LUKS unlocking";
-      wantedBy = [ "initrd.target" ];
+      wantedBy = [ "warbler-remote-unlock.target" ];
       wants = [ "tpm2.target" ];
       after = [ deviceUnit "tpm2.target" "initrd-nixos-copy-secrets.service" ];
       bindsTo = [ deviceUnit ];

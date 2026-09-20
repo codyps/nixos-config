@@ -99,7 +99,10 @@ pkgs.testers.runNixOSTest {
       services.tailscale.enable = lib.mkForce false;
       nix.gc.automatic = lib.mkForce false;
       nix.optimise.automatic = lib.mkForce false;
-      warbler.remoteUnlock.enable = false;
+      # Override the production setting, while allowing the remote
+      # specialisation's mkForce to enable recovery on subsequent boots.
+      warbler.remoteUnlock.enable = lib.mkOverride 60 false;
+      warbler.tpmUnlock.enable = lib.mkOverride 60 false;
       warbler.remoteUnlock.wifi.enable = true;
       warbler.rootVolumeKeyId = lib.mkForce "77e740d9d987a52981ee75ae6ab327c2b70a8b49c6e36258abc426db85c5f831";
       boot.lanzaboote.settings.secure-boot-enroll = "force";
@@ -117,7 +120,12 @@ pkgs.testers.runNixOSTest {
 
       specialisation.remote.configuration = {
         warbler.remoteUnlock.enable = lib.mkForce true;
-        warbler.tpmUnlock.enable = true;
+        warbler.tpmUnlock.enable = lib.mkForce true;
+        # /run survives switch-root, recording even briefly started services.
+        boot.initrd.systemd.services.systemd-networkd.serviceConfig.ExecStartPre =
+          "+${pkgs.coreutils}/bin/touch /run/warbler-initrd-networkd-started";
+        boot.initrd.systemd.services.sshd.serviceConfig.ExecStartPre =
+          "+${pkgs.coreutils}/bin/touch /run/warbler-initrd-sshd-started";
       };
 
       virtualisation = {
@@ -232,6 +240,7 @@ pkgs.testers.runNixOSTest {
         script = f"import pexpect; p=pexpect.spawn({ssh!r}, encoding='utf-8', timeout=120); p.expect('passphrase'); p.sendline({password!r}); p.expect(pexpect.EOF)"
         client.succeed("python3 -c " + shlex.quote(script))
         warbler.wait_for_unit("multi-user.target")
+        warbler.succeed("test -e /run/warbler-initrd-networkd-started && test -e /run/warbler-initrd-sshd-started")
 
     with subtest("enroll TPM with a verified recovery passphrase"):
         warbler.wait_for_unit("systemd-pcrlock-make-policy.service")
@@ -245,6 +254,7 @@ pkgs.testers.runNixOSTest {
         warbler.shutdown()
         warbler.start()
         warbler.wait_for_unit("multi-user.target")
+        warbler.succeed("test ! -e /run/warbler-initrd-networkd-started && test ! -e /run/warbler-initrd-sshd-started")
         warbler.succeed("test ! -e /ephemeral-marker && test ! -e /ephemeral-subvol && test -e /persist/persistent-marker && test -e /home/home-marker && test -e /nix/nix-marker")
         assert root_id != warbler.succeed("btrfs inspect-internal rootid /")
         warbler.succeed("test $(cat ${nodes.warbler.sops.secrets.vm-probe.path}) = warbler-sops-test")
@@ -269,5 +279,6 @@ pkgs.testers.runNixOSTest {
         script = f"import pexpect; p=pexpect.spawn({ssh!r}, encoding='utf-8', timeout=120); p.expect('passphrase'); p.sendline({password!r}); p.expect(pexpect.EOF)"
         client.succeed("python3 -c " + shlex.quote(script))
         warbler.wait_for_unit("multi-user.target")
+        warbler.succeed("test -e /run/warbler-initrd-networkd-started && test -e /run/warbler-initrd-sshd-started")
   '';
 }

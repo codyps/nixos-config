@@ -3,7 +3,7 @@ let
   inherit (import ../../nixos/ssh-auth.nix) authorizedKeys;
 in
 {
-  imports = [ ./hardware-configuration.nix ./disko.nix ./reset-root.nix ./wifi.nix ./tpm-setup.nix ./secrets.nix ./usbguard.nix ./account-passwords.nix ];
+  imports = [ ./hardware-configuration.nix ./disko.nix ./reset-root.nix ./remote-unlock.nix ./wifi.nix ./tpm-setup.nix ./secrets.nix ./usbguard.nix ./account-passwords.nix ];
 
   options.warbler.tpmUnlock.enable = lib.mkEnableOption "TPM measured-boot unlocking after enrollment";
   options.warbler.rootVolumeKeyId = lib.mkOption {
@@ -63,7 +63,7 @@ in
         "token-timeout=10s"
       ];
       network = {
-        enable = true;
+        enable = config.warbler.remoteUnlock.enable;
         ssh = {
           enable = config.warbler.remoteUnlock.enable;
           port = 2222;

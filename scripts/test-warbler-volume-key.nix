@@ -6,14 +6,17 @@ let
   configured = module: (base.extendModules { modules = [ module ]; }).config;
   crypttab = config: config.boot.initrd.systemd.contents."/etc/crypttab".source.text;
   failures = config: builtins.filter (a: !a.assertion) config.assertions;
-  normal = base.config;
-  tpm = configured { warbler.tpmUnlock.enable = true; };
+  normal = configured { warbler.tpmUnlock.enable = lib.mkForce false; };
+  tpm = configured { warbler.tpmUnlock.enable = lib.mkForce true; };
   bootstrap = flake.nixosConfigurations.warbler-bootstrap.config;
-  missing = configured { warbler.rootVolumeKeyId = lib.mkForce null; };
+  missing = configured {
+    warbler.rootVolumeKeyId = lib.mkForce null;
+    warbler.tpmUnlock.enable = lib.mkForce false;
+  };
   missingTpm = configured {
     warbler.rootVolumeKeyId = lib.mkForce null;
-    warbler.remoteUnlock.enable = false;
-    warbler.tpmUnlock.enable = true;
+    warbler.remoteUnlock.enable = lib.mkForce false;
+    warbler.tpmUnlock.enable = lib.mkForce true;
   };
   invalid = builtins.tryEval (configured { warbler.rootVolumeKeyId = lib.mkForce "not-a-digest"; }).warbler.rootVolumeKeyId;
   pin = "fixate-volume-key=${normal.warbler.rootVolumeKeyId}";

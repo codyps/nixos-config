@@ -240,6 +240,21 @@ def secret_archive(directory):
     return buffer.getvalue()
 
 
+def volume_identity_script(system, checkout):
+    """Pin only the freshly installed volume, using its existing recovery input."""
+    helper = shlex.quote(str(Path(system) / "sw/bin/warbler-root-volume-key-id"))
+    output = shlex.quote(str(Path(checkout) / "hosts/warbler/volume-identity.nix"))
+    return f"""
+warbler_volume_key_id=$({helper} --key-file /tmp/warbler-luks-password)
+if [[ ! "$warbler_volume_key_id" =~ ^[0-9a-f]{{64}}$ ]]; then
+    echo 'Invalid root volume identity; refusing to record it.' >&2
+    exit 1
+fi
+printf '\"%s\"\\n' "$warbler_volume_key_id" > {output}
+unset warbler_volume_key_id
+"""
+
+
 def install(directory, *, build_only=False):
     directory = validate_bundle(directory)
     if not build_only:
@@ -301,6 +316,7 @@ mkdir -p /mnt/persist/var/lib/sbctl /mnt/persist/nixos-config /mnt/persist/ssh
 cp -a {q}/secrets/sbctl/. /mnt/persist/var/lib/sbctl/
 cp -a {q}/secrets/ssh/. /mnt/persist/ssh/
 cp -a {q}/source/. /mnt/persist/nixos-config/
+{volume_identity_script(outputs[0], '/mnt/persist/nixos-config')}
 {shlex.quote(outputs[0])}/sw/bin/warbler-account-passwords initialize --root /mnt --password-dir {q}/secrets/account-passwords
 nixos-install --no-root-passwd --system {shlex.quote(outputs[0])}
 sync

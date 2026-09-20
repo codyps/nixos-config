@@ -33,7 +33,7 @@ in
   options.warbler.remoteUnlock.wifi.enable = lib.mkEnableOption "Wi-Fi in addition to Ethernet for remote LUKS unlocking";
 
   config = {
-    warbler.rootVolumeKeyId = "4c40134b6c4df2cf83344d7b417e588f70449534f51fccce6fc5e405f8c3ea1c";
+    warbler.rootVolumeKeyId = import ./volume-identity.nix;
     assertions = [{
       assertion = config.warbler.rootVolumeKeyId != null
         || (!config.warbler.tpmUnlock.enable && !config.warbler.remoteUnlock.enable);

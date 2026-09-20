@@ -5,6 +5,7 @@ import contextlib
 import importlib.util
 import io
 import json
+import subprocess
 from pathlib import Path
 import tarfile
 import tempfile
@@ -184,11 +185,13 @@ class InstallTests(unittest.TestCase):
                 secrets.assert_not_called()
                 accounts.assert_not_called()
                 self.assertFalse(any("nixos-install --" in cmd for cmd in calls))
+                self.assertFalse(any("warbler_volume_key_id=" in cmd for cmd in calls))
             elif not answer:
                 with self.assertRaisesRegex(RuntimeError, "cancelled"):
                     installer.install("/external")
                 secrets.assert_not_called()
                 self.assertFalse(any("nixos-install --" in cmd for cmd in calls))
+                self.assertFalse(any("warbler_volume_key_id=" in cmd for cmd in calls))
             else:
                 installer.install("/external")
                 build = next(i for i, cmd in enumerate(calls) if " build --accept-flake-config" in cmd)
@@ -197,6 +200,10 @@ class InstallTests(unittest.TestCase):
                 self.assertLess(build, transfer)
                 self.assertLess(transfer, installation)
                 self.assertIn("--system /nix/store/", calls[installation])
+                self.assertLess(calls[installation].index("cp -a /run/warbler-install.12345678/source/."),
+                                calls[installation].index("warbler_volume_key_id="))
+                self.assertLess(calls[installation].index("warbler_volume_key_id="),
+                                calls[installation].index("nixos-install --"))
                 self.assertLess(calls[installation].index("warbler-account-passwords initialize"),
                                 calls[installation].index("nixos-install --"))
             self.assertEqual(calls[-1], "rm -rf -- /run/warbler-install.12345678")
@@ -209,6 +216,28 @@ class InstallTests(unittest.TestCase):
 
     def test_build_only_never_transfers_secrets_or_formats(self):
         self.mock_install("", build_only=True)
+
+    def test_record_fresh_volume_identity(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary) / "paths with spaces"
+            helper = root / "system/sw/bin/warbler-root-volume-key-id"
+            helper.parent.mkdir(parents=True)
+            output = root / "checkout/hosts/warbler/volume-identity.nix"
+            output.parent.mkdir(parents=True)
+            script = installer.volume_identity_script(root / "system", root / "checkout")
+            for value, status in [("b" * 64, 0), ("invalid", 0), ("c" * 64, 1)]:
+                with self.subTest(value=value, status=status):
+                    output.write_text('"existing-pin"\n')
+                    helper.write_text(f"#!/bin/sh\nprintf '%s\\n' '{value}'\nexit {status}\n")
+                    helper.chmod(0o700)
+                    result = subprocess.run(["bash", "-eu", "-c", script], capture_output=True)
+                    self.assertEqual(result.stdout, b"")
+                    if value == "b" * 64:
+                        self.assertEqual(result.returncode, 0)
+                        self.assertEqual(output.read_text(), f'"{value}"\n')
+                    else:
+                        self.assertNotEqual(result.returncode, 0)
+                        self.assertEqual(output.read_text(), '"existing-pin"\n')
 
 
 if __name__ == "__main__":

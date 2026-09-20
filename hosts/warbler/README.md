@@ -41,10 +41,12 @@ mapper name requires a new pin. Changing the recovery password does not.
 
 `warbler-bootstrap` explicitly sets this identity to null and disables remote
 and TPM disk unlock. Use it only for attended installation of a new volume.
-After reformatting, obtain the new identity on the trusted installed system
-and update `warbler.rootVolumeKeyId` before building the normal configuration.
-The option defaults to `null`; the explicit setting in `configuration.nix`
-retains the known identity of the current installation. Never automatically
+The remote installer records the freshly formatted volume's identity in
+`hosts/warbler/volume-identity.nix` in the installed checkout. For a manual
+installation, obtain the identity on the trusted installed system and update
+that file before building the normal configuration. `configuration.nix` imports
+it as `warbler.rootVolumeKeyId`; the repository retains the current installation's
+known identity. Never automatically
 learn the expected identity from a disk during boot. An unpinned configuration
 cannot enable remote or TPM unlock. Pinning authenticates volume identity,
 not every filesystem block or its freshness.
@@ -74,8 +76,8 @@ sudo nix run .#luks-volume-key-id -- --device /dev/sdb2 --name data
 ```
 
 Enter the LUKS recovery passphrase. The command prints just the 64-character
-public ID to stdout; copy it into `warbler.rootVolumeKeyId` in
-`hosts/warbler/configuration.nix`. It reads the configured LUKS device and
+public ID to stdout; save it as a quoted Nix string in
+`hosts/warbler/volume-identity.nix`. It reads the configured LUKS device and
 derives the ID for mapper name `cryptroot`, without opening a mapping,
 changing the header, or writing the raw volume key to a file. The derivation
 matches [systemd's volume-key identity](https://github.com/systemd/systemd/blob/main/src/shared/cryptsetup-util.c).
@@ -137,7 +139,7 @@ normal boot. Recovery therefore includes the time needed to establish the
 network connection. The local console passphrase prompt remains available.
 
 Early Wi-Fi and SSH **always require TPM-encrypted credentials**, even when
-`warbler.tpmUnlock.enable = false` (the default). Only these ciphertext files
+`warbler.tpmUnlock.enable = false`. Only these ciphertext files
 are appended to the initrd at installation/rebuild time:
 
 | Source on encrypted storage | Credential name | Consumer |
@@ -177,10 +179,16 @@ From this checkout on the Mac:
 
 ```sh
 python3 scripts/warbler-install.py prepare
-python3 scripts/warbler-install.py check
-python3 scripts/warbler-install.py build
+```
+
+Back up the generated bundle to separately encrypted offline storage, then run:
+
+```sh
 python3 scripts/warbler-install.py install
 ```
+
+`install` includes the preflight checks and bootstrap build. Separate `check`
+and `build` runs are optional rehearsals, not required installation steps.
 
 - `prepare` captures `apple-password-gen` output without displaying it and
   generates RSA-4096 PK, KEK, and db keys/certificates with local OpenSSL. It
@@ -216,6 +224,13 @@ python3 scripts/warbler-install.py install
   The installer hashes the account passwords into `/mnt/persist/shadow.d` before
   account activation. Plaintext account inputs remain in live RAM until cleanup;
   the installer retains its private local copy.
+  After formatting, it derives the new root-volume identity using the recovery
+  passphrase file and records it in the installed checkout's
+  `hosts/warbler/volume-identity.nix`. It does not print the identity or modify
+  the source checkout on the Mac. Preserve that installed file when updating
+  the checkout; copying another installation's pin will prevent unlocking.
+  Before a later deployment from the Mac, copy the installed public identity
+  file back into its checkout.
   `check`, `build`, and `install` require it to match `ssh-host-key.pub` here.
 - `build` runs that same source-transfer/build/preflight path but stops before
   confirmation, secret transfer, or disk changes. Use it to validate the remote
@@ -233,7 +248,9 @@ BIOS Setup Mode/key enrollment, Secure Boot verification, and only then TPM
 credential sealing. Do not regenerate keys in the manual instructions. The
 copied checkout retains normal `warbler` settings; `warbler-bootstrap` supplies
 temporary forced-off remote/TPM unlock settings without editing the checkout.
-The later rebuild to `.#warbler` happens only after credentials exist.
+After Secure Boot verification, one rebuild to `.#warbler` seals credentials,
+installs remote unlock, and prepares measured boot for optional TPM enrollment.
+The bootloader hook creates the credentials before including them in the initrd.
 
 This automates installation preparation, transfer, formatting, and signing—not
 the attended T26 firmware-key operation and Setup Mode verification. Have someone at the local console
@@ -301,9 +318,8 @@ the TPM helper. Commands below are instructions, not evidence of installation.
 
 2. **Live USB: prepare the checkout:** obtain this flake checkout on the live host. Enter a root shell (`sudo -i`) and
    `cd` to that checkout. All installer commands below run there as root.
-   In the `config` attribute of `hosts/warbler/configuration.nix`, set
-   `warbler.remoteUnlock.enable = false` temporarily and keep
-   `warbler.tpmUnlock.enable = false`. This omits both encrypted
+   Use `.#warbler-bootstrap` for installation; leave the normal configuration
+   unchanged. This output disables remote and TPM disk unlock and omits encrypted
    initrd credentials and Wi-Fi services until credentials can be sealed against
    the final Secure Boot state. Disk unlocking is local-console only during
    bootstrap; administration after boot is via wired SSH.
@@ -315,7 +331,7 @@ the TPM helper. Commands below are instructions, not evidence of installation.
    test -d /sys/firmware/efi
    lsblk -o NAME,PATH,SIZE,MODEL,TYPE,FSTYPE,MOUNTPOINTS
    nix build --accept-flake-config --no-link --print-out-paths \
-     .#nixosConfigurations.warbler.config.system.build.diskoScript
+     .#nixosConfigurations.warbler-bootstrap.config.system.build.diskoScript
    ```
 
    Confirm `/dev/nvme0n1` is the intended 512 GB NVMe, not the 4 TB SATA SSD
@@ -374,7 +390,7 @@ the TPM helper. Commands below are instructions, not evidence of installation.
      sbctl --config /run/warbler-sbctl-install.conf create-keys
    mkdir -p /mnt/persist/nixos-config
    cp -a . /mnt/persist/nixos-config/
-   nixos-install --no-root-passwd --flake .#warbler
+   nixos-install --no-root-passwd --flake .#warbler-bootstrap
    ```
 
    Stop on any failure. Lanzaboote needs these keys before installation signs
@@ -383,182 +399,150 @@ the TPM helper. Commands below are instructions, not evidence of installation.
    separately encrypted offline storage. Remove the temporary passphrase file
    after successful installation (`rm /tmp/warbler-luks-password`).
 
-5. **First installed boot: BIOS then OS:**
-   reboot, keep Secure Boot disabled, and boot the OS. Unlock LUKS at the console.
-   SSH as `root@<wired-ip>`, and `cd /persist/nixos-config`.
-
-   run:
+5. **First installed boot: verify signatures and back up firmware keys.**
+   Keep Secure Boot disabled, boot the NVMe, and unlock LUKS at the console.
+   Connect over wired SSH as `root@<wired-ip>` and run:
 
    ```sh
+   cd /persist/nixos-config
    sbctl verify
+   warbler-secure-boot-backup
    ```
 
-   Inspect unsigned-file reports before proceeding. It's expected that the initramfs is unsigned.
+   Inspect signature reports for the active bootloader and UKI; standalone
+   initramfs files are not individually signed. The backup command saves PK,
+   KEK, db, and dbx under `/persist/secure-boot-backup/`, with readable listings,
+   boot status, and checksums. Require its `COMPLETE` marker, which is written
+   only after all four nonempty exports pass checksum verification. Copy the
+   backup to separate storage before clearing keys.
 
-6. **Back up PK, KEK, db, and dbx before changing firmware keys:** run:
+   If importing an existing initrd SSH identity, install its private key at
+   `/persist/credstore/ssh-host-key` now, with root ownership, directory mode
+   0700, and file mode 0600. Otherwise skip this: the first Secure Boot boot
+   generates and retains a dedicated identity automatically.
 
-   ```sh
-   sudo warbler-secure-boot-backup
-   ```
-
-   The command reads firmware databases and creates a root-only directory such
-   as `/persist/secure-boot-backup/2026-09-17T18-30-00Z-a1b2c3d4` (UTC date/time
-   plus a unique suffix). It saves all four `.esl` exports, readable `.txt`
-   listings, boot status, and `SHA256SUMS`. A `COMPLETE` marker is written after all four nonempty
-   exports pass checksum verification.
-
-7. **Clear the backed-up Secure Boot keys:** restart, press **F10** (or **ESC** then go to Setup), and
+6. **Enter Setup Mode.** Restart, press **F10** (or **ESC**, then Setup), and
    authenticate. Under **Security → Secure Boot Configuration → Secure Boot
-   Key Management**, **select Clear Secure Boot keys**. Leave **Import Custom
+   Key Management**, select **Clear Secure Boot keys**. Leave **Import Custom
    Secure Boot Keys** and **Reset Secure Boot keys to factory defaults**
    unselected. Save changes and accept the firmware confirmation.
+   Boot the installed NVMe, unlock LUKS locally, reconnect over wired SSH,
+   and run `sudo sbctl status`. Require **Setup Mode: Enabled** before continuing.
+   If it is not enabled, revisit BIOS; do not attempt enrollment yet.
 
-8.  **Boot the installed NVMe UEFI entry** and unlock LUKS locally. Reconnect
-    over wired SSH and run:
+7. **Enroll signing keys and enable Secure Boot.** On the installed system, run:
 
-    ```sh
-    sbctl status
-    ```
+   ```sh
+   sudo sbctl enroll-keys --microsoft
+   ```
 
-    Require **Setup Mode: Enabled**. If not in setup mode, revisit BIOS to clear secure boot keys.
+   Restart into **F10 → Security → Secure Boot Configuration** and enable
+   **Secure Boot**. Save changes, shut down, and power on again.
 
-9.  **Enroll the existing Warbler signing keys and Microsoft certificates:**
+8. **Verify the Secure Boot cold boot.** Boot the NVMe, unlock LUKS locally,
+   reconnect over wired SSH, and run:
 
-    ```sh
-    sbctl enroll-keys --microsoft
-    ```
+   ```sh
+   sudo bootctl status
+   sudo sbctl status
+   sudo sbctl verify
+   ```
 
-10. **Enable Secure Boot:** restart into **F10 → Security → Secure Boot
-    Configuration** and enable **Secure Boot** (enforces the enrolled signing
-    keys). Save changes, shut down, and power on again.
+   Require Secure Boot enabled in user mode, Setup Mode disabled, and valid
+   signatures on the active bootloader and UKI. Stop if firmware restored or
+   rejected the custom keys. Finish any further BIOS changes and repeat this
+   verification before sealing credentials.
 
-11. **Verify the cold boot:** boot the NVMe, unlock LUKS locally, reconnect
-    over wired SSH, and run:
+9. **Prepare remote unlock and optional disk enrollment in one rebuild.**
+   Work from `/persist/nixos-config`. The remote installer has already recorded
+   the new volume identity in `hosts/warbler/volume-identity.nix`. For a manual
+   install, run `sudo warbler-root-volume-key-id` and save the returned ID as a
+   quoted Nix string in that file. Never reuse the previous installation's pin.
 
-    ```sh
-    sudo bootctl status
-    sudo sbctl status
-    sudo sbctl verify
-    ```
+   Keep these normal configuration settings enabled:
 
-    Require Secure Boot enabled in user mode, Setup Mode disabled, and valid
-    signatures on the active bootloader and UKI. Stop if firmware restored or
-    rejected the custom keys. Complete any later
-    BIOS changes and repeat this cold-boot verification before sealing TPM
-    credentials. Keep the recovery passphrase and backups available.
+   ```nix
+   warbler.remoteUnlock.enable = true;
+   warbler.tpmUnlock.enable = true;
+   ```
 
-12. **Prepare persistent initramfs credentials:** create the root-only source
-    directory on the encrypted root filesystem:
+   The second setting prepares measured boot and TPM unlocking support; it
+   **does not enroll the disk**. A freshly installed disk still asks for its
+   LUKS passphrase until you explicitly enroll it. This lets the same cold boot
+   verify remote recovery and prepare for optional enrollment, without another
+   configuration change, rebuild, and preparatory reboot later.
 
-    ```sh
-    sudo install -d -m 0700 /persist/credstore
-    ```
+   Ethernet needs no credential preparation: the hook creates and retains the
+   dedicated initrd SSH identity automatically. For optional Wi-Fi, set
+   `warbler.remoteUnlock.wifi.enable = true` and install the complete
+   wpa_supplicant configuration before rebuilding:
 
-    For optional Wi-Fi, set `warbler.remoteUnlock.wifi.enable = true` and install
-    your complete wpa_supplicant configuration as a root-owned mode-0600 file:
+   ```sh
+   sudo install -d -m 0700 /persist/credstore
+   sudo install -o root -g root -m 0600 /run/warbler-wifi.conf /persist/credstore/wifi
+   ```
 
-    ```sh
-    sudo install -o root -g root -m 0600 /run/warbler-wifi.conf /persist/credstore/wifi
-    ```
+   Rebuild and record the initrd SSH fingerprint:
 
-    To use an existing initramfs SSH identity, install its private key before
-    the first provisioning run:
+   ```sh
+   sudo nixos-rebuild boot --flake .#warbler
+   sudo ssh-keygen -lf /persist/credstore.encrypted/ssh-host-key.pub
+   ```
 
-    ```sh
-    sudo install -o root -g root -m 0600 /run/existing-initrd-key /persist/credstore/ssh-host-key
-    ```
+   The bootloader hook generates or reuses the SSH identity, seals the SSH and
+   optional Wi-Fi credentials, verifies decryption, and includes the ciphertext
+   in the initrd before signing. No separate service-start command is needed.
+   Missing Wi-Fi input, bad permissions, or failed sealing stops installation
+   of the boot files. Rebuild after later credential changes too; starting the
+   provisioning service alone does not update an already-built initrd.
+   Back up `/persist/credstore` to separately encrypted offline storage.
 
-    Otherwise let the hook generate a dedicated SSH key once and retain it in
-    `/persist/credstore/ssh-host-key`. Existing sealed-only installations migrate
-    by decrypting the existing key into that file; the identity is preserved.
-    Do not replace it with a different key after provisioning.
-
-    **Run the hook and record the public fingerprint:**
-
-    ```sh
-    sudo systemctl start warbler-initrd-credentials.service
-    sudo systemctl status warbler-initrd-credentials.service
-    sudo ssh-keygen -lf /persist/credstore.encrypted/ssh-host-key.pub
-    ```
-
-    The service runs automatically at boot after `/persist` and the TPM are
-    available, and skips while Secure Boot is disabled. With Wi-Fi enabled it
-    seals both inputs; otherwise it seals only SSH. When changing the Wi-Fi
-    option in the checkout, rebuild to apply it to the service.
-
-    The bootloader-install hook runs the same helper before Lanzaboote appends
-    credentials to the initrd. It seals plaintext with TPM PCR 7, verifies a
-    decryption round trip, and atomically replaces each output under
-    `/persist/credstore.encrypted`. Unchanged decryptable ciphertext is reused;
-    changed inputs or a changed TPM policy cause resealing from the retained
-    plaintext. A different SSH identity is rejected. Missing Wi-Fi input, bad
-    permissions, or failed sealing stops bootloader installation.
-
-    **Rebuild after changing plaintext inputs** to include their newly sealed
-    copies in the initrd. Starting the service alone updates the copies on
-    `/persist`, not an already-built initrd. Back up `/persist/credstore` to
-    separately encrypted offline storage. Keep private keys and Wi-Fi inputs
-    out of Git, the Nix store, and `boot.initrd.secrets`; only sealed output
-    belongs in that option. LUKS TPM disk enrollment remains a separate,
-    attended operation.
-
-13. **Enable remote unlock: rebuild, then cold boot:** in the persisted
-    checkout, record the ID from `sudo warbler-root-volume-key-id` in
-    `warbler.rootVolumeKeyId`, restore `warbler.remoteUnlock.enable = true` and leave automatic
-    disk unlock disabled. Run from `/persist/nixos-config`:
-
-    ```sh
-    sudo nixos-rebuild boot --flake .#warbler
-    ```
-
-    On success, power off and start again with console access available. Unplug
-    Ethernet only if explicitly testing optional Wi-Fi; otherwise keep it connected.
-    From your workstation run `ssh -t -p 2222 root@<warbler-ip>`. Test port 2222, verify
-    the recorded host fingerprint, enter the LUKS passphrase, then verify port
-    22 and persistence. This cold-boot test is required; evaluation cannot verify
-    the physical radio, firmware measurements, DHCP, or TPM decryption in initrd.
-    If it fails, unlock locally and reconnect Ethernet for diagnosis; do not
-    clear the TPM or repeat formatting. Keep the preceding bootstrap generation
-    available in the boot menu during provisioning only. Before enrolling
-    unattended unlock, retire unpinned boot artifacts and exclude their
-    measurements from the effective TPM policy; retaining an accepted old
-    unpinned generation provides a route around the new volume check.
+   On success, power off and start again with console access available.
+   Keep Ethernet connected unless explicitly testing Wi-Fi. From the workstation,
+   run `ssh -t -p 2222 root@<warbler-ip>`, verify the recorded fingerprint, and
+   enter the LUKS passphrase. Verify normal SSH on port 22 and persistence.
+   This completes installation with remote unlock. If it fails, unlock locally
+   and reconnect Ethernet for diagnosis; do not clear the TPM or reformat.
+   Keep the preceding bootstrap generation available during provisioning only.
 
 ## Optional automatic disk unlock
 
-This is step 10, only after step 9 succeeds; there is no additional BIOS toggle
-for LUKS auto-unlock. In `/persist/nixos-config`, set
-`warbler.tpmUnlock.enable = true`, rebuild with `sudo nixos-rebuild boot --flake .#warbler`,
-and reboot once using the LUKS passphrase. Lanzaboote generates and persists a
-managed policy for PCRs 0, 4, and 7; eight boot generations are retained.
-Only pinned generations should remain accepted when enrolling. Secure Boot
-must enforce the trusted boot artifacts; a pin in a replaceable initrd does
-not protect against physical tampering. These are deployment checks, not
-properties established by building the configuration.
+After step 9 succeeds, the installed generation is already prepared for TPM
+unlocking. You can stop with remote passphrase unlock, or enroll later without
+another configuration change. There is no additional BIOS toggle for LUKS
+unlocking. If you have since switched generations without rebooting, boot the
+current generation first; the helper requires the booted and current systems
+to match.
 
-Then enroll on warbler using the same helper:
+Before enrollment, retire unpinned bootstrap boot artifacts and exclude their
+measurements from the effective TPM policy. Only pinned generations should
+remain accepted: an accepted unpinned generation bypasses the volume identity
+check. This policy cleanup is a separate prerequisite; `enroll-disk` does not
+perform it. Secure Boot must enforce the trusted boot artifacts.
+
+Then run on Warbler:
 
 ```sh
 sudo warbler-tpm-setup enroll-disk
 ```
 
-On success, power off and start again without supplying a passphrase. Verify
-stage-2 SSH on port 22 and the persistent files. Keep local console access and
-the recovery passphrase until this unattended cold boot succeeds.
+The helper prompts for the existing recovery passphrase, verifies it against
+a token-free LUKS slot, adds a TPM token, and checks that existing slots remain
+unchanged. It does not delete recovery slots. Rerunning leaves an existing
+pcrlock token alone; a different TPM policy requires explicit migration.
 
-The helper prompts once for the existing recovery passphrase and verifies it
-against a token-free LUKS slot before adding a TPM token. It verifies that
-existing slots remain unchanged. Re-running leaves an existing pcrlock token
-alone; enrollment under a different TPM policy requires explicit migration.
-Only the configured NVMe LUKS partition is targeted. The helper does not delete
-slots, change firmware, refresh the ESP, rebuild NixOS, or reboot. The command
-is available in bootstrap configurations too, but requires the measured-boot
-configuration to be booted before disk enrollment.
-Lanzaboote maintains the disk policy on subsequent bootloader updates. TPM
-unlock failure falls back to the LUKS passphrase; remote fallback additionally
-requires the separately sealed SSH/Wi-Fi credentials to remain decryptable.
-Test both paths before relying on unattended reboots. Do not clear the TPM or
-remove the passphrase slot as a test.
+On success, power off and start again without supplying a passphrase. Verify
+normal SSH on port 22 and persistent files. Keep local console access and the
+recovery passphrase until this unattended cold boot succeeds. TPM unlock
+failure falls back to the LUKS passphrase; remote fallback also requires the
+separately sealed SSH/Wi-Fi credentials to remain decryptable. Do not clear the
+TPM or remove the passphrase slot as a test.
+
+Lanzaboote maintains the managed PCR 0, 4, and 7 policy on subsequent bootloader
+updates; eight boot generations are retained. If using an older installation
+with `warbler.tpmUnlock.enable = false`, enable it, rebuild, and boot that
+configuration before enrollment. The helper never rebuilds, changes firmware,
+or reboots the machine itself.
 
 ## Validation
 

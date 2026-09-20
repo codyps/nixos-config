@@ -21,7 +21,6 @@ in
   options.warbler.remoteUnlock.wifi.enable = lib.mkEnableOption "Wi-Fi in addition to Ethernet for remote LUKS unlocking";
 
   config = {
-    # Public identity of the current installation; replace after reformatting.
     warbler.rootVolumeKeyId = "4c40134b6c4df2cf83344d7b417e588f70449534f51fccce6fc5e405f8c3ea1c";
     assertions = [{
       assertion = config.warbler.rootVolumeKeyId != null
@@ -32,11 +31,9 @@ in
     time.timeZone = "America/New_York";
     system.stateVersion = "26.05";
 
-    # Enable only after Secure Boot is enrolled and pcrlock support is verified.
-    warbler.tpmUnlock.enable = lib.mkDefault false;
-    # Enable after firmware Secure Boot is enabled. The credential service and
-    # bootloader hook provision the persistent SSH credential automatically.
+    warbler.tpmUnlock.enable = true;
     warbler.remoteUnlock.enable = true;
+
     boot.loader = {
       systemd-boot.enable = lib.mkForce false;
       systemd-boot.editor = false;
@@ -44,8 +41,6 @@ in
     };
     boot.lanzaboote = {
       enable = true;
-      # Direct backing path also works during installation, before persistence mounts.
-      # On the running system, sbctl defaults reach these keys through /var/lib.
       pkiBundle = "/persist/var/lib/sbctl";
       configurationLimit = 8;
       measuredBoot = {
@@ -110,7 +105,6 @@ in
       directories = [ "/var/lib" "/var/log" "/var/db" "/root" ];
       files = [ "/etc/machine-id" ];
     };
-    # /nix, /home and /persist live inside LUKS. No disk swap or hibernation.
     zramSwap.enable = true;
 
     users.users.root = {
@@ -121,7 +115,6 @@ in
       extraGroups = [ "wheel" ];
       openssh.authorizedKeys.keys = authorizedKeys;
     };
-    # SSH administration remains key-only; console passwords live in /persist/shadow.d.
     security.sudo.wheelNeedsPassword = false;
     services.openssh = {
       enable = true;
@@ -136,7 +129,6 @@ in
       }];
     };
     networking.firewall.enable = true;
-    # Keep this host's tailnet identity across ephemeral-root resets.
     services.tailscale.enable = true;
     environment.systemPackages = (with pkgs; [ sbctl cryptsetup tpm2-tools neovim htop tmux ghostty.terminfo ]) ++ [
       (pkgs.callPackage ./secure-boot-backup.nix { })
@@ -145,7 +137,6 @@ in
       })
     ];
 
-    # Explicit upgrades while Secure Boot/TPM enrollment is being established.
     system.autoUpgrade.enable = lib.mkForce false;
     p.nix.buildMachines.ward.enable = lib.mkForce false;
   };

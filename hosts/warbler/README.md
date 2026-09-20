@@ -6,6 +6,21 @@ Inspected at `nixos@nixos.bed.einic.org`: x86_64 AMD, 64 GB RAM, UEFI,
 TPM 2.0 (`systemd-pcrlock is-supported` returned `yes`), Secure Boot disabled.
 The installer currently uses Wi-Fi `wlp3s0` (rtw89_8852ae); `eno1` is unplugged.
 
+## Remote rebuild
+
+From the local checkout root, run:
+
+```sh
+nix run .#warbler-nixos-rebuild-remote
+```
+
+This archives the checkout and its flake inputs into Warbler's Nix store over
+SSH as `cody@warbler`, then runs `sudo nixos-rebuild boot` there using the
+archived source. It installs the next boot generation without rebooting.
+Tracked uncommitted edits are included; add new files to Git first.
+To select another rebuild action, use e.g.
+`nix run .#warbler-nixos-rebuild-remote -- switch` or `-- build`.
+
 ## Hardware and firmware references
 
 User-supplied `lshw` identifies an **HP EliteDesk 805 G8 Desktop Mini PC**,

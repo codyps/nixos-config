@@ -193,6 +193,29 @@
             mbx = pkgs.mbx;
             caddyFull = pkgs.caddyFull;
             nix-dynamic-machines = pkgs.nix-dynamic-machines;
+            warbler-nixos-rebuild-remote = pkgs.writeShellApplication {
+              name = "warbler-nixos-rebuild-remote";
+              runtimeInputs = [ pkgs.nix pkgs.openssh pkgs.jq ];
+              text = ''
+                if [[ $# -gt 1 ]]; then
+                  echo 'Usage: warbler-nixos-rebuild-remote [boot|switch|test|build|dry-build|dry-activate]' >&2
+                  exit 2
+                fi
+                action="''${1:-boot}"
+                case "$action" in
+                  -h|--help)
+                    echo 'Usage: warbler-nixos-rebuild-remote [boot|switch|test|build|dry-build|dry-activate]'
+                    echo 'Archives the current checkout to cody@warbler and rebuilds there (default: boot; no reboot).'
+                    exit 0
+                    ;;
+                  boot|switch|test|build|dry-build|dry-activate) ;;
+                  *) echo "Unsupported rebuild action: $action" >&2; exit 2 ;;
+                esac
+                source=$(nix flake archive --json --no-update-lock-file --to ssh-ng://cody@warbler . | jq -er .path)
+                printf -v command 'sudo nixos-rebuild %q --flake %q' "$action" "$source#warbler"
+                exec ssh -t cody@warbler "$command"
+              '';
+            };
           } // pkgs.lib.optionalAttrs pkgs.stdenv.hostPlatform.isLinux {
             luks-volume-key-id = pkgs.callPackage ./scripts/luks-volume-key-id.nix { };
             # Refresh both platform-independent source bundles on Linux CI.

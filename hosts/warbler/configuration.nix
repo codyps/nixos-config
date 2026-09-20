@@ -1,6 +1,18 @@
 { config, lib, pkgs, ... }:
 let
   inherit (import ../../nixos/ssh-auth.nix) authorizedKeys;
+  # Preserve eno1's existing lease across initrd and normal boot. The initrd
+  # cannot use the machine-id stored on encrypted /persist. These DHCP
+  # identifiers are public; DUIDRawData excludes the two-byte DUID type.
+  wiredDhcpIdentity = {
+    DUIDType = "vendor";
+    DUIDRawData = "00:00:ab:11:21:c2:67:af:22:79:38:e4";
+    IAID = 3055685611;
+  };
+  wiredDhcpConfig = {
+    dhcpV4Config = wiredDhcpIdentity // { ClientIdentifier = "duid"; };
+    dhcpV6Config = wiredDhcpIdentity;
+  };
 in
 {
   imports = [ ./hardware-configuration.nix ./disko.nix ./reset-root.nix ./remote-unlock.nix ./wifi.nix ./tpm-setup.nix ./secrets.nix ./usbguard.nix ./account-passwords.nix ];
@@ -83,7 +95,7 @@ in
         after = [ "tpm2.target" ];
         serviceConfig.LoadCredentialEncrypted = [ "ssh-host-key:/etc/credstore.encrypted/ssh-host-key" ];
       };
-      systemd.network.networks."10-wired" = {
+      systemd.network.networks."10-wired" = wiredDhcpConfig // {
         matchConfig.Name = "eno1";
         networkConfig.DHCP = "ipv4";
       };
@@ -92,7 +104,7 @@ in
     networking.useDHCP = false;
     systemd.network = {
       enable = true;
-      networks."10-wired" = {
+      networks."10-wired" = wiredDhcpConfig // {
         matchConfig.Name = "eno1";
         networkConfig.DHCP = "yes";
       };

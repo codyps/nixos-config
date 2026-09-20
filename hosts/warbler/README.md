@@ -97,6 +97,10 @@ learn a replacement pin automatically at boot.
 `ssh -t -p 2222 root@<warbler-ip>` authenticates with `nixos/ssh-auth.nix` keys
 and presents the LUKS passphrase prompt. Use the actual DHCP address or arrange
 a reservation/DNS entry; this configuration does not create DNS records.
+The wired interface uses the same explicit DHCP DUID and IAID in both boot
+stages, preserving its normal-system DHCP identity before `/persist` is unlocked.
+When deploying this change, let old early-boot leases expire or remove only
+those stale leases from the router, then verify DNS after a full boot.
 Stage 2 SSH uses port 22 and a separate persistent host key. Both root and cody
 accept authorized SSH keys; cody has passwordless sudo. Root and cody have
 installer-generated console passwords. SSH password authentication stays disabled.

@@ -73,12 +73,14 @@
             };
             # Use each host's package set, including the pinned Intel Darwin
             # stdenv, with the Rust version required by the Atuin fork.
-            atuinToolchain = (prev.callPackage atuin.inputs.fenix {
+            atuinToolchain = ((prev.callPackage atuin.inputs.fenix {
               pkgs = compatPkgs;
-            }).fromToolchainFile {
-              file = atuin + "/rust-toolchain.toml";
+            }).fromManifestFile (builtins.fetchurl {
+              # Avoid import-from-derivation when flake check evaluates systems
+              # whose fetch derivations have not yet been instantiated.
+              url = "https://static.rust-lang.org/dist/channel-rust-${(builtins.fromTOML (builtins.readFile (atuin + "/rust-toolchain.toml"))).toolchain.channel}.toml";
               sha256 = "sha256-P30Tm3O7vQAE725YtDCDHGjNrSsfZO4us11UwJGZSJo=";
-            };
+            })).defaultToolchain;
             caddy = prev.callPackage (nixpkgsSource + "/pkgs/by-name/ca/caddy/package.nix") {
               inherit caddy;
             };

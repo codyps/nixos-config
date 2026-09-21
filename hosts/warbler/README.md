@@ -21,6 +21,11 @@ Tracked uncommitted edits are included; add new files to Git first.
 To select another rebuild action, use e.g.
 `nix run .#warbler-nixos-rebuild-remote -- switch` or `-- build`.
 
+## AI harness account
+
+See [AI harness account](ai-harnesses.md) for the restricted `cody-ai` user,
+boot-started Codex service, phone pairing, and desktop SSH connection.
+
 ## Hardware and firmware references
 
 User-supplied `lshw` identifies an **HP EliteDesk 805 G8 Desktop Mini PC**,

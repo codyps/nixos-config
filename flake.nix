@@ -54,8 +54,8 @@
 
   outputs = { self, atuin, nixpkgs, nixpkgs-darwin, flake-utils, nix-darwin, nix-darwin-26-05, home-manager, home-manager-26-05, nixos-wsl, nixos-vscode-server, impermanence, sops-nix, disko, lanzaboote, clipway }:
     let
-      withCache = constructor: args: constructor (args // {
-        modules = [ ./modules/nix-cache.nix ] ++ args.modules;
+      withCommonModules = constructor: args: constructor (args // {
+        modules = [ ./modules/nix-cache.nix ./modules/terminfo.nix ] ++ args.modules;
       });
       mkOverlays = nixpkgsSource: [
         (final: prev:
@@ -183,6 +183,7 @@
               SECURE_UNLOCK_SCRIPT=${./nixos-modules/secure-unlock/tpm-setup.py} python3 ${./scripts/test-secure-unlock-setup.py}
               touch "$out"
             '';
+            warbler-ai-harnesses = import ./hosts/warbler/ai-harnesses-test.nix { inherit pkgs; };
             warbler-account-passwords = import ./hosts/warbler/account-passwords-test.nix { inherit pkgs; };
             warbler-vm = import ./hosts/warbler/vm-test.nix {
               inherit pkgs self disko impermanence lanzaboote sops-nix;
@@ -243,7 +244,7 @@
       ) //
     (
       let
-        nixosSystem = withCache nixpkgs.lib.nixosSystem;
+        nixosSystem = withCommonModules nixpkgs.lib.nixosSystem;
       in
       {
         nixosModules.secure-unlock = {
@@ -486,7 +487,7 @@
 
         # Build darwin flake using:
         # $ darwin-rebuild build --flake .#x-mbp
-        darwinConfigurations."x-mbp" = (withCache nix-darwin-26-05.lib.darwinSystem) {
+        darwinConfigurations."x-mbp" = (withCommonModules nix-darwin-26-05.lib.darwinSystem) {
           specialArgs = { inherit self; };
           modules = [
             ({ ... }: {
@@ -513,7 +514,7 @@
           ];
         };
 
-        darwinConfigurations."u3" = (withCache nix-darwin-26-05.lib.darwinSystem) {
+        darwinConfigurations."u3" = (withCommonModules nix-darwin-26-05.lib.darwinSystem) {
           specialArgs = { inherit self; };
           modules = [
             sops-nix.darwinModules.sops
@@ -557,7 +558,7 @@
           ];
         };
 
-        darwinConfigurations."RVW-LYY7YT7329M" = (withCache nix-darwin.lib.darwinSystem) {
+        darwinConfigurations."RVW-LYY7YT7329M" = (withCommonModules nix-darwin.lib.darwinSystem) {
           specialArgs = { inherit self; };
           modules = [
             ({ ... }: {
@@ -677,7 +678,7 @@
           # 3. add `experimental-features = nix-command flake` to /etc/nix/nix.conf
           # 4. modify /etc/ssh/ssh_config to kill the warning about gssapiauthentication
           # 5. ssh-keygen -t ed25519
-          homeConfigurations."cody@penguin" = (withCache home-manager.lib.homeManagerConfiguration) {
+          homeConfigurations."cody@penguin" = (withCommonModules home-manager.lib.homeManagerConfiguration) {
             inherit pkgs;
 
             modules = [
@@ -703,7 +704,7 @@
           };
 
           # arnold
-          homeConfigurations."y@arnold" = (withCache home-manager.lib.homeManagerConfiguration) {
+          homeConfigurations."y@arnold" = (withCommonModules home-manager.lib.homeManagerConfiguration) {
             inherit pkgs;
 
             modules = [
@@ -716,7 +717,7 @@
           };
 
           # vm on x-mbp
-          homeConfigurations."x@adams" = (withCache home-manager.lib.homeManagerConfiguration) {
+          homeConfigurations."x@adams" = (withCommonModules home-manager.lib.homeManagerConfiguration) {
             inherit pkgs;
 
             modules = [
@@ -728,7 +729,7 @@
             ];
           };
 
-          homeConfigurations."cody@constance" = (withCache home-manager.lib.homeManagerConfiguration) {
+          homeConfigurations."cody@constance" = (withCommonModules home-manager.lib.homeManagerConfiguration) {
             inherit pkgs;
 
             modules = [
@@ -740,7 +741,7 @@
             ];
           };
 
-          homeConfigurations."cody@arch1" = (withCache home-manager.lib.homeManagerConfiguration) {
+          homeConfigurations."cody@arch1" = (withCommonModules home-manager.lib.homeManagerConfiguration) {
             inherit pkgs;
 
             modules = [

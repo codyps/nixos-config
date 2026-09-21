@@ -15,7 +15,7 @@ let
   };
 in
 {
-  imports = [ ./hardware-configuration.nix ./disko.nix ./reset-root.nix ../../nixos-modules/secure-unlock ./secrets.nix ./usbguard.nix ./account-passwords.nix ];
+  imports = [ ./hardware-configuration.nix ./disko.nix ./reset-root.nix ../../nixos-modules/secure-unlock ./secrets.nix ./usbguard.nix ./account-passwords.nix ./ai-harnesses.nix ];
 
   config = {
     boot.secureUnlock.rootVolumeKeyId = import ./volume-identity.nix;

@@ -31,7 +31,7 @@ let
       mainProgram = "vp";
     };
   };
-  codingTools = with pkgs; [ git gh gcc rustup mbx nodejs bun uv pnpm vitePlus python3 ripgrep jq ];
+  codingTools = with pkgs; [ git gh gcc bazelisk (writeShellScriptBin "bazel" ''exec ${bazelisk}/bin/bazelisk "$@"'') rustup mbx nodejs bun uv pnpm vitePlus python3 ripgrep jq ];
   localBinPaths = map (path: "${home}/${path}") [
     ".local/share/python-default/bin"
     ".local/bin"

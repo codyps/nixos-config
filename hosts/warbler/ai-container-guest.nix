@@ -121,6 +121,8 @@ in
     gcc
     gnumake
     cmake
+    bazelisk
+    (writeShellScriptBin "bazel" ''exec ${bazelisk}/bin/bazelisk "$@"'')
     pkg-config
     rustup
     mbx

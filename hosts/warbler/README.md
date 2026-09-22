@@ -26,6 +26,10 @@ To select another rebuild action, use e.g.
 See [AI harness account](ai-harnesses.md) for the restricted `cody-ai` user,
 boot-started Codex service, phone pairing, and desktop SSH connection.
 
+The [alternate AI container](ai-container.md) provides a separate NixOS
+environment for Codex, Hermes, and other harnesses, with its own LAN DHCP address
+and user systemd. The existing host AI setup remains available independently.
+
 ## Hardware and firmware references
 
 User-supplied `lshw` identifies an **HP EliteDesk 805 G8 Desktop Mini PC**,

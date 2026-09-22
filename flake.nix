@@ -186,6 +186,7 @@
               touch "$out"
             '';
             warbler-ai-harnesses = import ./hosts/warbler/ai-harnesses-test.nix { inherit pkgs; };
+            warbler-ai-container = import ./hosts/warbler/ai-container-test.nix { inherit pkgs; };
             warbler-account-passwords = import ./hosts/warbler/account-passwords-test.nix { inherit pkgs; };
             warbler-vm = import ./hosts/warbler/vm-test.nix {
               inherit pkgs self disko impermanence lanzaboote sops-nix;

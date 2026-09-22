@@ -120,7 +120,7 @@ harnesses must be isolated from one another.
 
 ## Coding tools
 
-SSH Bash sessions and the managed service share Git, gh, rustup, mbx, Node.js/npm,
+SSH Bash sessions and the managed service share Git, gh, GCC (C/C++), rustup, mbx, Node.js/npm,
 Bun, uv, pnpm, Vite+ (`vp`), Python, ripgrep, and jq. The account module owns this environment directly,
 so service processes receive it without depending on Home Manager login hooks.
 Run `rustup default stable` once to select/download a Rust toolchain.

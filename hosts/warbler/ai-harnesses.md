@@ -92,7 +92,8 @@ adapter if Codex changes its CLI contract.
 ## Access boundaries and other harnesses
 
 The account has a locked password, no supplementary groups, no sudo grant,
-no polkit authorization, no SSH forwarding, and no access to the host Nix daemon.
+no polkit authorization, and no SSH forwarding. It has ordinary, untrusted access
+to the host Nix daemon for builds, development shells, and user profiles.
 Cody's home and the AI home are mode 0700. SSH shell sessions have ordinary Unix
 account permissions; systemd's extra restrictions apply to the managed service
 and its descendants, not to arbitrary programs launched directly over SSH.
@@ -100,7 +101,8 @@ and its descendants, not to arbitrary programs launched directly over SSH.
 The managed service additionally has no capabilities or privilege escalation,
 a read-only system filesystem, private temporary files and devices, hidden other
 homes, and inaccessible `/persist`, host secrets, user-manager sockets, system
-D-Bus, and the Nix daemon socket. Its writable persistent area is its own home.
+D-Bus. The Nix daemon socket is accessible; daemon builds run outside this
+service sandbox, under Nix's own build policy. Its writable persistent area is its own home.
 It has no service-specific CPU, memory, or task limits (`TasksMax=infinity`).
 User namespaces remain enabled for Codex's own sandbox.
 
@@ -113,9 +115,36 @@ All harnesses under this UID can access each other's files and credentials.
 For another harness, add its package and a separate root-managed systemd service
 in `ai-harnesses.nix`, reusing the service's confinement settings and this user.
 Use a separate private state directory in the home and separate credentials.
-Install tools declaratively or into this account's home; host Nix builds are
-intentionally denied. Add further language toolchains to the service `path` as
-needed. Use another UID if harnesses must be isolated from one another.
+Install tools declaratively or into this account's home. Use another UID if
+harnesses must be isolated from one another.
+
+## Coding tools
+
+SSH Bash sessions and the managed service share Git, gh, rustup, mbx, Node.js/npm,
+Bun, uv, pnpm, Vite+ (`vp`), Python, ripgrep, and jq. The account module owns this environment directly,
+so service processes receive it without depending on Home Manager login hooks.
+Run `rustup default stable` once to select/download a Rust toolchain.
+
+`npm install -g` installs under `~/.npm-global`; ordinary `npm install` uses the
+project directory. Python automatically creates a writable default virtual
+environment at `~/.local/share/python-default`, so `pip install` and
+`python -m pip install` work without modifying the Nix store. Project-specific
+virtual environments (`python -m venv .venv; source .venv/bin/activate`) also work.
+
+PATH includes the default Python environment, `~/.local/bin`, `~/.cargo/bin`,
+`~/.npm-global/bin`, `~/.bun/bin`, pnpm/Yarn and Vite+ user bins, `~/go/bin`, `~/.deno/bin`,
+`~/.dotnet/tools`, `~/.gem/bin`, and both Nix user profile locations. Language
+paths do not themselves install additional language runtimes. mbx is available
+as a command; automatic Cargo wrapping is not enabled.
+
+Vite+'s global CLI is pinned to the upstream 0.3.3 GNU/Linux release, with its
+archive hash checked by Nix and its ELF loader patched for NixOS. First use
+bootstraps its JavaScript toolchain into the user's home and needs internet
+access. `nix-ld` supports the upstream Node binaries downloaded by this setup.
+The Nix bootstrap package is version-pinned; Vite+ owns its subsequent user-local
+installation and updates. The offline VM test checks executable startup and
+PATH availability, not those first-use downloads. See the
+[upstream global CLI documentation](https://viteplus.dev/guide/global-cli).
 
 ## Operation and checks
 
@@ -139,7 +168,7 @@ nix build .#nixosConfigurations.warbler.config.system.build.toplevel --no-link
 The credential-free VM test seeds the standalone directory with Nixpkgs Codex
 0.154.0 as an offline fixture, then exercises the real managed bootstrap,
 updater process, SSH transport/RPC, forwarding denial, and command execution with Codex's inner sandbox disabled to test the outer service boundary,
-no-sudo/Nix access, private temporary files, automatic daemon recovery, and state
+no-sudo restrictions, allowed Nix access, coding-tool discovery, Python environments, private temporary files, automatic daemon recovery, and state
 across service restart.
 
 It does not download the latest installer release or verify an authenticated

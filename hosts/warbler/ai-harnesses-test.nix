@@ -32,10 +32,11 @@ pkgs.testers.runNixOSTest {
     assert machine.succeed("id -Gn cody-ai").strip() == "cody-ai"
     machine.fail("su - cody-ai -c 'sudo -n true'")
     machine.fail("su - cody-ai -c 'cat /home/cody/private-test'")
-    machine.fail("su - cody-ai -c 'nix --extra-experimental-features nix-command store ping --store daemon'")
+    machine.succeed("su - cody-ai -c 'nix --extra-experimental-features nix-command store ping --store daemon'")
     machine.succeed("ssh-keygen -q -t ed25519 -N \"\" -f /root/ai-test-key")
     machine.succeed("install -d -m 700 -o cody-ai -g cody-ai /home/cody-ai/.ssh; cp /root/ai-test-key.pub /home/cody-ai/.ssh/authorized_keys; chown cody-ai:cody-ai /home/cody-ai/.ssh/authorized_keys")
-    status, output = machine.execute("timeout 60 ssh -o StrictHostKeyChecking=accept-new -i /root/ai-test-key cody-ai@localhost 'python3 ${../../scripts/test-warbler-ai-rpc.py}'")
+    machine.succeed("ssh -o StrictHostKeyChecking=accept-new -i /root/ai-test-key cody-ai@localhost 'for tool in git gh rustup mbx node npm bun uv pnpm vp python pip nix; do command -v $tool || exit 1; done; test $(npm config get prefix) = /home/cody-ai/.npm-global'")
+    status, output = machine.execute("timeout 120 ssh -o StrictHostKeyChecking=accept-new -i /root/ai-test-key cody-ai@localhost 'python3 ${../../scripts/test-warbler-ai-rpc.py}'")
     if status != 0:
         print(machine.succeed("cat /home/cody-ai/.codex/app-server-daemon/*.stderr.log"))
     assert status == 0, output

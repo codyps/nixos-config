@@ -94,9 +94,20 @@ adapter if Codex changes its CLI contract.
 The account has a locked password, no supplementary groups, no sudo grant,
 no polkit authorization, and no SSH forwarding. It has ordinary, untrusted access
 to the host Nix daemon for builds, development shells, and user profiles.
-Cody's home and the AI home are mode 0700. SSH shell sessions have ordinary Unix
-account permissions; systemd's extra restrictions apply to the managed service
-and its descendants, not to arbitrary programs launched directly over SSH.
+Cody's home and the AI home are mode 0700. SSH sessions enter a Bubblewrap
+sandbox through a Nix-managed login shell, before user shell startup files run.
+Interactive shells, remote commands, and SFTP/SCP use this sandbox. The home is
+writable; the Nix store, system tools, and selected configuration are read-only.
+Other homes, `/persist`, host secrets, and administrative sockets are absent.
+Each session has private temporary storage, devices, and a PID namespace.
+Network access and nested user namespaces remain available for development.
+The Nix daemon socket is deliberately exposed: daemon builds run outside the
+SSH sandbox under the host's Nix build policy. User profile links in the host
+Nix profiles directory are read-only within SSH sessions.
+The `codex app-server daemon start` and `version` compatibility commands probe
+the control socket directly; `version` also reports the installed CLI version.
+They avoid native PID-file discovery, which cannot see the service's process
+from the SSH PID namespace and would incorrectly remove its state as stale.
 
 The managed service additionally has no capabilities or privilege escalation,
 a read-only system filesystem, private temporary files and devices, hidden other

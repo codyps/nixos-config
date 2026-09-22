@@ -65,6 +65,49 @@ let
       ${pkgs.python3}/bin/python3 -m venv ${home}/.local/share/python-default
     fi
   '';
+  # The login shell itself enters the sandbox: sshd invokes ForceCommand via
+  # this shell, so no user-controlled Bash startup file runs on the host.
+  # Privileged Bash mode ignores BASH_ENV and imported shell functions.
+  sshSandbox = (pkgs.writeScriptBin "ai-sandbox-shell" ''
+    #!${pkgs.bash}/bin/bash -p
+    set -euo pipefail
+    if [ "''${1-}" = -c ] && [ "''${2-}" = ai-sandbox-session ]; then
+      if [ -n "''${SSH_ORIGINAL_COMMAND-}" ]; then
+        set -- -c "$SSH_ORIGINAL_COMMAND"
+      else
+        set --
+      fi
+    fi
+    # internal-sftp must run as an external server inside the mount namespace.
+    if [ "''${1-}" = -c ] && [ "''${2-}" = internal-sftp ]; then
+      set -- -c ${pkgs.openssh}/libexec/sftp-server
+    fi
+    exec ${pkgs.bubblewrap}/bin/bwrap \
+      --unshare-user --unshare-pid --unshare-ipc --unshare-uts \
+      --die-with-parent --new-session --cap-drop ALL \
+      --ro-bind /nix/store /nix/store \
+      --ro-bind /run/current-system /run/current-system \
+      --ro-bind /etc/profiles/per-user/${user} /etc/profiles/per-user/${user} \
+      --ro-bind /nix/var/nix/profiles /nix/var/nix/profiles \
+      --ro-bind /nix/var/nix/daemon-socket /nix/var/nix/daemon-socket \
+      ${lib.concatMapStringsSep " \\\n      " (path: "--ro-bind-try ${path} ${path}") [
+        "/etc/passwd" "/etc/group" "/etc/nsswitch.conf" "/etc/hosts"
+        "/etc/resolv.conf" "/etc/localtime" "/etc/profile" "/etc/bashrc"
+        "/etc/bashrc.local" "/etc/inputrc" "/etc/nix" "/etc/ssl/certs"
+        "/etc/termcap" "/etc/terminfo"
+      ]} \
+      --dir /bin --symlink ${pkgs.bash}/bin/bash /bin/sh \
+      --dir /usr/bin --symlink ${pkgs.coreutils}/bin/env /usr/bin/env \
+      --proc /proc --dev /dev --tmpfs /tmp --tmpfs /var/tmp \
+      --bind ${home} ${home} --chdir "$PWD" \
+      --unsetenv BASH_ENV --unsetenv ENV \
+      --setenv SHELL ${pkgs.bashInteractive}/bin/bash \
+      --setenv HOME ${home} \
+      --setenv PATH /etc/profiles/per-user/${user}/bin:/run/current-system/sw/bin \
+      -- ${pkgs.bashInteractive}/bin/bash -l "$@"
+  '').overrideAttrs (old: {
+    passthru = (old.passthru or { }) // { shellPath = "/bin/ai-sandbox-shell"; };
+  });
   socket = "${home}/.codex/app-server-control/app-server-control.sock";
   inherit (import ../../nixos/ssh-auth.nix) authorizedKeys;
   # Optional compatibility for clients that launch a JSON-lines app server.
@@ -98,7 +141,16 @@ let
               echo 'codex-ai.service is not ready; contact the administrator.' >&2
               exit 1
             fi
-            exec "$codex" app-server daemon version
+            # The SSH PID namespace cannot see the service's daemon PID.
+            # Native daemon discovery treats that PID as stale and deletes
+            # its state, so probe the explicit socket without discovery.
+            ${pkgs.python3}/bin/python3 -c 'import socket; s = socket.socket(socket.AF_UNIX); s.connect("${socket}"); s.close()' || exit 1
+            echo 'Codex app server is running (control socket reachable).'
+            if [ "''${2-}" = version ]; then
+              printf 'Installed CLI: '
+              "$codex" --version
+            fi
+            exit 0
             ;;
         esac
         echo 'Codex lifecycle is managed by codex-ai.service.' >&2
@@ -149,7 +201,7 @@ in
       inherit home;
       homeMode = "0700";
       hashedPassword = "!";
-      shell = pkgs.bashInteractive;
+      shell = sshSandbox;
       packages = [ codexRemote ] ++ codingTools;
       openssh.authorizedKeys.keys = map (key: "restrict,pty ${key}") authorizedKeys;
     };
@@ -169,6 +221,7 @@ in
         KbdInteractiveAuthentication no
         DisableForwarding yes
         PermitUserRC no
+        ForceCommand ai-sandbox-session
       Match all
     '';
     # Neither sudo nor a desktop policy agent should confer host privileges.

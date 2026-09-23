@@ -123,6 +123,7 @@ in
     gcc
     gnumake
     cmake
+    (pkgs.callPackage ./ai-bubblewrap.nix { })
     bazelisk
     (writeShellScriptBin "bazel" ''exec ${bazelisk}/bin/bazelisk "$@"'')
     pkg-config

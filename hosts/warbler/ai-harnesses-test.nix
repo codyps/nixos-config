@@ -11,7 +11,8 @@ pkgs.testers.runNixOSTest {
     # OpenAI's installer. Exercise the actual pinned daemon and updater logic.
     systemd.services.codex-ai.preStart = lib.mkBefore ''
       mkdir -p /home/cody-ai/.codex/packages/standalone/current/bin
-      cp ${pkgs.codex}/bin/codex /home/cody-ai/.codex/packages/standalone/current/bin/codex
+      # Use the binary: Nixpkgs' wrapper prepends its unpatched Bubblewrap.
+      cp ${pkgs.codex}/bin/.codex-wrapped /home/cody-ai/.codex/packages/standalone/current/bin/codex
       chmod u+w /home/cody-ai/.codex/packages/standalone/current/bin/codex
     '';
     systemd.tmpfiles.rules = [

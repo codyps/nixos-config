@@ -10,7 +10,8 @@ pkgs.testers.runNixOSTest {
         # Keep the test offline, exercising the real bootstrap and updater.
         systemd.user.services.codex-ai.preStart = ''
           mkdir -p "$HOME/.codex/packages/standalone/current/bin"
-          cp ${pkgs.codex}/bin/codex "$HOME/.codex/packages/standalone/current/bin/codex"
+          # Use the binary: Nixpkgs' wrapper prepends its unpatched Bubblewrap.
+          cp ${pkgs.codex}/bin/.codex-wrapped "$HOME/.codex/packages/standalone/current/bin/codex"
           chmod u+w "$HOME/.codex/packages/standalone/current/bin/codex"
         '';
       };

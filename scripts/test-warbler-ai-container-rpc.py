@@ -36,3 +36,33 @@ touch ~/workspaces/codex-proof
     })
     assert result["exitCode"] == 0, result
     assert "gateway-service-ok" in result["stdout"], result
+    # Exercise the inner sandbox too: the outer service/container must permit
+    # Bubblewrap's user/network namespaces and NETLINK_ROUTE loopback setup.
+    for ident, policy in enumerate([
+        {"type": "readOnly"},
+        {"type": "workspaceWrite", "writableRoots": ["/home/cody-ai/workspaces"],
+         "networkAccess": False},
+    ], start=3):
+        result = request(ident, "command/exec", {
+            "command": ["python3", "-c", """
+import errno
+import pathlib
+import tempfile
+
+workspace = pathlib.Path('/home/cody-ai/workspaces')
+try:
+    with tempfile.TemporaryFile(dir=workspace) as proof:
+        proof.write(b'inner-sandbox-proof')
+except OSError as error:
+    assert error.errno in (errno.EACCES, errno.EPERM, errno.EROFS), error
+    assert EXPECT_READ_ONLY
+else:
+    assert not EXPECT_READ_ONLY
+print('inner-sandbox-ok')
+""".replace("EXPECT_READ_ONLY", repr(policy["type"] == "readOnly"))],
+            "cwd": "/home/cody-ai/workspaces",
+            "sandboxPolicy": policy,
+            "timeoutMs": 10000,
+        })
+        assert result["exitCode"] == 0, result
+        assert "inner-sandbox-ok" in result["stdout"], result

@@ -117,6 +117,10 @@ service sandbox, under Nix's own build policy. Its writable persistent area is i
 It has no service-specific CPU, memory, or task limits (`TasksMax=infinity`).
 User namespaces and netlink sockets remain enabled so Codex's own sandbox can
 create namespaces and configure their loopback interfaces.
+Both AI environments provide a Bubblewrap package with the older proc-mount
+error text expected by Codex's fallback for protected `/proc` mounts. This
+compatibility patch changes only the diagnostic; systemd/nspawn protections
+remain enabled.
 
 Network egress is allowed for OpenAI, Git, and package downloads, including access
 to reachable LAN services. This is process/account isolation on a shared kernel,
@@ -179,7 +183,9 @@ nix build .#nixosConfigurations.warbler.config.system.build.toplevel --no-link
 
 The credential-free VM test seeds the standalone directory with Nixpkgs Codex
 0.154.0 as an offline fixture, then exercises the real managed bootstrap,
-updater process, SSH transport/RPC, forwarding denial, and command execution with Codex's inner sandbox disabled to test the outer service boundary,
+updater process, SSH transport/RPC, forwarding denial, command execution with
+Codex's inner sandbox disabled to test the outer service boundary, and nested
+read-only and workspace-write sandboxes with networking disabled,
 no-sudo restrictions, allowed Nix access, coding-tool discovery, Python environments, private temporary files, automatic daemon recovery, and state
 across service restart.
 

@@ -170,6 +170,7 @@
               touch "$out"
             '';
           } // pkgs.lib.optionalAttrs (system == "x86_64-linux") {
+            codex-config-activation = import ./nixos-modules/codex-config-test.nix { inherit pkgs; };
             luks-volume-key-id = pkgs.runCommand "test-luks-volume-key-id"
               {
                 nativeBuildInputs = [

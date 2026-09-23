@@ -61,6 +61,8 @@ let
 in
 {
   networking.hostName = "warbler-ai";
+  imports = [ ../../nixos-modules/codex-config.nix ];
+  programs.codex-config.users = [ user ];
   system.stateVersion = "26.05";
   time.timeZone = "America/New_York";
   documentation.enable = false;

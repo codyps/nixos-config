@@ -162,7 +162,14 @@
           };
         in
         {
-          checks = pkgs.lib.optionalAttrs (system == "x86_64-linux") {
+          checks = {
+            codex-configure = pkgs.runCommand "test-codex-configure" {
+              nativeBuildInputs = [ (pkgs.python3.withPackages (p: [ p.tomlkit ])) ];
+            } ''
+              CODEX_CONFIGURE_SCRIPT=${./scripts/codex-configure.py} python3 ${./scripts/test-codex-configure.py}
+              touch "$out"
+            '';
+          } // pkgs.lib.optionalAttrs (system == "x86_64-linux") {
             luks-volume-key-id = pkgs.runCommand "test-luks-volume-key-id"
               {
                 nativeBuildInputs = [
@@ -193,6 +200,7 @@
             };
           };
           packages = {
+            codex-configure = import ./nixpkgs/codex-configure.nix { inherit pkgs; };
             atuin = pkgs.atuin;
             mbx = pkgs.mbx;
             caddyFull = pkgs.caddyFull;

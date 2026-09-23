@@ -115,7 +115,8 @@ homes, and inaccessible `/persist`, host secrets, user-manager sockets, system
 D-Bus. The Nix daemon socket is accessible; daemon builds run outside this
 service sandbox, under Nix's own build policy. Its writable persistent area is its own home.
 It has no service-specific CPU, memory, or task limits (`TasksMax=infinity`).
-User namespaces remain enabled for Codex's own sandbox.
+User namespaces and netlink sockets remain enabled so Codex's own sandbox can
+create namespaces and configure their loopback interfaces.
 
 Network egress is allowed for OpenAI, Git, and package downloads, including access
 to reachable LAN services. This is process/account isolation on a shared kernel,

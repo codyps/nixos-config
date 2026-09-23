@@ -285,7 +285,8 @@ in
         RestrictSUIDSGID = true;
         LockPersonality = true;
         RestrictRealtime = true;
-        RestrictAddressFamilies = [ "AF_UNIX" "AF_INET" "AF_INET6" ];
+        # Bubblewrap uses NETLINK_ROUTE to configure loopback in nested sandboxes.
+        RestrictAddressFamilies = [ "AF_UNIX" "AF_INET" "AF_INET6" "AF_NETLINK" ];
         SystemCallArchitectures = "native";
         TasksMax = "infinity";
         # User namespaces remain available for Codex's own Linux sandbox.

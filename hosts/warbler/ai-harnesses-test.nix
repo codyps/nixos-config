@@ -45,6 +45,7 @@ pkgs.testers.runNixOSTest {
     machine.fail("test -e /tmp/ssh-private")
     machine.succeed("test -e /home/cody-ai/startup-ran; test ! -s /home/cody-ai/startup-leak")
     machine.succeed(ssh + " " + shlex.quote("set -e; printf 'int main(void) { return 0; }' | cc -x c -o /tmp/c-proof -; /tmp/c-proof; printf '#include <iostream>\\nint main() { std::cout << 42; }' | c++ -x c++ -o /tmp/cpp-proof -; test $(/tmp/cpp-proof) = 42"))
+    machine.succeed(ssh + " " + shlex.quote("${pkgs.bubblewrap}/bin/bwrap --unshare-user --unshare-net --unshare-pid --ro-bind / / --proc /proc --dev /dev -- ${pkgs.coreutils}/bin/true"))
     machine.succeed("printf 'test ! -e /persist && echo interactive-ok; exit\\n' | " + ssh.replace("ssh -n ", "ssh -tt ", 1) + " | grep interactive-ok")
     machine.succeed("echo transfer-proof > /tmp/transfer-proof; scp -i /root/ai-test-key /tmp/transfer-proof cody-ai@localhost:workspaces/transfer-proof")
     machine.succeed("cmp /tmp/transfer-proof /home/cody-ai/workspaces/transfer-proof")

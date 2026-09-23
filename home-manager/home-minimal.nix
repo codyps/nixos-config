@@ -9,7 +9,7 @@ let
   ;
 in
 {
-  imports = [ ./git-emdash-hook.nix ./codex-config.nix ];
+  imports = [ ./git-emdash-hook.nix ./atuin.nix ./codex-config.nix ];
 
   # This value determines the Home Manager release that your configuration is
   # compatible with. This helps avoid breakage when a new Home Manager release
@@ -77,7 +77,6 @@ in
   # The home.packages option allows you to install Nix packages into your
   # environment.
   home.packages = [
-    pkgs.atuin
     pkgs.fd
     pkgs.gh
     pkgs.fzf
@@ -255,66 +254,12 @@ in
     nix-direnv.enable = true;
   };
 
-  programs.atuin = {
-    enable = true;
-    flags = [ "--disable-up-arrow" ];
-  };
-
   home.file = {
     "${cache-home}/nix/current-home-flake".source = ../.;
     ".tmux.conf".source = ../config/.tmux.conf;
     ".config/kitty/kitty.conf".source = ../config/.config/kitty/kitty.conf;
-    ".config/atuin/config.toml".source = ../config/.config/atuin/config.toml;
     ".ssh/config".source = ../config/.ssh/config;
   };
-
-  systemd.user.services.atuind = {
-    Service = {
-      # TODO: consider removing unix socket, it existing causes issues
-      ExecStartPre = "${pkgs.coreutils}/bin/rm -f %h/.local/share/atuin/atuin.sock";
-      ExecStart = "${pkgs.atuin}/bin/atuin daemon";
-      Environment = "ATUIN_LOG=info";
-    };
-    Install = {
-      WantedBy = [ "default.target" ];
-    };
-    Unit = {
-      After = [ "network.target" ];
-      X-Restart-Triggers = [
-        "${pkgs.atuin}"
-        "${config.home.file.".config/atuin/config.toml".source}"
-      ];
-    };
-  };
-
-  launchd.agents = {
-    atuin-daemon = {
-      enable = true;
-      config = {
-        #ProgramArguments = [ "${pkgs.atuin}/bin/atuin" "daemon" ];
-        ProgramArguments =
-          let
-            atuin-daemon = pkgs.writeShellScriptBin "atuin-daemon" ''
-              mkdir -p ${config.home.homeDirectory}/${cache-home}/atuin;
-              # A stale socket left behind by an unclean shutdown makes the
-              # daemon crash-loop with "Address already in use" (launchd
-              # guarantees a single instance, so removal is safe here).
-              rm -f ${config.home.homeDirectory}/.local/share/atuin/atuin.sock;
-              # exec so atuin gets launchd's SIGTERM directly and can clean up
-              # its socket, instead of dying as an orphan when the shell exits.
-              exec ${pkgs.atuin}/bin/atuin daemon;
-            '';
-          in
-          [ "${atuin-daemon}/bin/atuin-daemon" ];
-        EnvironmentVariables.ATUIN_LOG = "info";
-        StandardErrorPath = "${config.home.homeDirectory}/${cache-home}/atuin/atuin-daemon-error.log";
-        StandardOutPath = "${config.home.homeDirectory}/${cache-home}/atuin/atuin-daemon-out.log";
-        RunAtLoad = true;
-        KeepAlive = true;
-      };
-    };
-  };
-
 
   xdg.configFile."nvim/raw".source = ./nvim;
 

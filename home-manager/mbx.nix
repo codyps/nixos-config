@@ -1,10 +1,11 @@
 { config, lib, pkgs, ... }:
 let
   cfg = config.programs.mbx;
-  dataHome = if pkgs.stdenv.hostPlatform.isDarwin then
-    "${config.home.homeDirectory}/Library/Application Support"
-  else
-    config.xdg.dataHome;
+  dataHome =
+    if pkgs.stdenv.hostPlatform.isDarwin then
+      "${config.home.homeDirectory}/Library/Application Support"
+    else
+      config.xdg.dataHome;
   shimDirectory = "${dataHome}/mbx/bin";
   # doctor compares the launcher byte-for-byte with this upstream constant.
   # Extract it from the selected package's source, without patching its shebang.

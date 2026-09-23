@@ -13,13 +13,15 @@ let
         let
           configuration = configurations.${name};
           system = configuration.pkgs.stdenv.hostPlatform.system;
-        in {
+        in
+        {
           inherit kind name system;
           runner = runners.${system};
           target = ".#${kind}.${builtins.toJSON name}.${suffix}";
         })
       (builtins.attrNames configurations);
-in {
+in
+{
   include =
     entries "nixosConfigurations" flake.nixosConfigurations "config.system.build.toplevel"
     ++ entries "homeConfigurations" flake.homeConfigurations "activationPackage"

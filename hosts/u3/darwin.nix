@@ -79,7 +79,7 @@ in
   };
 
   # Replace the manual QEMU VM with the container; retain the Warbler remote builder.
-  nix.buildMachines = lib.mkForce [ {
+  nix.buildMachines = lib.mkForce [{
     hostName = "docker-linux-builder";
     sshUser = "root";
     protocol = "ssh-ng";
@@ -88,18 +88,19 @@ in
     maxJobs = 4;
     speedFactor = 20;
     supportedFeatures = [ "benchmark" "big-parallel" ];
-  } {
-    hostName = "warbler.little-moth.ts.net";
-    sshUser = "nix-ssh";
-    protocol = "ssh-ng";
-    sshKey = "${primary-home}/.ssh/id_ed25519";
-    systems = [ "x86_64-linux" ];
-    maxJobs = 4;
-    # Prefer Warbler over Docker (speedFactor 20) for its CPU, RAM, and KVM.
-    speedFactor = 40;
-    supportedFeatures = [ "kvm" "nixos-test" "benchmark" "big-parallel" ];
-    publicHostKey = "c3NoLWVkMjU1MTkgQUFBQUMzTnphQzFsWkRJMU5URTVBQUFBSUN3aERTSkdnUG00QWtUc2lWN1VQbG5IV1h1QmVOWXlPdEZpaDhoQ0RZbmUgd2FyYmxlciBzdGFnZS0yL1NPUFMK";
-  }];
+  }
+    {
+      hostName = "warbler.little-moth.ts.net";
+      sshUser = "nix-ssh";
+      protocol = "ssh-ng";
+      sshKey = "${primary-home}/.ssh/id_ed25519";
+      systems = [ "x86_64-linux" ];
+      maxJobs = 4;
+      # Prefer Warbler over Docker (speedFactor 20) for its CPU, RAM, and KVM.
+      speedFactor = 40;
+      supportedFeatures = [ "kvm" "nixos-test" "benchmark" "big-parallel" ];
+      publicHostKey = "c3NoLWVkMjU1MTkgQUFBQUMzTnphQzFsWkRJMU5URTVBQUFBSUN3aERTSkdnUG00QWtUc2lWN1VQbG5IV1h1QmVOWXlPdEZpaDhoQ0RZbmUgd2FyYmxlciBzdGFnZS0yL1NPUFMK";
+    }];
 
   sops.age.sshKeyPaths = [
     "/etc/ssh/ssh_host_ed25519_key"

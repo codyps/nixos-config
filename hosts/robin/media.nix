@@ -28,13 +28,15 @@ in
   # Match the compiled web client's asset prefix and OIDC callback validation.
   systemd.services.audiobookshelf.environment.ROUTER_BASE_PATH = "/audiobookshelf";
   systemd.services.audiobookshelf.unitConfig.RequiresMountsFor = [
-    "/tank/libation/data" "/tank/books/kindle" "/tank/books/personal"
+    "/tank/libation/data"
+    "/tank/books/kindle"
+    "/tank/books/personal"
   ];
 
   virtualisation.podman.enable = true;
   virtualisation.containers.policy = {
-    default = [ { type = "reject"; } ];
-    transports.docker.${libationImage} = [ { type = "insecureAcceptAnything"; } ];
+    default = [{ type = "reject"; }];
+    transports.docker.${libationImage} = [{ type = "insecureAcceptAnything"; }];
   };
   virtualisation.oci-containers.containers.libation = {
     # The image deployed on Finch; upgrade independently of the host move.

@@ -10,16 +10,18 @@ let
         (value: builtins.elem value (settings.${setting} or [ ]))
         expected.${setting};
       # Force generation of the actual config-file derivation, not just options.
-      source = if kind == "home" then
-        config.xdg.configFile."nix/nix.conf".source
-      else config.environment.etc."nix/nix.conf".source;
+      source =
+        if kind == "home" then
+          config.xdg.configFile."nix/nix.conf".source
+        else config.environment.etc."nix/nix.conf".source;
     in
     assert hasAll "extra-substituters";
     assert hasAll "extra-trusted-public-keys";
     assert config.nix.enable or true;
     assert kind != "home" || config.nix.package != null;
     builtins.seq source.drvPath true;
-in {
+in
+{
   nixos = builtins.mapAttrs (_: check "nixos") flake.nixosConfigurations;
   darwin = builtins.mapAttrs (_: check "darwin") flake.darwinConfigurations;
   home = builtins.mapAttrs (_: check "home") flake.homeConfigurations;

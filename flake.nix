@@ -102,7 +102,8 @@
                 "github.com/WeidiDeng/caddy-cloudflare-ip@v0.0.0-20231130002422-f53b62aa13cb"
               ];
               # The pinned Darwin package set has a separate Caddy source bundle.
-              hash = if nixpkgsSource.outPath == nixpkgs.outPath
+              hash =
+                if nixpkgsSource.outPath == nixpkgs.outPath
                 then (builtins.fromJSON (builtins.readFile ./nixpkgs/caddy-hashes.json)).nixpkgs
                 else (builtins.fromJSON (builtins.readFile ./nixpkgs/caddy-hashes.json)).nixpkgs-darwin;
             };
@@ -111,7 +112,8 @@
               let
                 package = nixpkgsSource + "/pkgs/by-name/au/audiobookshelf/package.nix";
                 args = builtins.functionArgs (import package);
-              in prev.callPackage package (
+              in
+              prev.callPackage package (
                 if args ? ffmpeg_8-full
                 then { ffmpeg_8-full = prev.ffmpeg_8-headless; }
                 else { ffmpeg-full = prev.ffmpeg-headless; }
@@ -163,9 +165,10 @@
         in
         {
           checks = {
-            codex-configure = pkgs.runCommand "test-codex-configure" {
-              nativeBuildInputs = [ (pkgs.python3.withPackages (p: [ p.tomlkit ])) ];
-            } ''
+            codex-configure = pkgs.runCommand "test-codex-configure"
+              {
+                nativeBuildInputs = [ (pkgs.python3.withPackages (p: [ p.tomlkit ])) ];
+              } ''
               CODEX_CONFIGURE_SCRIPT=${./scripts/codex-configure.py} python3 ${./scripts/test-codex-configure.py}
               touch "$out"
             '';

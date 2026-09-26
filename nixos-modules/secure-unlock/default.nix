@@ -80,7 +80,7 @@ in
     boot.loader.systemd-boot.editor = false;
     boot.lanzaboote = {
       enable = true;
-      configurationLimit = lib.mkDefault 8;
+      configurationLimit = lib.mkDefault 4;
       pkiBundle = lib.mkDefault "${cfg.stateDirectory}/sbctl";
       measuredBoot = {
         enable = cfg.tpmUnlock.enable;

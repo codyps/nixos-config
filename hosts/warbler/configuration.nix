@@ -89,7 +89,11 @@ in
       }];
     };
     networking.firewall.enable = true;
-    services.tailscale.enable = true;
+    services.tailscale = {
+      enable = true;
+      useRoutingFeatures = "server";
+      extraSetFlags = [ "--advertise-exit-node" ];
+    };
     environment.systemPackages = (with pkgs; [ sbctl cryptsetup tpm2-tools neovim htop tmux ghostty.terminfo ]) ++ [
       (pkgs.callPackage ./secure-boot-backup.nix { })
     ];

@@ -67,7 +67,7 @@ PID namespace as the managed daemon; there is no custom production adapter.
 Install Hermes into the container's own home using its upstream installer:
 
 ```sh
-install-hermes --skip-browser --skip-computer-use
+sys install-hermes --skip-browser --skip-computer-use
 hermes setup
 hermes gateway setup
 hermes gateway install

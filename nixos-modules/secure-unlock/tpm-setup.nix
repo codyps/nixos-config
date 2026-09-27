@@ -40,6 +40,13 @@ in
   config = lib.mkIf cfg.enable {
     environment.etc."secure-unlock.json".source = setupConfig;
     environment.systemPackages = [ setup ];
+    programs.adminCommands.commands = {
+      setup-unlock-credentials = [ "${setup}/bin/secure-unlock-setup" "credentials" ];
+    } // lib.optionalAttrs cfg.tpmUnlock.enable {
+      setup-luks-tpm-unlock = [ "${setup}/bin/secure-unlock-setup" "enroll-disk" ];
+    } // lib.optionalAttrs (cfg.remoteUnlock.enable && cfg.remoteUnlock.tailscale.enable) {
+      setup-unlock-tailscale = [ "${setup}/bin/secure-unlock-setup" "enroll-tailscale" ];
+    };
     systemd.tmpfiles.rules = [ "d ${cfg.stateDirectory} - root root -" ];
     systemd.services.secure-unlock-credentials = {
       description = "Provision persistent TPM-sealed initrd SSH credentials";

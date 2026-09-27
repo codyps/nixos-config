@@ -19,6 +19,8 @@ Use a compatible native runner or configured remote builder for platform-specifi
 
 Follow existing Nix formatting: two-space indentation, explicit attribute sets, and small reusable modules. Use descriptive kebab-case filenames such as `nix-cache.nix`. Keep host-specific choices under `hosts/`; move shared behavior into the appropriate common module. Preserve the separate Intel Darwin dependency set when changing flake inputs.
 
+Expose custom user-facing administration commands through `sys <kebab-case-command>` by registering `programs.adminCommands.commands` in the owning module. Import `modules/admin-commands.nix` when the module may be used independently. Use absolute store paths for the underlying executables, document the `sys` invocation, and retain existing helper names needed by scripts or services. Upstream-compatible wrappers and private service/PAM helpers keep their required names. See `docs/admin-commands.md` for the convention and scope.
+
 ## Testing Guidelines
 
 Python helper tests use `unittest`; follow the existing `test-*.py` and `test_*` method conventions. Run tests for changed helpers and build affected configuration outputs. No numeric coverage threshold is configured. CI discovers and builds exported configurations and packages; successful builds do not prove activation or running-service behavior.

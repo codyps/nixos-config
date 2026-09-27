@@ -18,6 +18,7 @@ in
   imports = [ ./hardware-configuration.nix ./disko.nix ./reset-root.nix ../../nixos-modules/secure-unlock ./secrets.nix ./usbguard.nix ./account-passwords.nix ./ai-harnesses.nix ./ai-container.nix ];
 
   config = {
+    programs.adminCommands.commands.backup-secure-boot = [ "${pkgs.callPackage ./secure-boot-backup.nix { }}/bin/warbler-secure-boot-backup" ];
     boot.secureUnlock.rootVolumeKeyId = import ./volume-identity.nix;
     networking.hostName = "warbler";
     time.timeZone = "America/New_York";

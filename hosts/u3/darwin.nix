@@ -17,6 +17,7 @@ let
   };
 in
 {
+  programs.adminCommands.commands.nix-maintenance = [ "${nix-maintenance}/bin/nix-maintenance" ];
   homebrew = {
     enable = true;
 

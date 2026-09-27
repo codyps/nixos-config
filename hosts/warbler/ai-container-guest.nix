@@ -60,6 +60,7 @@ let
   };
 in
 {
+  programs.adminCommands.commands.install-hermes = [ "${installHermes}/bin/install-hermes" ];
   networking.hostName = "warbler-ai";
   imports = [ ../../nixos-modules/codex-config.nix ];
   programs.codex-config.users = [ user ];

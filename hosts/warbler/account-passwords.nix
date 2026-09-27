@@ -20,6 +20,8 @@ let
   };
 in
 {
+  imports = [ ../../modules/admin-commands.nix ];
+  programs.adminCommands.commands.account-passwords = [ "${helper}/bin/warbler-account-passwords" ];
   users.mutableUsers = false;
   users.users.root.hashedPasswordFile = "/persist/shadow.d/root";
   users.users.cody.hashedPasswordFile = "/persist/shadow.d/cody";

@@ -27,6 +27,7 @@ let
 in
 {
   imports = [
+    ../modules/admin-commands.nix
     ./home-minimal.nix
     ./mbx.nix
   ];
@@ -35,6 +36,10 @@ in
     type = lib.types.bool;
     default = true;
     description = "Wrap Cargo to redirect workspace target directories into the shared cache.";
+  };
+
+  config.programs.adminCommands.commands = lib.mkIf config.programs.cargo-target-cache.enable {
+    cargo-gc = [ "${cargo-gc}/bin/cargo-gc" ];
   };
 
   config.programs.mbx.enable = true;

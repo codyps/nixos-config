@@ -3,12 +3,14 @@ let
   configure = import ../nixpkgs/codex-configure.nix { inherit pkgs; };
 in
 {
+  imports = [ ../modules/admin-commands.nix ];
   options.programs.codex-config.users = lib.mkOption {
     type = lib.types.listOf lib.types.str;
     default = [ ];
     description = "Users whose mutable Codex configuration is seeded at activation.";
   };
   config = lib.mkIf (config.programs.codex-config.users != [ ]) {
+    programs.adminCommands.commands.configure-codex = [ "${configure}/bin/codex-configure" ];
     environment.systemPackages = [ configure ];
     system.activationScripts.seedCodexConfig = {
       # runuser needs both the account and its PAM configuration on first boot.

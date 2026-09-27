@@ -4,7 +4,7 @@ let
   inherit (lib) mkOption types;
 in
 {
-  imports = [ ./remote-unlock.nix ./wifi.nix ./tailscale.nix ./tpm-setup.nix ];
+  imports = [ ../../modules/admin-commands.nix ./remote-unlock.nix ./wifi.nix ./tailscale.nix ./tpm-setup.nix ];
 
   options.boot.secureUnlock = {
     enable = lib.mkEnableOption "pinned LUKS root with Secure Boot, remote recovery and optional TPM unlocking";
@@ -76,6 +76,7 @@ in
       inherit (cfg) mapperName;
     };
     environment.systemPackages = [ cfg.volumeIdentityPackage ];
+    programs.adminCommands.commands.root-volume-key-id = [ "${cfg.volumeIdentityPackage}/bin/root-volume-key-id" ];
     boot.loader.systemd-boot.enable = lib.mkForce false;
     boot.loader.systemd-boot.editor = false;
     boot.lanzaboote = {

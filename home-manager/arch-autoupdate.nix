@@ -96,6 +96,8 @@ let
   };
 in
 {
+  imports = [ ../modules/admin-commands.nix ];
+  programs.adminCommands.commands.setup-system-auto-updates = [ "${installSystemAutoUpdates}/bin/install-system-auto-updates" ];
   home.packages = [ installSystemAutoUpdates ];
 
   home.activation.systemAutoUpdates = lib.hm.dag.entryAfter [ "installPackages" ] ''

@@ -55,7 +55,7 @@
   outputs = { self, atuin, nixpkgs, nixpkgs-darwin, flake-utils, nix-darwin, nix-darwin-26-05, home-manager, home-manager-26-05, nixos-wsl, nixos-vscode-server, impermanence, sops-nix, disko, lanzaboote, clipway }:
     let
       withCommonModules = constructor: args: constructor (args // {
-        modules = [ ./modules/nix-cache.nix ./modules/terminfo.nix ] ++ args.modules;
+        modules = [ ./modules/nix-cache.nix ./modules/terminfo.nix ./modules/admin-commands.nix ] ++ args.modules;
       });
       mkOverlays = nixpkgsSource: [
         (final: prev:
@@ -165,6 +165,10 @@
         in
         {
           checks = {
+            admin-commands = pkgs.runCommand "test-admin-commands" { nativeBuildInputs = [ pkgs.python3 ]; } ''
+              SYS_DISPATCHER=${./scripts/sys.py} python3 ${./scripts/test-sys.py}
+              touch "$out"
+            '';
             codex-configure = pkgs.runCommand "test-codex-configure"
               {
                 nativeBuildInputs = [ (pkgs.python3.withPackages (p: [ p.tomlkit ])) ];

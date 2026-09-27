@@ -80,7 +80,7 @@ not every filesystem block or its freshness.
 On the trusted installed system (including `warbler-bootstrap`), run:
 
 ```sh
-sudo root-volume-key-id
+sudo sys root-volume-key-id
 ```
 
 Or run directly from this checkout on Linux, without installing the command:
@@ -110,7 +110,7 @@ matches [systemd's volume-key identity](https://github.com/systemd/systemd/blob/
 For provisioning automation with an existing passphrase file in RAM:
 
 ```sh
-sudo root-volume-key-id --key-file /run/warbler-luks-password
+sudo sys root-volume-key-id --key-file /run/warbler-luks-password
 ```
 
 Use `--device /dev/disk/by-partlabel/disk-system-crypt` to override the device
@@ -432,7 +432,7 @@ the TPM helper. Commands below are instructions, not evidence of installation.
    ```sh
    cd /persist/nixos-config
    sbctl verify
-   warbler-secure-boot-backup
+   sys backup-secure-boot
    ```
 
    Inspect signature reports for the active bootloader and UKI; standalone
@@ -482,7 +482,7 @@ the TPM helper. Commands below are instructions, not evidence of installation.
 9. **Prepare remote unlock and optional disk enrollment in one rebuild.**
    Work from `/persist/nixos-config`. The remote installer has already recorded
    the new volume identity in `hosts/warbler/volume-identity.nix`. For a manual
-   install, run `sudo root-volume-key-id` and save the returned ID as a
+   install, run `sudo sys root-volume-key-id` and save the returned ID as a
    quoted Nix string in that file. Never reuse the previous installation's pin.
 
    Keep these normal configuration settings enabled:
@@ -537,7 +537,7 @@ Warbler enables `boot.secureUnlock.remoteUnlock.tailscale.enable` for a separate
 `warbler-unlock` node in the initrd. Follow the
 [Tailscale provisioning procedure](../../docs/secure-unlock.md#separate-tailscale-identity-in-the-initrd)
 before installing this configuration's boot files. Run the new system closure's
-`secure-unlock-setup enroll-tailscale`, authenticate the separate node and disable
+`sys setup-unlock-tailscale`, authenticate the separate node and disable
 its key expiry, then install the boot generation. Its state is sealed to TPM
 PCR 7; the normal host's `warbler` identity and state remain separate.
 
@@ -563,7 +563,7 @@ perform it. Secure Boot must enforce the trusted boot artifacts.
 Then run on Warbler:
 
 ```sh
-sudo secure-unlock-setup enroll-disk
+sudo sys setup-luks-tpm-unlock
 ```
 
 The helper prompts for the existing recovery passphrase, verifies it against
@@ -676,3 +676,21 @@ run its `bin/nixos-test-driver --keep-machine-state` for interactive debugging.
 References: [Lanzaboote Secure Boot setup](https://nix-community.github.io/lanzaboote/getting-started/enable-secure-boot.html),
 [Lanzaboote measured boot](https://nix-community.github.io/lanzaboote/how-to-guides/enable-measured-boot.html),
 [systemd-creds source documentation](https://github.com/systemd/systemd/blob/v260/man/systemd-creds.xml).
+
+## Custom administration commands
+
+Run `sys help` to list the repository commands installed on this host. For example:
+
+```sh
+sudo sys setup-luks-tpm-unlock
+sudo sys setup-unlock-tailscale
+sudo sys setup-unlock-credentials
+sudo sys root-volume-key-id
+sudo sys backup-secure-boot
+sudo sys account-passwords --help
+```
+
+The enrollment prerequisites above still apply. `sys` forwards arguments and exit
+status to the existing helpers; it does not elevate privileges automatically.
+Existing helper names remain available for compatibility. See
+[the command convention](../../docs/admin-commands.md) when adding an operation.

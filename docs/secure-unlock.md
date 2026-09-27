@@ -48,7 +48,7 @@ Configure wired networking for the running system separately.
 
 1. Install with the module enabled but `remoteUnlock.enable = false` and
    `tpmUnlock.enable = false`. A null `rootVolumeKeyId` is allowed during this
-   attended bootstrap only. After formatting, run `sudo root-volume-key-id`
+   attended bootstrap only. After formatting, run `sudo sys root-volume-key-id`
    and save its public output as a quoted Nix string in `volume-identity.nix`.
    The configured helper is installed with the module, including during bootstrap.
 2. Back up firmware keys, create signing keys, sign boot files, and enroll Secure
@@ -67,7 +67,7 @@ Configure wired networking for the running system separately.
 5. For optional disk enrollment, first retire any unpinned bootstrap boot entries
    and their measured-boot policy components using Lanzaboote's policy workflow.
    After booting the current pinned, TPM-enabled generation, run
-   `sudo secure-unlock-setup enroll-disk`. It verifies a token-free recovery
+   `sudo sys setup-luks-tpm-unlock`. It verifies a token-free recovery
    passphrase slot before adding a pcrlock TPM token. Reboot with console access
    available to verify automatic unlock and that recovery networking stays idle.
 
@@ -75,7 +75,7 @@ Enabling TPM support prepares the measured-boot policy (PCRs 0, 4 and 7);
 it does not enroll the disk. Enrollment remains an explicit command.
 Plaintext credential backups stay on encrypted storage; only TPM-sealed
 ciphertext enters the initrd. Existing SSH identities are preserved, including
-during resealing. `sudo secure-unlock-setup credentials` manually checks/reseals
+during resealing. `sudo sys setup-unlock-credentials` manually checks/reseals
 the configured credentials; rebuild afterward to include changed ciphertext.
 
 Warbler uses this module with its existing `/persist` paths, volume identity,
@@ -103,7 +103,7 @@ Provision the identity before installing the new boot generation:
    Run the helper from that new closure so it uses the new configuration:
 
    ```sh
-   sudo /nix/store/NEW-SYSTEM/sw/bin/secure-unlock-setup enroll-tailscale
+   sudo /nix/store/NEW-SYSTEM/sw/bin/sys setup-unlock-tailscale
    ```
 
 2. Complete the printed Tailscale login URL, registering the dedicated

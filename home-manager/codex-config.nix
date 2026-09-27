@@ -7,6 +7,8 @@ let
     else config.xdg.cacheHome;
 in
 {
+  imports = [ ../modules/admin-commands.nix ];
+  programs.adminCommands.commands.configure-codex = [ "${configure}/bin/codex-configure" ];
   home.packages = [ configure ];
   # Keep the live file out of home.file: Codex owns and edits it after seeding.
   home.activation.seedCodexConfig = lib.hm.dag.entryAfter [ "writeBoundary" ] ''

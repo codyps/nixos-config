@@ -44,8 +44,8 @@
   };
 
   programs.gnupg.agent = {
-    # Added to get prompted on ssh?
-    pinentryPackage = lib.mkForce pkgs.pinentry-gnome3;
+    # Show passphrase prompts through WSLg without GNOME's GCR prompt service.
+    pinentryPackage = lib.mkForce pkgs.pinentry-qt;
   };
 
   #virtualisation.docker = {

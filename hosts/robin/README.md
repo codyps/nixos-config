@@ -9,6 +9,25 @@ ZFS pool. ZFS imports from `/dev/robin-vg`, after its logical volume appears.
 Root rolls back to `robin/root@blank`; `/nix`, `/home`, `/persist`, and
 Syncthing data remain persistent. This layout requires formatting the disk.
 
+## Remote rebuild
+
+From the local checkout root, run:
+
+```sh
+nix run .#nixos-rebuild-remote -- robin
+# Apply immediately instead:
+nix run .#nixos-rebuild-remote -- robin switch
+```
+
+This archives the checkout and its flake inputs into Robin's Nix store over
+SSH as `cody@robin`, then runs `sudo nixos-rebuild` there using the archived
+source. The default action is `boot`: install the next boot generation without
+rebooting. Tracked uncommitted edits are included; add new files to Git first.
+The SSH name `robin` must resolve or be configured in your SSH config.
+Supported actions are `boot`, `switch`, `test`, `build`, `dry-build`, and
+`dry-activate`. The shortcut `nix run .#robin-nixos-rebuild-remote -- switch`
+is also available; omitting its action defaults to `boot`.
+
 ## Secrets and first boot
 
 `secrets.yaml` contains the DNS token copied from Ward and independent root

@@ -11,7 +11,7 @@ The installer currently uses Wi-Fi `wlp3s0` (rtw89_8852ae); `eno1` is unplugged.
 From the local checkout root, run:
 
 ```sh
-nix run .#warbler-nixos-rebuild-remote
+nix run .#nixos-rebuild-remote -- warbler
 ```
 
 This archives the checkout and its flake inputs into Warbler's Nix store over
@@ -19,7 +19,9 @@ SSH as `cody@warbler`, then runs `sudo nixos-rebuild boot` there using the
 archived source. It installs the next boot generation without rebooting.
 Tracked uncommitted edits are included; add new files to Git first.
 To select another rebuild action, use e.g.
-`nix run .#warbler-nixos-rebuild-remote -- switch` or `-- build`.
+`nix run .#nixos-rebuild-remote -- warbler switch` or `warbler build`.
+The existing `nix run .#warbler-nixos-rebuild-remote` shortcut remains available.
+The generic helper accepts any configuration host name and connects as `cody@HOST`.
 
 ## AI harness account
 

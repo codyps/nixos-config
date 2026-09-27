@@ -214,27 +214,48 @@
             mbx = pkgs.mbx;
             caddyFull = pkgs.caddyFull;
             nix-dynamic-machines = pkgs.nix-dynamic-machines;
-            warbler-nixos-rebuild-remote = pkgs.writeShellApplication {
-              name = "warbler-nixos-rebuild-remote";
+            nixos-rebuild-remote = pkgs.writeShellApplication {
+              name = "nixos-rebuild-remote";
               runtimeInputs = [ pkgs.nix pkgs.openssh pkgs.jq ];
               text = ''
-                if [[ $# -gt 1 ]]; then
-                  echo 'Usage: warbler-nixos-rebuild-remote [boot|switch|test|build|dry-build|dry-activate]' >&2
+                usage() {
+                  echo 'Usage: nixos-rebuild-remote HOST [boot|switch|test|build|dry-build|dry-activate]'
+                  echo 'Archives the current checkout to cody@HOST and rebuilds HOST there (default: boot; no reboot).'
+                }
+                if [[ "''${1:-}" == -h || "''${1:-}" == --help ]]; then
+                  usage
+                  exit 0
+                fi
+                if [[ $# -lt 1 || $# -gt 2 ]]; then
+                  usage >&2
                   exit 2
                 fi
-                action="''${1:-boot}"
+                host="$1"
+                if [[ ! "$host" =~ ^[a-zA-Z0-9][a-zA-Z0-9_-]*$ ]]; then
+                  echo "Invalid configuration host name: $host" >&2
+                  exit 2
+                fi
+                action="''${2:-boot}"
                 case "$action" in
-                  -h|--help)
-                    echo 'Usage: warbler-nixos-rebuild-remote [boot|switch|test|build|dry-build|dry-activate]'
-                    echo 'Archives the current checkout to cody@warbler and rebuilds there (default: boot; no reboot).'
-                    exit 0
-                    ;;
+                  -h|--help) usage; exit 0 ;;
                   boot|switch|test|build|dry-build|dry-activate) ;;
                   *) echo "Unsupported rebuild action: $action" >&2; exit 2 ;;
                 esac
-                source=$(nix flake archive --json --no-update-lock-file --to ssh-ng://cody@warbler . | jq -er .path)
-                printf -v command 'sudo nixos-rebuild %q --flake %q' "$action" "$source#warbler"
-                exec ssh -t cody@warbler "$command"
+                source=$(nix flake archive --json --no-update-lock-file --to "ssh-ng://cody@$host" . | jq -er .path)
+                printf -v command 'sudo nixos-rebuild %q --flake %q' "$action" "$source#$host"
+                exec ssh -t "cody@$host" "$command"
+              '';
+            };
+            warbler-nixos-rebuild-remote = pkgs.writeShellApplication {
+              name = "warbler-nixos-rebuild-remote";
+              text = ''
+                exec "${self.packages.${system}.nixos-rebuild-remote}/bin/nixos-rebuild-remote" warbler "$@"
+              '';
+            };
+            robin-nixos-rebuild-remote = pkgs.writeShellApplication {
+              name = "robin-nixos-rebuild-remote";
+              text = ''
+                exec "${self.packages.${system}.nixos-rebuild-remote}/bin/nixos-rebuild-remote" robin "$@"
               '';
             };
           } // pkgs.lib.optionalAttrs pkgs.stdenv.hostPlatform.isLinux {

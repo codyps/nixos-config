@@ -103,3 +103,70 @@ runtime. Exactly one patched desktop agent was running afterward. This
 session-only activation does not switch the system; activate the NixOS
 configuration to make the service and autostart suppression survive reboot.
 Host/guest clipboard round-trip testing remains an interactive console check.
+
+## Reclaiming Fusion disk space
+
+The `reclaim-space` specialisation adds an explicitly selected maintenance boot
+entry. It runs from the initrd while the ext4 root is unmounted:
+
+1. Verify the root filesystem UUID and type, inactive swap, and normal swap
+   signatures (refuse a possible hibernation image).
+2. Check that Fusion enables compaction, then run `e2fsck -f -p`.
+3. Run `zerofree` and flush the device. This writes only nonzero, unallocated
+   ext4 blocks; it does not create a file or consume the guest's free space.
+4. Send `disk.shrink` through `vmware-rpctool`, wait for the host's response,
+   and continue booting.
+
+The specialisation disables the fstab root check and orders maintenance after
+any root fsck job still emitted by the initrd generator. Maintenance runs its own
+full check before zeroing. The ordinary entry keeps its usual fsck behavior.
+Hibernation resume is disabled for the maintenance entry. Use a clean reboot;
+if maintenance detects a suspended swap image, boot normally and resume/shut down
+cleanly before trying again. Boot and swap partitions are not zeroed.
+
+To install the entries for the next boot without switching the running system:
+
+```sh
+sudo nixos-rebuild boot --flake ~/nixos-config#mifflin
+```
+
+Select the entry containing `reclaim-space` in the systemd-boot menu for that
+boot, leaving the ordinary entry as the default. Switching to the specialisation
+at runtime does not run its initrd. No periodic or normal-boot zeroing is enabled.
+Commit or stage the new module/script/test files before using the Git flake
+reference above; untracked files are excluded by Nix. Alternatively use
+`--flake path:/home/cody/nixos-config#mifflin` while reviewing an unstaged change.
+
+Progress is printed to the console and journal. After boot:
+
+```sh
+journalctl -b -u mifflin-reclaim-space.service
+```
+
+A filesystem check that needs a reboot or further repair, a zero/flush failure,
+or a rejected host shrink request fails the maintenance service and blocks the
+root mount. Reboot into the ordinary entry rather than repeatedly trying a
+failed maintenance pass. The journal distinguishes failed zeroing from successful
+zeroing followed by a failed host compaction request. Do not interrupt Fusion
+while its compaction is in progress; the operation deliberately has no short
+service timeout.
+
+Fusion's RPC compacts all eligible VM disks. Snapshot/preallocation restrictions
+still apply, and zero writes can temporarily allocate host storage even though
+no guest wipe files are created. Host allocation must be measured on macOS;
+command success is not a measurement of reclaimed bytes.
+
+Validation commands (no activation):
+
+```sh
+nix build path:$PWD#checks.x86_64-linux.mifflin-reclaim-space --no-link
+nix build path:$PWD#nixosConfigurations.mifflin.config.system.build.toplevel --no-link
+```
+
+The VM test boots the production initrd service on a disposable ext4 root with
+a simulated VMware RPC endpoint. A second VM uses actual e2fsck/zerofree on
+disposable disks to test identity/mount/swap/hibernation checks, host and
+filesystem failures, zeroed free blocks, preserved live file contents, and error
+reporting after host compaction failure. It does not validate Fusion's proprietary
+compactor. Actual maintenance boot and host space reclamation require a Fusion
+integration run; building the configuration does not execute either operation.

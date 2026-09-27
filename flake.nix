@@ -177,6 +177,7 @@
               touch "$out"
             '';
           } // pkgs.lib.optionalAttrs (system == "x86_64-linux") {
+            mifflin-reclaim-space = import ./hosts/mifflin/reclaim-space-test.nix { inherit pkgs; };
             codex-config-activation = import ./nixos-modules/codex-config-test.nix { inherit pkgs; };
             luks-volume-key-id = pkgs.runCommand "test-luks-volume-key-id"
               {

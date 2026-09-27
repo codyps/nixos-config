@@ -97,6 +97,7 @@ in
     [
       # Include the results of the hardware scan.
       ./hardware-configuration.nix
+      ./reclaim-space.nix
     ];
 
   # Bootloader.

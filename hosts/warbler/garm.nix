@@ -46,7 +46,7 @@ let
   '';
 in
 {
-  imports = [ ../../modules/admin-commands.nix ];
+  imports = [ ../../modules/admin-commands.nix ./garm-cache.nix ];
 
   sops.secrets.garm-app-key = {
     sopsFile = ./garm-app-key.enc.json;
@@ -110,7 +110,7 @@ in
         chain input {
           type filter hook input priority -10; policy accept;
           iifname "garm0" udp dport { 53, 67 } accept
-          iifname "garm0" tcp dport { 53, 9998 } accept
+          iifname "garm0" tcp dport { 53, 9998, 9443 } accept
           iifname "garm0" drop
         }
         chain forward {
@@ -122,7 +122,7 @@ in
     };
   };
   networking.firewall.interfaces.garm0 = {
-    allowedTCPPorts = [ 53 9998 ];
+    allowedTCPPorts = [ 53 9998 9443 ];
     allowedUDPPorts = [ 53 67 ];
   };
 

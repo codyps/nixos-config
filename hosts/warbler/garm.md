@@ -99,7 +99,8 @@ Pin a tested image fingerprint before relying on reproducible image contents.
 ## Isolation and checks
 
 `garm0` is a private NAT bridge. Guests can reach public IPv4 destinations, DNS,
-DHCP and the authenticated GARM metadata/callback/agent endpoints. nftables drops
+DHCP, the authenticated GARM metadata/callback/agent endpoints, and the build
+cache HTTPS endpoint described below. nftables drops
 guest traffic to private, link-local and tailnet ranges and all other host ports.
 Incus NIC filtering and port isolation block spoofing and direct guest-to-guest
 traffic. Guests have no host filesystem or daemon socket mounts. The controller
@@ -139,3 +140,60 @@ Upstream references:
 - https://github.com/cloudbase/garm/blob/v0.2.1/doc/scale-sets.md
 - https://github.com/cloudbase/garm/blob/v0.2.1/doc/credentials.md
 - https://github.com/cloudbase/garm-provider-incus/tree/v0.1.5
+
+## Persistent build caches
+
+`garm-cache.nix` provides an 80 GiB Bazel action cache for zpl-comparison and a
+separate 20 GiB sccache backend for zpl. Both use bazel-remote's disk storage and
+LRU eviction. `/var/lib/garm-bazel-cache` and `/var/lib/garm-rust-cache` persist
+across VM deletion and reboot (DynamicUser resolves these through
+`/var/lib/private`). There is no cloud backend or guest filesystem mount.
+
+Use `sudo sys garm-cache-status` for size/file counts and
+`sudo sys garm-cache-check` for live TLS, round-trip and authorization tests.
+Logs are in `journalctl -u garm-bazel-cache -u garm-rust-cache -u nginx`.
+
+Nginx exposes cache objects on `https://10.77.0.1:9443`, which is permitted only
+through the runner bridge firewall. Other host ports remain blocked. Backend
+listeners and status endpoints remain on loopback. Each repository has separate
+storage and credentials: URL prefixes alone do not isolate Bazel CAS data.
+
+The Rust backend accepts opaque sccache values through its HTTP action-cache
+API, with protobuf validation disabled only for that separate backend. Nginx
+maps sccache's sharded keys to flat action-cache keys. Static WebDAV collection
+metadata lets OpenDAL discover virtual parent directories without creating host
+filesystem directories; only those empty metadata responses are unauthenticated.
+Actual object reads and writes always require credentials.
+
+`garm-cache-auth.service` generates random read/write credentials and a private
+TLS CA under `/var/lib/garm-cache-auth`. ZPL credentials live in its `zpl/`
+subdirectory; comparison credentials live at the top level. Raw credentials and
+private keys never enter Git or the Nix store. Each repository has its own
+`WARBLER_CACHE_READ` secret containing `reader:PASSWORD`. Its
+`WARBLER_CACHE_WRITE` secret contains `writer:PASSWORD` exclusively in GitHub
+environment `warbler-cache-main`, whose selected deployment branch policy allows
+only the branch `main`, not tags or PR merge refs. Do not move write secrets to
+repository scope or loosen that policy. Other builds use `warbler-cache-read`;
+forks without secrets run uncached. Nginx rejects reader writes regardless of
+client flags.
+
+Both repositories pin the public CA at `.github/warbler-cache.crt`. Bazel uses a
+scoped credential helper; sccache receives credentials through masked environment
+variables. Passwords are absent from command arguments and bazelrc logs. ZPL's
+Clippy/test jobs disable incremental compilation as required by sccache and
+publish cache statistics; linking and unsupported calls still run normally.
+
+The CA expires after ten years. A daily `garm-cache-renew` timer renews the
+server leaf for 90 days when fewer than 30 days remain, then reloads nginx.
+Inspect dates with `openssl x509 -in FILE -noout -enddate` (`server.crt` is the
+CA; `tls.crt` is the leaf). CA rotation requires updating both repositories'
+public CA file. Cache preflight failures retry three times and fall back to
+uncached builds rather than blocking compilation; authorization boundary failures
+(reader unexpectedly able to write) remain fatal.
+Credential rotation requires synchronizing the corresponding GitHub secret.
+Back up the auth directory as secrets, or regenerate and resynchronize; cached
+build outputs are disposable and need not be backed up.
+
+Bazelisk and repository-download archives still use GitHub caching. Cargo/npm
+downloads and a prebuilt tool image are separate from these compiler/action
+caches; this does not make every Actions cache host-local.

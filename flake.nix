@@ -259,6 +259,7 @@
               '';
             };
           } // pkgs.lib.optionalAttrs pkgs.stdenv.hostPlatform.isLinux {
+            actions-vm-scaler = pkgs.callPackage ./nixpkgs/actions-vm-scaler.nix { };
             luks-volume-key-id = pkgs.callPackage ./scripts/luks-volume-key-id.nix { };
             # Refresh both platform-independent source bundles on Linux CI.
             caddy-source = (import nixpkgs {
@@ -292,6 +293,7 @@
           imports = [ lanzaboote.nixosModules.lanzaboote ./nixos-modules/secure-unlock ];
         };
         nixosModules.nix-dynamic-machines = import ./nixos-modules/nix-dynamic-machines.nix;
+        nixosModules.actions-vm-scaler = import ./nixos-modules/actions-vm-scaler.nix;
         darwinModules.nix-dynamic-machines = import ./nix-darwin/modules/nix-dynamic-machines.nix;
         nixosConfigurations = {
           warbler-bootstrap = self.nixosConfigurations.warbler.extendModules {

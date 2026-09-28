@@ -23,6 +23,11 @@ To select another rebuild action, use e.g.
 The existing `nix run .#warbler-nixos-rebuild-remote` shortcut remains available.
 The generic helper accepts any configuration host name and connects as `cody@HOST`.
 
+## GitHub Actions runners
+
+See [GARM runners](garm.md) for disposable Incus VMs, GitHub App setup,
+scale-to-zero configuration, isolation, and `sudo sys garm` administration.
+
 ## AI harness account
 
 See [AI harness account](ai-harnesses.md) for the restricted `cody-ai` user,

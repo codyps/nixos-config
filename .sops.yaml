@@ -32,7 +32,7 @@ creation_rules:
     - *admin_cody
     age:
     - *host_robin
-  - path_regex: hosts/warbler/secrets\.yaml$
+  - path_regex: hosts/warbler/(secrets\.yaml|garm-app-key\.enc\.json)$
     pgp:
     - *admin_cody
     age:

@@ -317,7 +317,15 @@
               sops-nix.nixosModules.sops
               ./nixos/common.nix
               ./hosts/warbler/configuration.nix
-              { nixpkgs = nixpkgsConfig; }
+              home-manager.nixosModules.home-manager
+              {
+                nixpkgs = nixpkgsConfig;
+                home-manager.useGlobalPkgs = true;
+                home-manager.useUserPackages = true;
+                home-manager.users.cody.imports = [
+                  ./home-manager/home.nix
+                ];
+              }
             ];
           };
 

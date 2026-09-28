@@ -4,6 +4,9 @@ pkgs.testers.runNixOSTest {
   nodes = {
     host = { lib, ... }: {
       imports = [ ./ai-container.nix ];
+      # Model the trusted Tailscale interface separately from the other LAN.
+      services.tailscale.interfaceName = "eth1";
+      virtualisation.vlans = [ 1 2 ];
       containers.ai.macvlans = lib.mkForce [ "eth1" ];
       containers.ai.config = {
         systemd.network.networks."10-lan".matchConfig.Name = lib.mkForce "mv-eth1";
@@ -27,6 +30,7 @@ pkgs.testers.runNixOSTest {
       virtualisation.cores = 4;
     };
     client = { ... }: {
+      virtualisation.vlans = [ 1 2 ];
       services.dnsmasq = {
         enable = true;
         settings = {
@@ -40,6 +44,7 @@ pkgs.testers.runNixOSTest {
     };
   };
   testScript = ''
+    import json
     import shlex
 
     start_all()
@@ -55,6 +60,18 @@ pkgs.testers.runNixOSTest {
     host.succeed(inside + "sh -c " + shlex.quote("echo " + shlex.quote(key) + " > /home/cody-ai/.ssh/authorized_keys; chown cody-ai:cody-ai /home/cody-ai/.ssh/authorized_keys"))
     ssh = "ssh -n -o StrictHostKeyChecking=accept-new -i /root/ai-key cody-ai@192.168.1.100 "
     client.wait_until_succeeds(ssh + "true")
+    host.wait_for_unit("ai-container-ssh.socket")
+    host.wait_until_succeeds("ip -4 address show ai-ssh | grep 10.79.0.1/24")
+    host.wait_until_succeeds(inside + "ip -4 address show ai-ssh | grep 10.79.0.2/24")
+    def host_address(interface):
+        addresses = json.loads(host.succeed(f"ip -j -4 address show {interface}"))[0]["addr_info"]
+        return next(address["local"] for address in addresses if address["scope"] == "global")
+    proxy_ssh = "ssh -n -o StrictHostKeyChecking=accept-new -i /root/ai-key -p 2223 cody-ai@" + host_address("eth1") + " "
+    assert client.succeed(proxy_ssh + "hostname").strip() == "warbler-ai"
+    client.fail("nc -z -w 3 " + host_address("eth2") + " 2223")
+    # The private link must not replace the macvlan DHCP default route.
+    host.succeed(inside + "ip -4 route show default | grep mv-eth1")
+    host.fail(inside + "ip -4 route show default | grep ai-ssh")
     client.succeed(ssh + shlex.quote("set -e; test $(hostname) = warbler-ai; test $(id -un) = cody-ai; test ! -e /home/cody-ai/host-only; test ! -e /persist/host-only; /bin/bash -c 'echo bash-ok'; /bin/kill -0 $$; /usr/bin/env bash -c true; systemctl --user is-active codex-ai; test $(loginctl show-user cody-ai -p Linger --value) = yes; nix store ping --store daemon"))
     # Same service access from a background task, without an interactive login.
     client.succeed(ssh + shlex.quote("systemd-run --user --wait --pipe /bin/bash -lc 'test -S /run/user/1001/bus; systemctl --user is-active codex-ai; command -v git uv pip node; touch ~/workspaces/service-proof'"))
@@ -67,6 +84,7 @@ pkgs.testers.runNixOSTest {
     host.wait_until_succeeds(inside + "test -S /home/cody-ai/.codex/app-server-control/app-server-control.sock")
     host.succeed(inside + "test -f /home/cody-ai/workspaces/service-proof")
     host.succeed(inside + "test -f /home/cody-ai/workspaces/codex-proof")
+    client.wait_until_succeeds(proxy_ssh + "true")
     host.succeed("test -f /home/cody-ai/host-only")
   '';
 }

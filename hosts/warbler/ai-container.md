@@ -28,6 +28,28 @@ It has a separate SSH host identity. A client alias can use `Host warbler-ai`,
 `HostName warbler-ai.local`, and `User cody-ai`; point the desktop connection at
 this alias to use the alternate environment.
 
+Through Warbler's Tailscale address, use port **2223** (2222 remains reserved
+for initrd SSH):
+
+```sh
+ssh -p 2223 cody-ai@warbler.little-moth.ts.net
+```
+
+In t3, use that hostname, user `cody-ai`, and SSH port `2223`. This endpoint
+presents the container's SSH host key, not Warbler's host key. The socket binds
+only to `tailscale0`; port 2223 is not exposed on the LAN. A dedicated private
+veth pair (`10.79.0.1/24` on the host, `10.79.0.2/24` in the guest) carries the proxy
+traffic without changing the guest's LAN DHCP lease or default route. No
+Tailscale subnet route or separate container Tailscale identity is required.
+
+Warbler also advertises **`10.79.0.2/32`** as a Tailscale subnet route. Once
+approved in the Tailscale admin console (or by an auto-approver), clients that
+accept subnet routes can use `ssh cody-ai@10.79.0.2` on the normal port 22.
+Only the container IP is advertised; the rest of `10.79.0.0/24` is not.
+Tailscale's default subnet SNAT provides the return path, preserving the
+container's LAN default route. The `10.78.0.0/24` range belongs to the Actions
+VM scaler and must not be reused for this container.
+
 Macvlan does not allow direct communication between the host and its own child
 interface. Administer locally through the container manager instead:
 

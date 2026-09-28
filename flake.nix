@@ -629,6 +629,12 @@
                 bash-prompt-prefix = (nix:$name)\040
                 #upgrade-nix-store-path-url = "https://install.determinate.systems/nix-upgrade/stable/universal";
               '';
+
+              # Home Manager's .zshrc runs compinit after extending fpath with
+              # the user profile. A second compinit here sees a different
+              # file count, so each call invalidates the other's ~/.zcompdump
+              # and startup rebuilds the completion dump twice (1.5-5s).
+              programs.zsh.enableGlobalCompInit = false;
             })
             ./nix-darwin/configuration.nix
             ({ pkgs, ... }: {

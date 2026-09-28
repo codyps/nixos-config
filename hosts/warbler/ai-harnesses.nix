@@ -69,6 +69,8 @@ let
   # The login shell itself enters the sandbox: sshd invokes ForceCommand via
   # this shell, so no user-controlled Bash startup file runs on the host.
   # Privileged Bash mode ignores BASH_ENV and imported shell functions.
+  # Use the generated certificate directory: /etc/ssl/certs contains links
+  # through /etc/static, which is deliberately absent from the sandbox.
   sshSandbox = (pkgs.writeScriptBin "ai-sandbox-shell" ''
     #!${pkgs.bash}/bin/bash -p
     set -euo pipefail
@@ -83,18 +85,27 @@ let
     if [ "''${1-}" = -c ] && [ "''${2-}" = internal-sftp ]; then
       set -- -c ${pkgs.openssh}/libexec/sftp-server
     fi
+    command=( ${pkgs.bashInteractive}/bin/bash -l "$@" )
+    if [ -t 0 ] && [ -t 1 ]; then
+      # --new-session detaches the SSH controlling terminal. Give terminal
+      # sessions their own PTY inside the sandbox for job control and signals.
+      # Pipe-based commands (including SFTP and RPC) stay byte-transparent.
+      command=( ${pkgs.util-linux}/bin/script --quiet --return /dev/null -- "''${command[@]}" )
+    fi
     exec ${pkgs.bubblewrap}/bin/bwrap \
       --unshare-user --unshare-pid --unshare-ipc --unshare-uts \
       --die-with-parent --new-session --cap-drop ALL \
       --ro-bind /nix/store /nix/store \
       --ro-bind /run/current-system /run/current-system \
+      --ro-bind /run/current-system/etc/ssl/certs /etc/ssl/certs \
+      --ro-bind /lib64/ld-linux-x86-64.so.2 /lib64/ld-linux-x86-64.so.2 \
       --ro-bind /etc/profiles/per-user/${user} /etc/profiles/per-user/${user} \
       --ro-bind /nix/var/nix/profiles /nix/var/nix/profiles \
       --ro-bind /nix/var/nix/daemon-socket /nix/var/nix/daemon-socket \
       ${lib.concatMapStringsSep " \\\n      " (path: "--ro-bind-try ${path} ${path}") [
         "/etc/passwd" "/etc/group" "/etc/nsswitch.conf" "/etc/hosts"
         "/etc/resolv.conf" "/etc/localtime" "/etc/profile" "/etc/bashrc"
-        "/etc/bashrc.local" "/etc/inputrc" "/etc/nix" "/etc/ssl/certs"
+        "/etc/bashrc.local" "/etc/inputrc" "/etc/nix"
         "/etc/termcap" "/etc/terminfo"
       ]} \
       --dir /bin --symlink ${pkgs.bash}/bin/bash /bin/sh \
@@ -105,7 +116,7 @@ let
       --setenv SHELL ${pkgs.bashInteractive}/bin/bash \
       --setenv HOME ${home} \
       --setenv PATH /etc/profiles/per-user/${user}/bin:/run/current-system/sw/bin \
-      -- ${pkgs.bashInteractive}/bin/bash -l "$@"
+      -- "''${command[@]}"
   '').overrideAttrs (old: {
     passthru = (old.passthru or { }) // { shellPath = "/bin/ai-sandbox-shell"; };
   });

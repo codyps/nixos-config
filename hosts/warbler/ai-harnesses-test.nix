@@ -1,4 +1,11 @@
 { pkgs }:
+let
+  genericLinuxExecutable = pkgs.runCommand "generic-linux-hello" { nativeBuildInputs = [ pkgs.patchelf ]; } ''
+    cp ${pkgs.hello}/bin/hello "$out"
+    chmod u+w "$out"
+    patchelf --set-interpreter /lib64/ld-linux-x86-64.so.2 "$out"
+  '';
+in
 pkgs.testers.runNixOSTest {
   name = "warbler-ai-harnesses";
   nodes.machine = { lib, ... }: {
@@ -39,6 +46,11 @@ pkgs.testers.runNixOSTest {
     machine.succeed("ssh-keygen -q -t ed25519 -N \"\" -f /root/ai-test-key")
     machine.succeed("install -d -m 700 -o cody-ai -g cody-ai /home/cody-ai/.ssh; cp /root/ai-test-key.pub /home/cody-ai/.ssh/authorized_keys; chown cody-ai:cody-ai /home/cody-ai/.ssh/authorized_keys")
     ssh = "ssh -n -o StrictHostKeyChecking=accept-new -i /root/ai-test-key cody-ai@localhost"
+    machine.succeed("python3 ${../../scripts/test-warbler-ai-terminal.py} " + ssh.replace("ssh -n ", "ssh -tt ", 1))
+    # Downloaded Linux executables need the host's nix-ld entry point.
+    assert "Hello, world!" in machine.succeed(ssh + " 'test ! -w /lib64/ld-linux-x86-64.so.2 && ${genericLinuxExecutable}'")
+    # Standard CA paths must resolve without exposing the rest of /etc/static.
+    machine.succeed(ssh + " 'set -e; test ! -e /etc/static; test -s /etc/ssl/certs/ca-bundle.crt; test -s /etc/ssl/certs/ca-certificates.crt; test ! -w /etc/ssl/certs/ca-bundle.crt'")
     # Startup files must never execute before confinement, including remote commands.
     machine.succeed("echo 'touch ~/startup-ran; cat /persist/public-test > ~/startup-leak 2>/dev/null || true' > /home/cody-ai/.bashrc; cp /home/cody-ai/.bashrc /home/cody-ai/.bash_profile; chown cody-ai:cody-ai /home/cody-ai/.bashrc /home/cody-ai/.bash_profile")
     machine.succeed(ssh + " 'set -e; test ! -e /persist; test ! -e /run/secrets; test ! -e /home/cody; test ! -e /root; test ! -e /run/user; test ! -e /run/dbus; test ! -e /run/systemd/private; test ! -e /proc/1/root/persist; test ! -e /dev/sda'")

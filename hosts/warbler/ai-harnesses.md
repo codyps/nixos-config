@@ -100,6 +100,8 @@ Interactive shells, remote commands, and SFTP/SCP use this sandbox. The home is
 writable; the Nix store, system tools, and selected configuration are read-only.
 Other homes, `/persist`, host secrets, and administrative sockets are absent.
 Each session has private temporary storage, devices, and a PID namespace.
+Terminal sessions get a private controlling PTY inside the sandbox so job
+control and Ctrl-C work. Non-terminal SSH commands retain direct byte streams.
 Network access and nested user namespaces remain available for development.
 The Nix daemon socket is deliberately exposed: daemon builds run outside the
 SSH sandbox under the host's Nix build policy. User profile links in the host

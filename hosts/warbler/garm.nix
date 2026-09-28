@@ -68,8 +68,8 @@ in
           "features.images" = "true";
           "features.profiles" = "true";
           "features.networks" = "false";
-          "limits.instances" = "2";
-          "limits.virtual-machines" = "2";
+          "limits.instances" = "3";
+          "limits.virtual-machines" = "3";
           "limits.containers" = "0";
         };
       }];

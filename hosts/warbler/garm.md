@@ -2,8 +2,8 @@
 
 Warbler runs GARM 0.2.1 with the Incus provider 0.1.5. Each runner is a
 disposable KVM VM. GitHub scale sets allow zero idle VMs without a public webhook.
-The Incus `garm` project is configured for two runner VMs, with each of the two
-repository scale sets limited to one concurrent runner. Each VM has 4 vCPUs,
+The Incus `garm` project is configured for three runner VMs, with each of the two
+repository scale sets allowed to use all three slots. Each VM has 4 vCPUs,
 8 GiB RAM and a 40 GiB disk. Excess work queues; these are capacity limits,
 not reservations.
 
@@ -49,8 +49,9 @@ The private App `codyps-warbler-garm` is installed only on `codyps/zpl` and
 - GARM repository ID: `e73b49df-0546-4662-965e-e75ade5ca8a1`.
 - `zpl-comparison` repository ID: `a6b37378-d884-40d1-99d9-eeb2871f6076`;
   its separate `warbler-linux` scale set has GARM ID `2`. Both scale sets use
-  min 0/max 1 to avoid racing each other against the shared project quota.
-  Both repositories share the Incus project's two-VM total limit.
+  min 0/max 3, so either repository can use the full capacity when the other is idle.
+  Both repositories share the Incus project's three-VM total limit. Concurrent
+  demand can hit this quota; capacity is not reserved for either repository.
 - The App key is SOPS-encrypted in `garm-app-key.enc.json` and decrypted to
   root-only `/run/secrets/garm-app-key`. GARM also encrypts its imported copy in
   its database. Key rotation requires updating both copies.
@@ -84,8 +85,15 @@ Create a scale set for each repository ID returned above:
 ```sh
 sudo sys garm scaleset add --repo REPOSITORY_ID --provider-name incus \
   --image images:ubuntu/24.04/cloud --flavor runner --name warbler-linux \
-  --min-idle-runners 0 --max-runners 1 --enabled
+  --min-idle-runners 0 --max-runners 3 --enabled
 sudo sys garm scaleset list
+```
+
+Scale set limits are stored in GARM's database. To update the existing scale sets:
+
+```sh
+sudo sys garm scaleset update 1 --min-idle-runners 0 --max-runners 3
+sudo sys garm scaleset update 2 --min-idle-runners 0 --max-runners 3
 ```
 
 Select this scale set with `runs-on: warbler-linux` in a workflow. Personal-account

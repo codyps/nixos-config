@@ -53,8 +53,6 @@ in
   #  corepack() { _nvm_lazy_load || return; corepack "$@"; }
   #'';
 
-  programs.zsh.completionInit = "";
-
   # Keychain ACLs identify the executable reading a password by its designated
   # code-signing requirement. Sign a mutable copy with a certificate-backed
   # identity so "Always Allow" survives package rebuilds and agent restarts.

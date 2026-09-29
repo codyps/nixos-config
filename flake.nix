@@ -703,7 +703,6 @@
                 imports = [
                   ./nix-darwin/home.nix
                   ./home-manager/home.nix
-                  ./home-manager/claude-quota-bar.nix
                 ];
                 home.file = {
                   ".ssh/config.d/1password".text = ''

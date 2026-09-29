@@ -35,6 +35,21 @@ for initrd SSH):
 ssh -p 2223 cody-ai@warbler.little-moth.ts.net
 ```
 
+The short name `warbler` can resolve to LAN addresses before its Tailscale
+address, causing port 2223 connections to stall. To keep using
+`ssh cody-ai@warbler -p 2223`, add this to your SSH client configuration
+(on clients that include `~/.ssh/config.d/*`, use a file in that directory):
+
+```sshconfig
+Match originalhost warbler exec "test %p = 2223"
+  HostName warbler.little-moth.ts.net
+
+Host *
+```
+
+This selects the Tailscale hostname only for port 2223; ordinary host SSH
+continues to use its existing address selection.
+
 In t3, use that hostname, user `cody-ai`, and SSH port `2223`. This endpoint
 presents the container's SSH host key, not Warbler's host key. The socket binds
 only to `tailscale0`; port 2223 is not exposed on the LAN. A dedicated private

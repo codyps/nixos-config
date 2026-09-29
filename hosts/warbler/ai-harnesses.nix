@@ -98,6 +98,7 @@ let
       --ro-bind /nix/store /nix/store \
       --ro-bind /run/current-system /run/current-system \
       --ro-bind /run/current-system/etc/ssl/certs /etc/ssl/certs \
+      --ro-bind /run/current-system/etc/gitconfig /etc/gitconfig \
       --ro-bind /lib64/ld-linux-x86-64.so.2 /lib64/ld-linux-x86-64.so.2 \
       --ro-bind /etc/profiles/per-user/${user} /etc/profiles/per-user/${user} \
       --ro-bind /nix/var/nix/profiles /nix/var/nix/profiles \
@@ -196,7 +197,7 @@ let
   '';
 in
 {
-  imports = [ ../../nixos-modules/codex-config.nix ];
+  imports = [ ../../nixos-modules/codex-config.nix ../../nixos-modules/git-gh-credentials.nix ];
 
   options.services.codex-ai.stdioForwarder.enable = lib.mkEnableOption
     "the custom JSON-lines stdio compatibility adapter for Codex";

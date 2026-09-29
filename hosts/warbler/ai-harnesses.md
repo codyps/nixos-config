@@ -20,6 +20,21 @@ access. It opens no additional firewall ports. The SSH-facing native `codex app-
 command connects to this same process, so the desktop and phone use the same
 account, history, workspaces, and service restrictions.
 
+## GitHub HTTPS authentication
+
+Warbler and its AI container set `programs.git.config.credential` to use
+`gh auth git-credential` for GitHub and Gist HTTPS URLs. Nix generates
+`/etc/gitconfig`; the host AI SSH sandbox mounts that file read-only. Each
+account uses its own active `gh` login or `GH_TOKEN`/`GITHUB_TOKEN`; credentials
+are not copied between accounts or written into the Nix store.
+
+Existing SSH remotes remain SSH. Use an `https://github.com/…` remote to use
+these credentials. For a repository-specific replacement helper, first reset
+Git's inherited helper list with `git config --local --add credential.helper ''`,
+then add the desired helper. Git tries helpers in order, so merely appending
+another helper does not override the default. To opt out persistently, set an
+empty global helper for the relevant HTTPS host.
+
 ## Activate and authenticate
 
 After reviewing/building the configuration, deploy with the existing remote

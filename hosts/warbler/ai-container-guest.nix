@@ -62,7 +62,7 @@ in
 {
   programs.adminCommands.commands.install-hermes = [ "${installHermes}/bin/install-hermes" ];
   networking.hostName = "warbler-ai";
-  imports = [ ../../nixos-modules/codex-config.nix ];
+  imports = [ ../../nixos-modules/codex-config.nix ../../nixos-modules/git-gh-credentials.nix ];
   programs.codex-config.users = [ user ];
   system.stateVersion = "26.05";
   time.timeZone = "America/New_York";

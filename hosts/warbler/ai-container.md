@@ -58,6 +58,10 @@ ssh cody@warbler 'sudo nixos-container run ai -- ip -4 address show mv-eno1'
 ssh -t cody@warbler 'sudo nixos-container root-login ai'
 ```
 
+GitHub HTTPS operations default to this account's own `gh` login through
+Nix-managed `/etc/gitconfig`. See [GitHub HTTPS authentication](ai-harnesses.md#github-https-authentication)
+for defaults and repository overrides.
+
 ## Services and compatibility
 
 The container runs its own systemd, D-Bus, and SSH server. Its `cody-ai` user

@@ -258,6 +258,8 @@
                 exec "${self.packages.${system}.nixos-rebuild-remote}/bin/nixos-rebuild-remote" robin "$@"
               '';
             };
+          } // pkgs.lib.optionalAttrs pkgs.stdenv.hostPlatform.isDarwin {
+            claude-quota-bar = pkgs.claude-quota-bar;
           } // pkgs.lib.optionalAttrs pkgs.stdenv.hostPlatform.isLinux {
             actions-vm-scaler = pkgs.callPackage ./nixpkgs/actions-vm-scaler.nix { };
             luks-volume-key-id = pkgs.callPackage ./scripts/luks-volume-key-id.nix { };
@@ -701,6 +703,7 @@
                 imports = [
                   ./nix-darwin/home.nix
                   ./home-manager/home.nix
+                  ./home-manager/claude-quota-bar.nix
                 ];
                 home.file = {
                   ".ssh/config.d/1password".text = ''

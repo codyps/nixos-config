@@ -28,6 +28,16 @@ The generic helper accepts any configuration host name and connects as `cody@HOS
 See [GARM runners](garm.md) for disposable Incus VMs, GitHub App setup,
 scale-to-zero configuration, isolation, and `sudo sys garm` administration.
 
+For macOS image preparation, see the [QEMU image builder](../../scripts/actions-vm-image/README.md).
+Warbler enables `sys actions-vm-image` and the macOS autoscaler with one shared VM
+slot. It uses `/var/lib/actions-vm-images/sequoia-clt-auto-v1` (Sequoia 15.8.1,
+CLT 16.4) and discovers repositories granted to the existing GARM GitHub App.
+Use `runs-on: warbler-macos-intel` for CLI macOS jobs; full Xcode is not installed.
+Inspect `systemctl status actions-vm-scaler` and
+`journalctl -u actions-vm-scaler` for controller status. GARM continues serving
+its separate Linux scale sets.
+See [validation results](macos-image-validation.md) for the tested boundary and temporary workspace.
+
 ## AI harness account
 
 See [AI harness account](ai-harnesses.md) for the restricted `cody-ai` user,

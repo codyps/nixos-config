@@ -1,0 +1,14 @@
+#!/bin/bash
+set -euo pipefail
+# Installer supplies the destination volume as argument three.
+target=${3:?missing installer target}
+[[ -d "$target" ]]
+mkdir -p "$target/var/db"
+touch "$target/var/db/.AppleSetupDone"
+# startosinstall can install extra packages after launchd has scanned this
+# directory on the first boot. Load it now when installing into the live OS;
+# an offline target will instead load the daemon on its next boot.
+if [[ "$target" == / ]]; then
+    /bin/launchctl bootstrap system /Library/LaunchDaemons/org.actions-vm.image-firstboot.plist
+fi
+exit 0

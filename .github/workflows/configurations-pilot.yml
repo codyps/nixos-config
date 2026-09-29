@@ -45,6 +45,8 @@ jobs:
         run: python3 scripts/test-configuration-pilot.py
       - name: Test Caddy hash updater
         run: python3 scripts/test-update-caddy-hashes.py
+      - name: Test macOS image automation
+        run: python3 scripts/test-actions-vm-image.py
       - name: Test mutable Codex configuration
         run: nix build .#checks.x86_64-linux.codex-configure --no-link
       - name: Test dynamic builder modules

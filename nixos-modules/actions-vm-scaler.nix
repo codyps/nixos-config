@@ -17,6 +17,7 @@ let
       inherit taps;
     };
   });
+  serviceConfigPath = if cfg.imageConfigFile == null then runtimeConfig else "/run/actions-vm-scaler/config.json";
   networkSetup = pkgs.writeShellScript "actions-vm-network" ''
     set -eu
     ${pkgs.iproute2}/bin/ip link show avmbr0 >/dev/null 2>&1 || ${pkgs.iproute2}/bin/ip link add avmbr0 type bridge
@@ -42,6 +43,11 @@ in
     privateKeyFile = lib.mkOption {
       type = lib.types.str;
       description = "Runtime GitHub App PEM path, typically a SOPS secret. Never a Nix store path.";
+    };
+    imageConfigFile = lib.mkOption {
+      type = lib.types.nullOr lib.types.str;
+      default = null;
+      description = "Runtime published vm.json path. Image settings are merged with settings.vm; module executable and TAP settings take precedence.";
     };
     settings = lib.mkOption {
       type = format.type;
@@ -127,6 +133,11 @@ in
       };
     };
     systemd.services.actions-vm-scaler = {
+      preStart = lib.mkIf (cfg.imageConfigFile != null) ''
+        ${pkgs.jq}/bin/jq -s '.[0] as $base | $base + {vm: (.[1] + $base.vm)}' \
+          ${runtimeConfig} ${lib.escapeShellArg cfg.imageConfigFile} > /run/actions-vm-scaler/config.json
+        ${package}/bin/actions-vm-scaler check /run/actions-vm-scaler/config.json
+      '';
       description = "GitHub Actions macOS VM scale set";
       wantedBy = [ "multi-user.target" ];
       wants = [ "network-online.target" ];
@@ -137,7 +148,9 @@ in
         User = "actions-vm-scaler";
         Group = "actions-vm-scaler";
         SupplementaryGroups = [ "kvm" ];
-        ExecStart = "${package}/bin/actions-vm-scaler run ${runtimeConfig}";
+        ExecStart = "${package}/bin/actions-vm-scaler run ${serviceConfigPath}";
+        RuntimeDirectory = "actions-vm-scaler";
+        RuntimeDirectoryMode = "0700";
         LoadCredential = [ "github-app-key:${cfg.privateKeyFile}" ];
         StateDirectory = "actions-vm-scaler";
         StateDirectoryMode = "0700";

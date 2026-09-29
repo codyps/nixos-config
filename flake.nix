@@ -270,6 +270,8 @@
               inherit system;
               overlays = mkOverlays nixpkgs-darwin;
             }).caddyFull.src;
+          } // pkgs.lib.optionalAttrs (system == "x86_64-linux") {
+            actions-vm-image = pkgs.callPackage ./nixpkgs/actions-vm-image.nix { };
           };
           devShells.default = pkgs.mkShell {
             nativeBuildInputs = with pkgs; [
@@ -293,6 +295,7 @@
           imports = [ lanzaboote.nixosModules.lanzaboote ./nixos-modules/secure-unlock ];
         };
         nixosModules.nix-dynamic-machines = import ./nixos-modules/nix-dynamic-machines.nix;
+        nixosModules.actions-vm-image = import ./nixos-modules/actions-vm-image.nix;
         nixosModules.actions-vm-scaler = import ./nixos-modules/actions-vm-scaler.nix;
         darwinModules.nix-dynamic-machines = import ./nix-darwin/modules/nix-dynamic-machines.nix;
         nixosConfigurations = {

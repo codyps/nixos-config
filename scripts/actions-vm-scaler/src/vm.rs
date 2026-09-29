@@ -270,6 +270,14 @@ impl Manager {
             .arg(&disk))
         .await
         .context("creating disposable disk")?;
+        // IDE hard disks require a writable block node. Keep the shared boot
+        // image immutable by giving OpenCore its own disposable overlay too.
+        run(Command::new(&self.config.vm.qemu_img)
+            .args(["create", "-f", "qcow2", "-F", "qcow2", "-b"])
+            .arg(&self.config.vm.opencore_disk)
+            .arg(dir.join("opencore.qcow2")))
+        .await
+        .context("creating disposable OpenCore disk")?;
         fs::copy(&self.config.vm.firmware_vars, dir.join("nvram.fd"))?;
         fs::set_permissions(dir.join("nvram.fd"), fs::Permissions::from_mode(0o600))?;
         run(Command::new(&self.config.vm.xorriso)
@@ -403,8 +411,8 @@ pub fn qemu_args(config: &Config, dir: &Path, name: &str, slot: usize, id: Uuid)
         "ich9-ahci,id=sata".into(),
         "-drive".into(),
         format!(
-            "id=opencore,if=none,format=qcow2,readonly=on,file={}",
-            v.opencore_disk.display()
+            "id=opencore,if=none,format=qcow2,file={}",
+            dir.join("opencore.qcow2").display()
         ),
         "-device".into(),
         "ide-hd,bus=sata.2,drive=opencore".into(),

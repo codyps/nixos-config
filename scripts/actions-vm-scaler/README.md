@@ -21,8 +21,9 @@ keep state stable across renames. Each repository has its own listener, retry lo
 registration namespace and persistent state under `repositories/<id>/`.
 
 The scope remains one App installation on github.com and one Linux host per
-process. GHES, multiple installations, multi-host placement, automatic image
-installation and rolling image builds are not implemented. Keep GARM handling the
+process. GHES, multiple installations, multi-host placement and rolling image builds are not implemented. The companion
+[image builder](../actions-vm-image/README.md) automates image preparation,
+installation, first-boot setup, provisioning, sealing, and publication. Keep GARM handling the
 existing Linux scale sets. Supplying a nonempty `github_url` explicitly selects
 legacy single-repository/organization mode; **omit it for all granted repositories**.
 
@@ -70,8 +71,11 @@ not redistribute macOS, firmware, OpenCore or SMC data.
 
 ## NixOS service
 
-The exported `nixosModules.actions-vm-scaler` module is opt-in. No host is enabled
-by importing this repository's flake. Example in an x86_64 Linux host module:
+The exported `nixosModules.actions-vm-scaler` module is opt-in. Warbler enables it
+with capacity one and the published Sequoia/CLT image. Set `imageConfigFile` to a
+published `vm.json` to load its hardware settings at service startup without
+copying them into Nix source. Explicit `settings.vm` values and the module's
+executable/TAP settings take precedence. Example in an x86_64 Linux host module:
 
 ```nix
 {
@@ -201,7 +205,7 @@ Do not run multiple controllers against the same repository scale set or share
 state directories across hosts.
 
 The golden disk and OpenCore disk are never written by the manager. Guest writes
-go to private overlays; NVRAM is copied per instance. Budget physical disk space
+go to private OS and OpenCore overlays; NVRAM is copied per instance. Budget physical disk space
 for **capacity × guest disk virtual size**, plus images and image publication.
 Deleting a VM deletes its local QEMU log as well; use Actions artifact/log upload
 for build diagnostics. QEMU logs are available in `runs/avm-*/qemu.log` while the

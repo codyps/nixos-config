@@ -430,7 +430,7 @@ fn qemu_owns_writable_disks_and_has_no_host_shares_or_daemonization() {
     )));
     assert!(args
         .iter()
-        .any(|s| s.contains("readonly=on") && s.contains("opencore.qcow2")));
+        .any(|s| s.ends_with("run/opencore.qcow2") && !s.contains("readonly=on")));
     assert!(args
         .iter()
         .any(|s| s == "tap,id=net0,ifname=avm1,script=no,downscript=no"));
@@ -629,6 +629,7 @@ async fn disposable_vms_are_bounded_redelivery_safe_and_cleaned_on_completion() 
     for name in &names {
         let dir = manager.dir(name).unwrap();
         assert!(dir.join("disk.qcow2").exists());
+        assert!(dir.join("opencore.qcow2").exists());
         assert!(dir.join("seed.iso").exists());
         assert!(!dir.join("seed").exists());
         assert_eq!(fs::read_to_string(dir.join("nvram.fd")).unwrap(), "golden");

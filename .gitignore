@@ -5,3 +5,4 @@ result
 .cloudflare
 __pycache__/
 .security-audit/
+/target

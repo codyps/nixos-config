@@ -38,7 +38,7 @@ configuration. The controller never runs the installer. The runtime requires:
 - A matching raw OVMF code image and raw, initialized OVMF variable-store template.
 - Tested QEMU machine, CPU, SMBIOS and SMC parameters for this image and host.
   Supply these as `hardware_args` option/value pairs, not a shell command.
-- A local, unprivileged `runner` account with home `/Users/runner`, and a current
+- A local `runner` account with passwordless sudo inside the disposable VM with home `/Users/runner`, and a current
   **osx-x64** GitHub Actions runner extracted to `/Users/runner/actions-runner`.
   Do not run `config.sh` or register the golden image.
 - Xcode or CLT, accepted licenses/first-launch setup, and required build tools

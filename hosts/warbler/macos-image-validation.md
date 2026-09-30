@@ -150,3 +150,86 @@ address filtering and bridge anti-spoof rules are present on the running host.
 All 21 scaler tests and 16 image tests passed in their respective validation
 runs, and the activated system built successfully. A real GitHub job and active
 guest network-isolation probes remain separate acceptance work.
+
+
+## Session refresh repair and first Actions job (2026-09-29)
+
+The scaler accepted initial sessions but rejected token-refresh responses because
+GitHub returns `statistics: null` on refresh. The decoder now models session
+statistics as optional, matching the upstream protocol. Initial missing statistics
+start with zero demand until queue messages supply counts. The queue-refresh test
+uses the observed null response and verifies polling, acquisition, and acknowledgment
+with the replacement token. All 21 native scaler tests passed in the Nix build;
+Rust formatting and diff checks also passed.
+
+Warbler was switched to
+`/nix/store/2wbhp39gfj95rzlsqnzi934kq1s959yl-nixos-system-warbler-26.11.20260926.e158d9e`.
+The new scaler started both repository listeners and a disposable VM, which
+registered and executed the macOS job in
+[zpl CI run 36523272814](https://github.com/codyps/zpl/actions/runs/36523272814).
+This verifies actual job pickup, execution, and runner cleanup. The Nix installation
+step failed because the image's unprivileged runner lacks passwordless sudo;
+it does not establish a successful macOS shell build or Cachix upload.
+
+Diagnostic session creation under the existing listener identity invalidated its
+previous session and caused HTTP 400 refresh errors in the old process. The
+configuration switch replaced that process and cleared the stale session state.
+Avoid parallel session-creation probes against an active listener.
+
+
+## Disposable runner sudo access (2026-09-29)
+
+The operator selected passwordless guest sudo, matching the Linux CI setup.
+Provisioning now installs a root:wheel, mode-0440 sudoers rule for `runner`, and
+sealing verifies `sudo -n` as that account. The runner remains outside the macOS
+admin group; the sudoers rule grants root inside its disposable VM.
+
+A separate copy of the sealed workspace was repaired through Recovery; the old
+published image was not modified. A one-time normal-boot verifier checked the
+sudoers syntax and ownership, confirmed `sudo -n id -u` returned zero as `runner`,
+ran Clang and Runner.Listener, checked absence of registered runner state, restored
+the job bootstrap daemon, removed itself, and shut down cleanly. Its receipt is
+`/var/tmp/actions-vm-sudo-v2/sudo-validation.txt` on Warbler. The replacement image
+is published at `/var/lib/actions-vm-images/sequoia-clt-sudo-v2`, with provenance
+and receipt in its manifest. This version was subsequently superseded by the
+Full Disk Access image below.
+
+
+## Headless Full Disk Access (2026-09-29)
+
+The sudo-enabled image reached Nix volume creation but macOS denied the installer's
+`vifs` access to `/etc/fstab`. The operator approved guest Full Disk Access for the
+shell and Actions runner process chain, including persistence for future images.
+`guest/runner-access.sh` is now included in image-build media for use against the
+offline Data volume in Recovery. SIP and Warbler host permissions are unchanged.
+
+The unpublished working copy received the five scoped TCC entries from that
+helper. A normal headless boot verified `sudo -n env EDITOR=/usr/bin/true vifs`
+as `runner`, then removed the empty test fstab. The same boot rechecked sudoers
+ownership/mode, passwordless sudo, Clang, Runner.Listener, and absence of prior
+job registration. Its temporary verifier removed itself, restored the job
+bootstrap daemon, and shut down cleanly. The receipt contains
+`HEADLESS_VIFS_VALIDATED` and `RUNNER_SUDO_VALIDATED` and is retained in the
+`sequoia-clt-fda-v3` image manifest. The configuration selects this new version;
+previous published images remain unchanged. All 16 image-helper tests passed
+on Warbler using Python 3.14 and QEMU; shell syntax and diff checks passed.
+
+Warbler was then successfully built and switched to
+`/nix/store/maga9dwkndz9fayf829d096gvlkmk7jr-nixos-system-warbler-26.11.20260926.e158d9e`.
+All 21 scaler tests passed during that build. The real macOS Actions job passed
+Nix installation and Cachix configuration with the new image.
+
+The first shell build completed its package derivations, including release-plz,
+but `nix develop` fell back to host Bash 3.2 after attempting to select
+`bashInteractive` from the unsupported unstable Intel-Darwin input. Bash rejected
+the generated environment before upload. The zpl cache workflow now uses
+`nix print-dev-env --profile` to realize the same environment without launching
+a shell (commit `45b820c0a9979affded20ad11a9ac56159a069b1`).
+
+The corrected [zpl CI run 36576819797](https://github.com/codyps/zpl/actions/runs/36576819797)
+passed all jobs, including Linux and Intel macOS shell caching. The macOS upload
+reported 110 paths already present and successfully pushed release-plz 0.3.165
+plus `/nix/store/p44g0p2jvqzywh14vw7j70ypccdxwci3-nix-shell-env` to `codyps`.
+The scaler removed the completed runner at 10:14:24 EDT. One earlier VM in this
+run exited before job pickup; the scaler replaced it automatically. This validates
+successful real job execution and cleanup, but does not explain that startup exit.

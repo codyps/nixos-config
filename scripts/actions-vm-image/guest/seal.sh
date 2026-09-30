@@ -17,6 +17,9 @@ if [[ $1 == xcode ]]; then
 else
     pkgutil --pkg-info com.apple.pkg.CLTools_Executables
 fi
+visudo -cf /private/etc/sudoers.d/actions-vm-runner
+sudo -H -u runner sudo -n /usr/bin/true
+echo 'Runner passwordless sudo verified'
 sudo -H -u runner /Users/runner/actions-runner/bin/Runner.Listener --version
 sudo -H -u runner /usr/bin/xcrun clang --version
 sudo -H -u runner /usr/bin/xcrun swift --version

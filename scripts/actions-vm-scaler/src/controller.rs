@@ -57,7 +57,13 @@ pub async fn converge(api: &mut Api, manager: &mut Manager, assigned: usize) -> 
 pub async fn listen(api: &mut Api, manager: &mut Manager) -> Result<()> {
     manager.recover(api).await?;
     api.open_session(&manager.owner).await?;
-    let mut assigned = api.session.as_ref().unwrap().statistics.total_assigned_jobs;
+    let mut assigned = api
+        .session
+        .as_ref()
+        .unwrap()
+        .statistics
+        .as_ref()
+        .map_or(0, |stats| stats.total_assigned_jobs);
     let mut changed = manager.pool.subscribe();
     let mut last = 0;
     let mut pending = None;

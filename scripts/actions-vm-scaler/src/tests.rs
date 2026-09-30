@@ -541,8 +541,13 @@ async fn queue_refresh_capacity_acquisition_and_acknowledgment() {
         .expect(1)
         .mount(&server)
         .await;
+    // Observed on Warbler, 2026-09-29: refresh returns null statistics even
+    // though session creation supplies them. Match the optional upstream field:
+    // https://github.com/actions/scaleset/blob/e6daac702355cdb5b880b4fbdcf6d85dcd9e48e5/types.go#L116-L123
+    let mut refreshed = session(&server, "queue-new");
+    refreshed["statistics"] = Value::Null;
     Mock::given(method("PATCH")).and(path("/tenant/_apis/runtime/runnerscalesets/42/sessions/00000000-0000-4000-8000-000000000001"))
-        .respond_with(ResponseTemplate::new(200).set_body_json(session(&server, "queue-new"))).expect(1).mount(&server).await;
+        .respond_with(ResponseTemplate::new(200).set_body_json(refreshed)).expect(1).mount(&server).await;
     Mock::given(method("GET")).and(path("/queue")).and(header("Authorization", "Bearer queue-new"))
         .and(header("X-ScaleSetMaxCapacity", "2")).and(query_param("lastMessageId", "7")).and(query_param("tokenScope", "runner"))
         .respond_with(ResponseTemplate::new(200).set_body_json(json!({"messageId": 8, "messageType": "RunnerScaleSetJobMessages", "body": "[]", "statistics": {"totalAssignedJobs": 0}}))).expect(1).mount(&server).await;

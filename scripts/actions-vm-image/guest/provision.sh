@@ -47,6 +47,15 @@ if ! id runner >/dev/null 2>&1; then
 fi
 [[ $(dscl . -read /Users/runner NFSHomeDirectory) == 'NFSHomeDirectory: /Users/runner' ]]
 ! id -Gn runner | tr ' ' '\n' | grep -qx admin
+# Disposable CI jobs need root inside their VM for installers such as Nix.
+# Match GitHub-hosted macOS runner privileges, not host administrator access.
+# https://docs.github.com/en/actions/reference/runners/github-hosted-runners#administrative-privileges
+install -d -o root -g wheel -m 0755 /private/etc/sudoers.d
+printf '%s\n' 'runner ALL=(ALL) NOPASSWD: ALL' > /private/etc/sudoers.d/actions-vm-runner
+chown root:wheel /private/etc/sudoers.d/actions-vm-runner
+chmod 0440 /private/etc/sudoers.d/actions-vm-runner
+visudo -cf /private/etc/sudoers.d/actions-vm-runner
+sudo -H -u runner sudo -n /usr/bin/true
 install -d -o runner -g staff -m 0755 /Users/runner /Users/runner/actions-runner
 [[ ! -e /Users/runner/actions-runner/.runner ]] || { echo 'Runner already registered' >&2; exit 1; }
 tar -xzf "$bundle/runner.tar.gz" -C /Users/runner/actions-runner

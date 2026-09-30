@@ -307,7 +307,7 @@ def download(work, manifest):
 def seed(work, manifest):
     directory = work / "seed"
     directory.mkdir(exist_ok=True)
-    for name in ("install.sh", "provision.sh", "seal.sh"):
+    for name in ("install.sh", "provision.sh", "seal.sh", "runner-access.sh"):
         shutil.copyfile(GUEST / name, directory / name)
     if (work / "bootstrap.pkg").exists():
         shutil.copyfile(work / "bootstrap.pkg", directory / "bootstrap.pkg")

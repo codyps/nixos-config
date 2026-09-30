@@ -151,7 +151,7 @@ sys actions-vm-image --work-dir /var/lib/actions-vm-build/sequoia provision \
 ```
 
 The tool installs the toolchain, accepts the Xcode license/runs first-launch setup
-when supplying Xcode, creates the unprivileged `runner`, installs the existing
+when supplying Xcode, creates the `runner` with passwordless sudo inside the disposable VM, installs the existing
 scaler bootstrap, and disables guest sleep and unattended macOS updates. It does
 not register a GitHub runner. Provisioning currently transfers an archive through
 SSH and needs temporary space for the toolchain archive plus extracted Xcode.
@@ -214,3 +214,26 @@ and a representative project build. Verify a second job gets a fresh disk and
 that shutdown removes both OS and OpenCore overlays. GUI/Metal tests require a
 separate login/session/graphics configuration and are not established by these
 CLI checks.
+
+
+### Headless runner Full Disk Access
+
+The shell and Actions runner process chain need guest Full Disk Access for
+headless installers that update protected files such as `/etc/fstab`. Passwordless
+sudo alone does not grant this macOS privacy permission. Before publishing an
+image, boot its **unpublished workspace copy** into Recovery and run the helper
+from the `IMAGE_BUILD` seed against the mounted Data volume:
+
+```sh
+bash /Volumes/IMAGE_BUILD/runner-access.sh '/Volumes/MACOS - Data'
+```
+
+The helper grants `SystemPolicyAllFiles` only to `/bin/bash`, the two
+`/usr/local/libexec/actions-vm-*` bootstrap/runner scripts, and the installed
+`Runner.Listener` and `Runner.Worker` executables. It does not change SIP configuration or
+Warbler host permissions. This follows the shell/runner Full Disk
+Access setup in [GitHub's macOS image](https://github.com/actions/runner-images/blob/main/images/macos/scripts/build/configure-tccdb-macos.sh).
+The helper is included on newly generated build media; existing workspaces need
+media regenerated with the updated image tool. Do not edit a published base disk.
+Verify `sudo -n env EDITOR=/usr/bin/true /usr/sbin/vifs` from the headless runner
+process before sealing, and then verify a real disposable Actions job.

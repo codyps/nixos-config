@@ -1,6 +1,6 @@
 #!/bin/bash
 # Install root:wheel, mode 0755, at /usr/local/libexec/actions-vm-bootstrap.
-# Golden image contract: local unprivileged `runner`, /Users/runner/actions-runner.
+# Golden image contract: local `runner` with guest sudo, /Users/runner/actions-runner.
 set -euo pipefail
 export PATH=/usr/bin:/bin:/usr/sbin:/sbin
 umask 077

@@ -37,7 +37,9 @@ pub struct Session {
     pub session_id: String,
     pub message_queue_url: String,
     pub message_queue_access_token: String,
-    pub statistics: Statistics,
+    // Session refresh returns null statistics; the upstream wire type is optional.
+    // https://github.com/actions/scaleset/blob/e6daac702355cdb5b880b4fbdcf6d85dcd9e48e5/types.go#L116-L123
+    pub statistics: Option<Statistics>,
 }
 
 #[derive(Deserialize)]

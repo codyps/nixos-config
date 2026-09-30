@@ -6,7 +6,7 @@
     enable = true;
     capacity = 1;
     privateKeyFile = config.sops.secrets.garm-app-key.path;
-    imageConfigFile = "/var/lib/actions-vm-images/sequoia-clt-auto-v1/vm.json";
+    imageConfigFile = "/var/lib/actions-vm-images/sequoia-clt-fda-v3/vm.json";
     settings = {
       # Discover repositories granted to the existing App installation.
       scale_set = "warbler-macos-intel";

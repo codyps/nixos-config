@@ -145,6 +145,16 @@ last activates the entire checked-out host configuration: review other pending
 host changes before using it. The alternate container module itself does not
 change the existing host AI account or service.
 
+Host switches reload the running container and activate its guest configuration
+in place. Guest services may still restart when their configuration changes,
+but the container itself and unaffected sessions keep running. Changes to the
+container boundary, such as macvlans, veths, bind mounts, or nspawn settings,
+require an explicit restart after the host switch:
+
+```sh
+ssh cody@warbler 'sudo systemctl restart container@ai'
+```
+
 The offline two-machine VM test verifies a separate DHCP lease, SSH, filesystem
 separation, `/bin/bash`, lingering user systemd, real Codex command execution
 with user-service access, and state surviving container restart. It uses the

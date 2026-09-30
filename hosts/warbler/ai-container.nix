@@ -4,6 +4,7 @@
   # /var/lib is already persisted on Warbler's encrypted /persist filesystem.
   containers.ai = {
     autoStart = true;
+    restartIfChanged = false;
     ephemeral = false;
     privateNetwork = true;
     macvlans = [ "eno1" ];
@@ -16,7 +17,11 @@
       networking.interfaces.ai-ssh.ipv4.addresses = [{ address = "10.79.0.2"; prefixLength = 24; }];
     };
   };
-  systemd.services."container@ai".unitConfig.RequiresMountsFor = [ "/var/lib/nixos-containers" ];
+  systemd.services."container@ai" = {
+    # Activate guest changes in place; container boundary changes need a restart.
+    reloadIfChanged = true;
+    unitConfig.RequiresMountsFor = [ "/var/lib/nixos-containers" ];
+  };
   networking.interfaces.ai-ssh.ipv4.addresses = [{ address = "10.79.0.1"; prefixLength = 24; }];
   # Advertise only the container, not the host or the rest of the private /24.
   services.tailscale.extraSetFlags = [ "--advertise-routes=10.79.0.2/32" ];

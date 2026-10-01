@@ -48,8 +48,8 @@ Run long-lived workloads through `launchd.daemons`, using a dedicated account,
 and persistent logs with rotation. These services must work before GUI login.
 Use service credentials that do not require a login Keychain, GUI prompt, or
 interactive SSH agent. For automated Git commits, use a dedicated identity and
-configure noninteractive signing or disable signing in that workload's Git
-configuration; the shared personal Git configuration enables OpenPGP signing.
+configure noninteractive signing if required. Wren overrides the shared personal
+Git configuration to disable automatic commit signing for unattended use.
 
 Workload services, data backups, and external downtime/disk-space alerts need
 to be configured when the workload and backup/monitoring destinations are known.

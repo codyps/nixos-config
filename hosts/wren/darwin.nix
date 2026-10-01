@@ -50,4 +50,7 @@
 
   # Home Manager initializes completions after adding the user profile to fpath.
   programs.zsh.enableGlobalCompInit = false;
+
+  # Unattended commits must not wait for an interactive GPG unlock.
+  home-manager.users.cody.programs.git.signing.signByDefault = lib.mkForce false;
 }

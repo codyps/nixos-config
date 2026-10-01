@@ -1,4 +1,11 @@
 (final: prev: ({
+  # The frozen Gen8/9/11 runtime predates GCC 16's incomplete-type SFINAE
+  # diagnostic and treats it as an error. Keep this legacy package on GCC 15.
+  intel-compute-runtime-legacy1 =
+    if prev.intel-compute-runtime-legacy1.version == "24.35.30872.41" then
+      prev.intel-compute-runtime-legacy1.override { stdenv = prev.gcc15Stdenv; }
+    else prev.intel-compute-runtime-legacy1;
+
   # Contour uses the experimental SIMD API, not GCC 16's new <simd> API.
   # Keep its existing <experimental/simd> branch until upstream migrates.
   contour =

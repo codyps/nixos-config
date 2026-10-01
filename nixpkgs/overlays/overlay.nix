@@ -1,4 +1,17 @@
 (final: prev: ({
+  # Contour uses the experimental SIMD API, not GCC 16's new <simd> API.
+  # Keep its existing <experimental/simd> branch until upstream migrates.
+  contour =
+    if prev.contour.version == "0.6.3.8249" then
+      prev.contour.overrideAttrs
+        (old: {
+          postPatch = (old.postPatch or "") + ''
+            substituteInPlace src/vtbackend/Image.cpp \
+              --replace-fail '#if __has_include(<simd>)' '#if 0'
+          '';
+        })
+    else prev.contour;
+
   # Protobuf's Abseil dependency now exposes C++20 comparison types.
   usbguard =
     if prev.usbguard.version == "1.1.4" then

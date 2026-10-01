@@ -25,7 +25,7 @@ Malformed configs and symlinks are rejected rather than replaced. Avoid running
 the explicit update while Codex is editing the file; Codex does not share a lock
 with this command.
 
-The cache subdirectories are `bazel`, `bazelisk`, `cargo-targets`, `mbx`, `nix`,
+The cache subdirectories are `bazel`, `bazelisk`, `cargo-targets`, `gh`, `mbx`, `nix`,
 and `uv`. macOS uses `~/Library/Caches`; Linux uses `$XDG_CACHE_HOME`, falling
 back to `~/.cache`. Home Manager activation uses its configured `xdg.cacheHome`
 on Linux; the Warbler service accounts use `~/.cache`. `--cache-home` overrides

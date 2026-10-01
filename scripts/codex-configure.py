@@ -9,7 +9,7 @@ import tempfile
 import tomlkit
 
 
-CACHES = ("bazel", "bazelisk", "cargo-targets", "mbx", "nix", "uv")
+CACHES = ("bazel", "bazelisk", "cargo-targets", "gh", "mbx", "nix", "uv")
 
 
 def configure(path, cache_home, *, if_missing=False):

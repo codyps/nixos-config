@@ -1,5 +1,7 @@
 { config, options, pkgs, lib, ... }:
 {
+  imports = [ ./wren-builder-client.nix ];
+
   options.p.nix.buildMachines.ward.enable = lib.mkEnableOption "Use `ward` as a build machine.";
   options.p.nix.buildMachines.ward.sshKey = lib.mkOption {
     type = lib.types.path;
@@ -38,9 +40,7 @@
     } // (if (options.nix ? sshServe) then {
       # darwin doesn't have this, nixos only.
       # TODO: find a nicer way to check.
-      sshServe.keys = [
-        "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIA2gAJB7HLffugJejcMpcSUa64q176A6vpdPLI/fBLp/ root@u3"
-      ] ++ (import ../nixos/ssh-auth.nix).authorizedKeys;
+      sshServe.keys = import ./builder-ssh-keys.nix;
     } else { });
   };
 }

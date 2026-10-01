@@ -579,6 +579,25 @@
           ];
         };
 
+        darwinConfigurations.wren = (withCommonModules nix-darwin-26-05.lib.darwinSystem) {
+          specialArgs = { inherit self; };
+          modules = [
+            ./nix-darwin/configuration.nix
+            ./hosts/wren/darwin.nix
+            home-manager-26-05.darwinModules.home-manager
+            {
+              nixpkgs = nixpkgsDarwinConfig;
+              home-manager.useGlobalPkgs = true;
+              home-manager.useUserPackages = true;
+              home-manager.users.cody.imports = [
+                ./nix-darwin/home.nix
+                ./home-manager/home.nix
+                x86_64DarwinHomeModule
+              ];
+            }
+          ];
+        };
+
         darwinConfigurations."u3" = (withCommonModules nix-darwin-26-05.lib.darwinSystem) {
           specialArgs = { inherit self; };
           modules = [

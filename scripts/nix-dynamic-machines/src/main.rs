@@ -158,6 +158,16 @@ fn main() -> ExitCode {
     }
 }
 
+struct OutputLock(fs::File);
+
+impl Drop for OutputLock {
+    fn drop(&mut self) {
+        // A concurrent fork can retain this open file description until exec.
+        // Closing our descriptor alone would leave the lock held in that child.
+        let _ = self.0.unlock();
+    }
+}
+
 fn run(args: impl Iterator<Item = OsString>) -> Result<(), String> {
     let Some(args) = parse_args(args)? else {
         println!("{USAGE}");
@@ -191,6 +201,7 @@ fn run(args: impl Iterator<Item = OsString>) -> Result<(), String> {
         .map_err(|e| format!("cannot open lock: {e}"))?;
     lock.try_lock()
         .map_err(|e| format!("cannot lock output (another instance may be running; send SIGHUP to refresh a watcher): {e}"))?;
+    let _lock = OutputLock(lock);
     let source = fs::read_to_string(&args.candidates)
         .map_err(|e| format!("cannot read {}: {e}", args.candidates.display()))?;
     let candidates = parse_candidates(&source)?;
@@ -660,6 +671,28 @@ mod tests {
         ));
         fs::create_dir(&path).unwrap();
         path
+    }
+
+    #[test]
+    fn output_lock_releases_even_when_a_descriptor_is_inherited() {
+        let directory = temp_dir();
+        let path = directory.join("lock");
+        let file = fs::File::create(&path).unwrap();
+        file.try_lock().unwrap();
+        let lock = OutputLock(file);
+        // Like fork, try_clone keeps the same open file description alive.
+        let inherited = lock.0.try_clone().unwrap();
+        let next = fs::File::options()
+            .read(true)
+            .write(true)
+            .open(&path)
+            .unwrap();
+        assert!(next.try_lock().is_err());
+        drop(lock);
+        next.try_lock().unwrap();
+        next.unlock().unwrap();
+        drop(inherited);
+        fs::remove_dir_all(directory).unwrap();
     }
 
     #[test]

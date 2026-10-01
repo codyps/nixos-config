@@ -49,7 +49,8 @@ in
         KERNEL=="sd[a-z]*[0-9]*|mmcblk[0-9]*p[0-9]*|nvme[0-9]*n[0-9]*p[0-9]*|xvd[a-z]*[0-9]*", ENV{ID_FS_TYPE}=="zfs_member", ATTR{../queue/scheduler}="none"
       '';
 
-      systemd.generators."zfs-mount-generator" = "${zfs}/lib/systemd/system-generator/zfs-mount-generator";
+      # NixOS installs zfs-mount-generator through the ZFS systemd package.
+      # An explicit generator here creates a duplicate link in system-generators.
       environment.etc."zfs/zed.d/history_event-zfs-list-cacher.sh".source = "${zfs}/etc/zfs/zed.d/history_event-zfs-list-cacher.sh";
       systemd.services.zfs-mount.enable = false;
 

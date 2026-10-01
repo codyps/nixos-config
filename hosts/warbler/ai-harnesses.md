@@ -5,6 +5,16 @@ Warbler defines `cody-ai` for Cody's AI tools, independently of the administrati
 `/home/cody-ai/workspaces`. Existing administrator SSH public keys can log in;
 no private keys, Git credentials, or Codex login tokens are copied from Cody.
 
+The host account and the `warbler-ai` container share
+[`ai-user-config.nix`](ai-user-config.nix). Each receives Cody's
+[`~/.tmux.conf`](../../config/.tmux.conf), including the `Ctrl-z` prefix and
+one-based window numbering, on boot and system activation. NixOS activation
+also runs `codex-configure` for each account, updating existing mutable configs
+with the [shared defaults](../../config/codex.md) while preserving unrelated
+settings. These accounts do not require a separate Home Manager activation.
+The changes apply to new tmux servers and Codex sessions; existing processes
+are not restarted by these configuration hooks.
+
 `codex-ai.service` starts at boot, restarts on failure, and runs OpenAI's mutable
 standalone Codex install under this account. On first start it downloads and runs
 `https://chatgpt.com/codex/install.sh` as `cody-ai`. It then runs

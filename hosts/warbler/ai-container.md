@@ -84,6 +84,13 @@ has lingering enabled, so the user manager starts at boot and survives logout.
 SSH and agent tasks share the container filesystem and user-manager sockets.
 User services inherit the coding tool PATH without requiring a login shell.
 
+The container uses the same [AI user configuration](ai-user-config.nix) as the
+host's `cody-ai` account: Cody's tmux config is linked into `~/.tmux.conf`, and
+every container activation applies `codex-configure` to the mutable Codex
+config, including existing files. See the [Codex defaults](../../config/codex.md)
+for the settings and preservation behavior. No separate Home Manager switch is
+needed; new tmux servers and Codex sessions pick up the settings.
+
 `/bin/bash`, `/bin/kill`, `/usr/bin/env`, and selected `/usr/bin` command aliases
 support conventional scripts. `nix-ld` supports standard Linux dynamic loaders.
 This remains NixOS: software that requires apt, arbitrary FHS libraries, a

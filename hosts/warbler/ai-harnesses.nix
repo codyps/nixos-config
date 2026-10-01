@@ -197,13 +197,12 @@ let
   '';
 in
 {
-  imports = [ ../../nixos-modules/codex-config.nix ../../nixos-modules/git-gh-credentials.nix ];
+  imports = [ ./ai-user-config.nix ../../nixos-modules/git-gh-credentials.nix ];
 
   options.services.codex-ai.stdioForwarder.enable = lib.mkEnableOption
     "the custom JSON-lines stdio compatibility adapter for Codex";
 
   config = {
-    programs.codex-config.users = [ user ];
     # Vite+ downloads Node runtimes during first-use setup. Their standard
     # ELF interpreter must be available even though this host uses Nix paths.
     programs.nix-ld.enable = true;

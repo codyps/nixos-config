@@ -1,20 +1,24 @@
 # Mutable Codex defaults
 
-Home Manager activation seeds `~/.codex/config.toml` if no file exists. Warbler
-also seeds the `cody-ai` account during NixOS activation, on both the host and
-the AI container. The resulting file is a user-owned regular file (mode 0600),
-not a Nix store symlink. Later activations leave existing files untouched.
+Home Manager activation seeds `~/.codex/config.toml` if no file exists and leaves
+existing files untouched. Warbler's `cody-ai` accounts, on both the host and the
+AI container, apply the current defaults on every NixOS activation, including
+to existing configs. They opt into `programs.codex-config.updateExisting`; other
+users of the NixOS module retain seed-only behavior by default. The resulting
+file is a user-owned regular file (mode 0600), not a Nix store symlink. Unrelated
+settings, comments, and additional writable roots are preserved.
 
 To apply the current defaults to an existing config, close Codex instances
 using that config, then run as its owner:
 
 ```sh
-codex-configure
+sys configure-codex
 ```
 
-The command is installed with these configurations and is also available with
-`nix run .#codex-configure`. It honors `CODEX_HOME`; `--config /absolute/path`
-selects a different file. `--if-missing` performs the activation's seed-only
+The command is installed with these configurations (the `codex-configure` helper
+is retained for scripts) and is also available with `nix run .#codex-configure`.
+It honors `CODEX_HOME`; `--config /absolute/path`
+selects a different file. `--if-missing` performs the seed-only
 operation.
 
 It sets top-level `sandbox_mode = "workspace-write"` and

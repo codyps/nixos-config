@@ -1,6 +1,7 @@
-{ ... }:
+{ pkgs, ... }:
 {
   services.usbguard = {
+    package = pkgs.callPackage ../../nixpkgs/usbguard.nix { };
     enable = true;
     IPCAllowedUsers = [ "root" ];
     IPCAllowedGroups = [ ];

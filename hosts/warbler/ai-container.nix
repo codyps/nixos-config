@@ -1,6 +1,6 @@
 { config, pkgs, ... }:
 {
-  # Alternate environment: do not mount or migrate the host AI account's home.
+  # Primary AI environment: keep its persistent home separate from the legacy host home.
   # /var/lib is already persisted on Warbler's encrypted /persist filesystem.
   containers.ai = {
     autoStart = true;

@@ -18,6 +18,9 @@ in
   imports = [ ./hardware-configuration.nix ./disko.nix ./reset-root.nix ../../nixos-modules/secure-unlock ./secrets.nix ./usbguard.nix ./account-passwords.nix ./ai-harnesses.nix ./ai-container.nix ./garm.nix ./actions-vm-scaler.nix ../../nixos-modules/actions-vm-image.nix ];
 
   config = {
+    # warbler-ai owns the primary Codex runtime. Retain the old account/home
+    # for migration and recovery, without competing daemon supervision.
+    systemd.services.codex-ai.enable = false;
     programs.actions-vm-image.enable = true;
     programs.adminCommands.commands.backup-secure-boot = [ "${pkgs.callPackage ./secure-boot-backup.nix { }}/bin/warbler-secure-boot-backup" ];
     boot.secureUnlock.rootVolumeKeyId = import ./volume-identity.nix;

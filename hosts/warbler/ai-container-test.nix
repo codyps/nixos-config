@@ -10,7 +10,8 @@ pkgs.testers.runNixOSTest {
       containers.ai.macvlans = lib.mkForce [ "eth1" ];
       containers.ai.config = {
         systemd.network.networks."10-lan".matchConfig.Name = lib.mkForce "mv-eth1";
-        # Keep the test offline, exercising the real bootstrap and updater.
+        # Keep the test offline, exercising the foreground app server.
+        systemd.user.timers.codex-ai-update.enable = lib.mkForce false;
         systemd.user.services.codex-ai.preStart = ''
           mkdir -p "$HOME/.codex/packages/standalone/current/bin"
           # Use the binary: Nixpkgs' wrapper prepends its unpatched Bubblewrap.
@@ -77,6 +78,13 @@ pkgs.testers.runNixOSTest {
     client.succeed(ssh + shlex.quote("systemd-run --user --wait --pipe /bin/bash -lc 'test -S /run/user/1001/bus; systemctl --user is-active codex-ai; command -v git uv pip node; touch ~/workspaces/service-proof'"))
     # Exercise the real control socket and a Codex service child, no model/auth.
     client.succeed(ssh + shlex.quote("${pkgs.python3.withPackages (p: [ p.websockets ])}/bin/python3 ${../../scripts/test-warbler-ai-container-rpc.py}"))
+    # A real active turn must survive repeated drain requests. This uses a
+    # separate server and local fake model; no provider login is needed.
+    client.succeed(ssh + shlex.quote("${pkgs.python3.withPackages (p: [ p.websockets ])}/bin/python3 ${../../scripts/test-codex-drain.py} /home/cody-ai/.codex/packages/standalone/current/bin/codex"))
+    old_pid = client.succeed(ssh + "systemctl --user show codex-ai --property=MainPID --value").strip()
+    client.succeed(ssh + "sys restart-codex")
+    client.wait_until_succeeds(ssh + shlex.quote("pid=$(systemctl --user show codex-ai --property=MainPID --value); test $pid -gt 0 && test $pid != " + old_pid))
+    client.wait_until_succeeds(ssh + "codex app-server daemon version")
     host.succeed(inside + "test -f /home/cody-ai/workspaces/service-proof")
     host.fail("test -e /home/cody-ai/workspaces/service-proof")
     host.succeed("systemctl restart container@ai")

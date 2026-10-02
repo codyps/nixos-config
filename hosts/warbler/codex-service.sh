@@ -26,14 +26,30 @@ if [[ ! -x "$CODEX_HOME/packages/standalone/current/bin/codex" &&
   trap - EXIT
 fi
 
+if [[ "${1-}" = foreground ]]; then
+  # systemd owns this process directly. No detached daemon or native updater:
+  # the user timer installs packages and asks systemd for an unbounded drain.
+  current="$CODEX_HOME/packages/app-server-daemon/current"
+  if [[ ! -e "$current" && ! -L "$current" ]]; then
+    current="$CODEX_HOME/packages/standalone/current"
+  fi
+  codex="$current/bin/codex"
+  if [[ ! -x "$codex" ]]; then codex="$current/codex"; fi
+  exec "$codex" app-server --remote-control --listen unix:// --managed-daemon
+fi
+
 # Both detached children inherit the systemd unit's UID, cgroup, and sandbox.
-# Bootstrap re-establishes Codex's updater on every boot/service restart.
-managed_codex app-server daemon bootstrap --remote-control
+# Let Codex select its daemon package and manage updater eligibility. A pinned
+# release or disabled updates legitimately has no updater process. Lifecycle
+# failures must not make systemd kill otherwise healthy sessions.
+until managed_codex app-server daemon bootstrap --remote-control; do
+  echo 'Codex bootstrap failed; retrying in 30 seconds.' >&2
+  sleep 30
+done
 while sleep 30; do
-  # Idempotent health check/start also picks up the current managed binary.
-  managed_codex app-server daemon start >/dev/null
-  updater_pid=$(jq -er '.pid | select(type == "number" and . > 1)' \
-    "$CODEX_HOME/app-server-daemon/app-server-updater.pid")
-  # If the updater dies, let systemd restart the whole group and bootstrap it.
-  kill -0 "$updater_pid"
+  # Native start repairs a missing eligible updater, but leaves a running
+  # server alone. In particular, it is not a request to upgrade that server.
+  if ! managed_codex app-server daemon start >/dev/null; then
+    echo 'Codex health check failed; leaving existing processes intact and retrying.' >&2
+  fi
 done

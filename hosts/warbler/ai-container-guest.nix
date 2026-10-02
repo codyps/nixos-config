@@ -47,6 +47,9 @@ let
     export PATH=${lib.escapeShellArg toolPath}
     mkdir -p ${home}/workspaces
   '' + builtins.readFile ./codex-service.sh);
+  updateCodex = pkgs.writeShellScript "ai-container-codex-update" (''
+    export PATH=${lib.escapeShellArg toolPath}
+  '' + builtins.readFile ./codex-update.sh);
   installHermes = pkgs.writeShellApplication {
     name = "install-hermes";
     runtimeInputs = [ pkgs.curl pkgs.bash ];
@@ -61,6 +64,8 @@ let
 in
 {
   programs.adminCommands.commands.install-hermes = [ "${installHermes}/bin/install-hermes" ];
+  programs.adminCommands.commands.update-codex = [ "${pkgs.systemd}/bin/systemctl" "--user" "start" "codex-ai-update.service" ];
+  programs.adminCommands.commands.restart-codex = [ "${pkgs.systemd}/bin/systemctl" "--user" "reload" "codex-ai.service" ];
   networking.hostName = "warbler-ai";
   imports = [ ../../modules/terminfo.nix ./ai-user-config.nix ../../nixos-modules/git-gh-credentials.nix ];
   system.stateVersion = "26.05";
@@ -193,19 +198,45 @@ in
   };
   systemd.user.services.codex-ai = {
     description = "Self-managed Codex in the AI container";
+    # A switch must not terminate the daemon's active turns. Lifecycle updates
+    # are handled by Codex; supervisor changes take effect at the next start.
+    restartIfChanged = false;
     wantedBy = [ "default.target" ];
     after = [ "ai-python.service" ];
     unitConfig.ConditionUser = user;
     environment = codingEnvironment;
     serviceConfig = {
-      ExecStart = supervisor;
+      ExecStart = "${supervisor} foreground";
+      # SIGHUP is Codex's graceful-only drain: repeated requests never force
+      # termination. New turns are rejected while existing turns finish.
+      ExecReload = "${pkgs.coreutils}/bin/kill -HUP $MAINPID";
       WorkingDirectory = home;
       Restart = "always";
-      RestartSec = 30;
-      KillMode = "control-group";
-      TimeoutStopSec = 30;
+      RestartSec = 2;
+      KillMode = "mixed";
+      KillSignal = "SIGHUP";
+      TimeoutStopSec = "infinity";
       UMask = "0077";
       TasksMax = "infinity";
+    };
+  };
+  systemd.user.services.codex-ai-update = {
+    description = "Update Codex packages and request a graceful drain";
+    unitConfig.ConditionUser = user;
+    environment = codingEnvironment;
+    serviceConfig = {
+      Type = "oneshot";
+      ExecStart = updateCodex;
+      UMask = "0077";
+      TimeoutStartSec = "30min";
+    };
+  };
+  systemd.user.timers.codex-ai-update = {
+    wantedBy = [ "timers.target" ];
+    timerConfig = {
+      OnStartupSec = "5min";
+      OnUnitActiveSec = "1h";
+      RandomizedDelaySec = "2min";
     };
   };
   # The container is the common boundary. Do not hide its own user manager or

@@ -1,11 +1,11 @@
-# Alternate AI container
+# Primary AI environment
 
-`containers.ai` is a persistent NixOS system named `warbler-ai`, separate from
-Warbler's existing `cody-ai` account and `codex-ai.service`. Neither the host
-home nor its credentials are copied or mounted into the container. Its root,
-home, SSH host keys, and application state live under
-`/var/lib/nixos-containers/ai`, covered by Warbler's encrypted `/var/lib`
-persistence. Do not destroy this directory when rebuilding.
+`containers.ai` is the primary AI environment, a persistent NixOS system named
+`warbler-ai`. The legacy host `cody-ai` account and home remain for recovery;
+the host's `codex-ai.service` is disabled. The container's root, home, SSH host
+keys, and application state live under `/var/lib/nixos-containers/ai`, covered
+by Warbler's encrypted `/var/lib` persistence. Do not destroy this directory
+when rebuilding. The host home is not mounted into the container.
 
 ## Network and login
 
@@ -24,9 +24,11 @@ ssh cody-ai@warbler-ai.local
 
 The account accepts the existing public keys from `nixos/ssh-auth.nix`, has no
 sudo access, and allows ordinary SSH/SFTP and forwarding within the container.
-It has a separate SSH host identity. A client alias can use `Host warbler-ai`,
-`HostName warbler-ai.local`, and `User cody-ai`; point the desktop connection at
-this alias to use the alternate environment.
+It has a separate SSH host identity. The shared Home Manager SSH config maps
+`warbler-ai` to `cody-ai@warbler-ai.bed.einic.org:22`, overriding old local
+aliases for that name. Point the desktop connection at `warbler-ai`. The separate
+`warbler-ai-tailscale` alias uses `cody-ai@warbler.little-moth.ts.net:2223` for
+clients connected to the tailnet. mDNS clients can also use `warbler-ai.local`.
 
 Through Warbler's Tailscale address, use port **2223** (2222 remains reserved
 for initrd SSH):
@@ -96,21 +98,46 @@ support conventional scripts. `nix-ld` supports standard Linux dynamic loaders.
 This remains NixOS: software that requires apt, arbitrary FHS libraries, a
 desktop, GPU access, or privileged installation may need additional packaging.
 
-Codex uses the existing self-managed standalone installer/supervisor, now as a
-**user** service. Its packages, login, workspaces, and history are independent
-of the host account. Run inside the container:
+Codex runs in the foreground as a **user** service. Systemd tracks the actual
+app-server process; there is no detached-daemon PID-file watchdog or native
+updater. This prevents updater failures from terminating healthy sessions.
+The server uses the dedicated `~/.codex/packages/app-server-daemon/current`
+package when installed, falling back to the standalone CLI for initial setup.
+
+The `codex-ai-update.timer` checks hourly (with a short randomized delay), updates
+both the CLI and daemon packages through the standalone installer, and requests
+a reload when the selected server differs from the running executable. Installer
+errors leave the server running. Explicit package pins are respected through the
+installer's `auto-update-version` selection guard.
+
+Reload sends **SIGHUP** to the app server. Codex stops admitting new turns and
+waits for active turns to finish before exiting; systemd then starts the selected
+package. Repeated SIGHUP requests do not force termination. Unlike the native
+updater's bounded shutdown grace, this service uses `TimeoutStopSec=infinity`.
+A stuck turn can therefore defer an update indefinitely. Clients reconnect after
+the drain; this is not a connection-preserving hot swap. Explicit force-kills,
+container termination, and host shutdown can still interrupt work.
+
+Routine NixOS switches do not restart this unit. New supervisor settings apply
+at its next start. Run inside the container, without administrator access:
 
 ```sh
 systemctl --user status codex-ai
 journalctl --user -u codex-ai -n 100 --no-pager
+systemctl --user list-timers codex-ai-update
+sys update-codex    # Install packages, then request a drain if needed.
+sys restart-codex   # Request a graceful drain and restart, without installing.
+codex app-server daemon version
 codex login --device-auth
-systemctl --user restart codex-ai
 codex remote-control pair
 ```
 
-Authentication and real phone pairing require the user's account and must be
-verified separately. Native daemon discovery/proxy commands work in the same
-PID namespace as the managed daemon; there is no custom production adapter.
+The `sys` commands return after requesting a drain, which may still be running.
+Use systemd and these helpers for lifecycle changes, not native `daemon
+bootstrap/restart/update`: the server is systemd-managed rather than pid-managed.
+Native socket discovery, `daemon start/version`, proxying, and phone pairing
+still use the common socket. Authentication and real phone pairing require the
+user's account and are verified separately.
 
 Install Hermes into the container's own home using its upstream installer:
 
@@ -124,10 +151,26 @@ hermes gateway status
 ```
 
 The helper downloads the [official Hermes installer](https://hermes-agent.nousresearch.com/docs/getting-started/installation)
-as the unprivileged user; it does not copy the host's installation or tokens.
+as the unprivileged user. The existing host installation was copied during the
+2026-10-01 migration; this helper is available for fresh installations.
 The suggested flags skip browser/desktop components for an initial headless
 setup. Model and messaging credentials are configured interactively. Add other
 harnesses with their own user units under `~/.config/systemd/user`.
+
+## Migration from the host (2026-10-01)
+
+The container's pre-existing Codex/T3 state stays primary. The host's full home
+was copied with Btrfs reflinks to
+`~/migration-from-host-20261001/home`, including its independent Codex databases,
+sessions, credentials, and T3 state. Those databases were not overlaid onto the
+container's live databases. The original `/home/cody-ai` on the host is retained.
+
+Host projects are also available at their original paths under `~/zpl`, while
+existing container projects remain under `~/p` (`~/workspaces` points there).
+Hermes is installed at `~/.hermes`; its user unit was copied but not enabled,
+matching the old host state. Missing user tools, GitHub/SSH configuration, and
+Codex skills/rules were copied without overwriting existing container files.
+Conflicting settings and caches remain available in the full migration archive.
 
 ## Boundaries
 
@@ -149,8 +192,8 @@ nix run .#warbler-nixos-rebuild-remote -- switch
 
 The first two commands build and test without changing running services. The
 last activates the entire checked-out host configuration: review other pending
-host changes before using it. The alternate container module itself does not
-change the existing host AI account or service.
+host changes before using it. Warbler disables the old host service while retaining the account and home for
+recovery.
 
 Host switches reload the running container and activate its guest configuration
 in place. Guest services may still restart when their configuration changes,

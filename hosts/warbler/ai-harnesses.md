@@ -1,5 +1,10 @@
 # AI harness account
 
+> The primary environment is now [warbler-ai](ai-container.md). Warbler disables
+> this legacy host service and retains the account/home for recovery. The
+> configuration below documents the old sandbox and its optional test fixture.
+
+
 Warbler defines `cody-ai` for Cody's AI tools, independently of the administrative
 `cody` account. Its persistent home is `/home/cody-ai`; put repositories under
 `/home/cody-ai/workspaces`. Existing administrator SSH public keys can log in;
@@ -19,8 +24,8 @@ are not restarted by these configuration hooks.
 standalone Codex install under this account. On first start it downloads and runs
 `https://chatgpt.com/codex/install.sh` as `cody-ai`. It then runs
 `codex app-server daemon bootstrap --remote-control`, enabling Codex's own
-updater. The supervisor checks the daemon every 30 seconds and restarts the unit
-if the updater exits. Both detached children stay inside the systemd sandbox.
+updater. The supervisor checks the daemon every 30 seconds and starts it when missing.
+Lifecycle failures are retried without killing existing processes. Both detached children stay inside the systemd sandbox.
 The managed package tree is `~/.codex/packages/standalone`; updates survive
 reboots and are independent of `flake.lock`. First installation needs internet
 access; subsequent starts use the installed copy while Codex checks for updates.

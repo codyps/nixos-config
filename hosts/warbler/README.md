@@ -40,12 +40,12 @@ See [validation results](macos-image-validation.md) for the tested boundary and 
 
 ## AI harness account
 
-See [AI harness account](ai-harnesses.md) for the restricted `cody-ai` user,
-boot-started Codex service, phone pairing, and desktop SSH connection.
+Use the [primary AI container](ai-container.md), `warbler-ai`, for Codex, Hermes,
+and other harnesses. It provides its own LAN DHCP address and user systemd;
+`cody-ai` can manage its services without host administrator access.
 
-The [alternate AI container](ai-container.md) provides a separate NixOS
-environment for Codex, Hermes, and other harnesses, with its own LAN DHCP address
-and user systemd. The existing host AI setup remains available independently.
+The [legacy host AI account](ai-harnesses.md) and its home are retained for
+recovery. Its Codex service is disabled after migration to the container.
 
 ## Hardware and firmware references
 

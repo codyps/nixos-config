@@ -1,6 +1,10 @@
 {
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
+    zpl.url = "github:codyps/zpl";
+    zpl.inputs.nixpkgs.follows = "nixpkgs";
+    zpl.inputs.nixpkgs-intel-darwin.follows = "nixpkgs-darwin";
+    zpl.inputs.flake-utils.follows = "flake-utils";
     atuin.url = "github:codyps/atuin/fuzzy-scoring-allocations";
     atuin.inputs.nixpkgs.follows = "nixpkgs";
     nix-darwin.url = "github:LnL7/nix-darwin";
@@ -52,7 +56,7 @@
     ];
   };
 
-  outputs = { self, atuin, nixpkgs, nixpkgs-darwin, flake-utils, nix-darwin, nix-darwin-26-05, home-manager, home-manager-26-05, nixos-wsl, nixos-vscode-server, impermanence, sops-nix, disko, lanzaboote, clipway }:
+  outputs = { self, zpl, atuin, nixpkgs, nixpkgs-darwin, flake-utils, nix-darwin, nix-darwin-26-05, home-manager, home-manager-26-05, nixos-wsl, nixos-vscode-server, impermanence, sops-nix, disko, lanzaboote, clipway }:
     let
       withCommonModules = constructor: args: constructor (args // {
         modules = [ ./modules/nix-cache.nix ./modules/terminfo.nix ./modules/admin-commands.nix ] ++ args.modules;
@@ -325,6 +329,7 @@
               lanzaboote.nixosModules.lanzaboote
               sops-nix.nixosModules.sops
               ./nixos/common.nix
+              zpl.nixosModules.zpl-proxy-api
               ./hosts/warbler/configuration.nix
               home-manager.nixosModules.home-manager
               {

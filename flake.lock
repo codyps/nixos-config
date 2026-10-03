@@ -490,7 +490,8 @@
         "nixos-wsl": "nixos-wsl",
         "nixpkgs": "nixpkgs",
         "nixpkgs-darwin": "nixpkgs-darwin",
-        "sops-nix": "sops-nix"
+        "sops-nix": "sops-nix",
+        "zpl": "zpl"
       }
     },
     "rust-analyzer-src": {
@@ -563,6 +564,32 @@
       "original": {
         "owner": "nix-systems",
         "repo": "default",
+        "type": "github"
+      }
+    },
+    "zpl": {
+      "inputs": {
+        "flake-utils": [
+          "flake-utils"
+        ],
+        "nixpkgs": [
+          "nixpkgs"
+        ],
+        "nixpkgs-intel-darwin": [
+          "nixpkgs-darwin"
+        ]
+      },
+      "locked": {
+        "lastModified": 1790996654,
+        "narHash": "sha256-6PX/o3oV8SGgvvgiAv1ia3pT6iTBovMneJp170loBgc=",
+        "owner": "codyps",
+        "repo": "zpl",
+        "rev": "17cee03ad824d0f8f3dcef3d074ec6e26f3662d5",
+        "type": "github"
+      },
+      "original": {
+        "owner": "codyps",
+        "repo": "zpl",
         "type": "github"
       }
     }

@@ -23,6 +23,11 @@ To select another rebuild action, use e.g.
 The existing `nix run .#warbler-nixos-rebuild-remote` shortcut remains available.
 The generic helper accepts any configuration host name and connects as `cody@HOST`.
 
+## ZPL preview proxy
+
+See [ZPL preview proxy](zpl-proxy-api.md) for the two named printers,
+SOPS configuration, API access on port 3000, and service operations.
+
 ## GitHub Actions runners
 
 See [GARM runners](garm.md) for disposable Incus VMs, GitHub App setup,

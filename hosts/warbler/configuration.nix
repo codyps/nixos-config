@@ -15,7 +15,7 @@ let
   };
 in
 {
-  imports = [ ./hardware-configuration.nix ./disko.nix ./reset-root.nix ../../nixos-modules/secure-unlock ./secrets.nix ./usbguard.nix ./account-passwords.nix ./ai-harnesses.nix ./ai-container.nix ./garm.nix ./actions-vm-scaler.nix ../../nixos-modules/actions-vm-image.nix ];
+  imports = [ ./hardware-configuration.nix ./disko.nix ./reset-root.nix ../../nixos-modules/secure-unlock ./secrets.nix ./usbguard.nix ./account-passwords.nix ./ai-harnesses.nix ./ai-container.nix ./garm.nix ./zpl-proxy-api.nix ./actions-vm-scaler.nix ../../nixos-modules/actions-vm-image.nix ];
 
   config = {
     # warbler-ai owns the primary Codex runtime. Retain the old account/home

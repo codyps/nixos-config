@@ -1,7 +1,7 @@
-{ pkgs, ... }:
+{ ... }:
 {
   services.usbguard = {
-    package = pkgs.callPackage ../../nixpkgs/usbguard.nix { };
+    # Pinned nixpkgs already includes the required C++20 build fix.
     enable = true;
     IPCAllowedUsers = [ "root" ];
     IPCAllowedGroups = [ ];

@@ -61,6 +61,12 @@ pkgs.testers.runNixOSTest {
     host.succeed(inside + "sh -c " + shlex.quote("echo " + shlex.quote(key) + " > /home/cody-ai/.ssh/authorized_keys; chown cody-ai:cody-ai /home/cody-ai/.ssh/authorized_keys"))
     ssh = "ssh -n -o StrictHostKeyChecking=accept-new -i /root/ai-key cody-ai@192.168.1.100 "
     client.wait_until_succeeds(ssh + "true")
+    # /tmp is disk-backed, private from the host /tmp, and survives restart.
+    assert host.succeed(inside + "findmnt -n -o FSTYPE -T /tmp").strip() != "tmpfs"
+    client.succeed(ssh + shlex.quote("set -e; test $(stat -c %a /tmp) = 1777; echo scratch-proof > /tmp/ai-disk-proof; printf '#!/bin/sh\\nexit 0\\n' > /tmp/ai-exec-proof; chmod +x /tmp/ai-exec-proof; /tmp/ai-exec-proof"))
+    host.succeed("grep scratch-proof /var/lib/warbler-ai/tmp/ai-disk-proof")
+    host.fail("test -e /tmp/ai-disk-proof")
+    host.fail("runuser -u cody-ai -- test -r /var/lib/warbler-ai/tmp/ai-disk-proof")
     host.wait_for_unit("ai-container-ssh.socket")
     host.wait_until_succeeds("ip -4 address show ai-ssh | grep 10.79.0.1/24")
     host.wait_until_succeeds(inside + "ip -4 address show ai-ssh | grep 10.79.0.2/24")
@@ -92,6 +98,7 @@ pkgs.testers.runNixOSTest {
     host.wait_until_succeeds(inside + "test -S /home/cody-ai/.codex/app-server-control/app-server-control.sock")
     host.succeed(inside + "test -f /home/cody-ai/workspaces/service-proof")
     host.succeed(inside + "test -f /home/cody-ai/workspaces/codex-proof")
+    host.succeed(inside + "grep scratch-proof /tmp/ai-disk-proof")
     client.wait_until_succeeds(proxy_ssh + "true")
     host.succeed("test -f /home/cody-ai/host-only")
   '';

@@ -174,6 +174,20 @@ Conflicting settings and caches remain available in the full migration archive.
 
 ## Boundaries
 
+The container's `/tmp` is a writable bind mount of `/var/lib/warbler-ai/tmp`
+on the host's encrypted SSD. Its host parent is root-only; it is separate from
+both the host `/tmp` and the legacy host AI account. It shares the SSD's free
+space rather than having a small RAM limit. Files survive container restarts;
+the guest's standard tmpfiles policy removes aged entries after 10 days.
+
+Scratch storage inherits `noatime`. On Btrfs, the directory has `chattr +C`,
+so new files avoid data copy-on-write, data checksums, and compression. This
+favors disposable build scratch over crash durability and integrity; metadata
+protection and explicit application sync calls still work normally. No global
+filesystem durability settings are changed. Executables are allowed for builds.
+Changing this bind mount requires a container restart, ending its running
+sessions; save needed files from an existing tmpfs before that restart.
+
 This is a shared-kernel system container, not a VM. It has no host-home,
 `/persist`, secrets, or host systemd/D-Bus bind mounts. Standard NixOS containers
 share the read-only Nix store and the host Nix daemon; UID 1001 has the same

@@ -31,6 +31,8 @@ def configure(path, cache_home, *, if_missing=False):
     if not isinstance(roots, tomlkit.items.Array) or not all(isinstance(root, str) for root in roots):
         raise ValueError("sandbox_workspace_write.writable_roots must be an array of strings")
     document["sandbox_mode"] = "workspace-write"
+    document.setdefault("approval_policy", "on-request")
+    document.setdefault("approvals_reviewer", "auto_review")
     sandbox["network_access"] = True
     for cache in CACHES:
         root = str(cache_home / cache)

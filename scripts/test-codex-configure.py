@@ -33,6 +33,9 @@ class ConfigureTests(unittest.TestCase):
         self.assertTrue(configure.configure(self.path, self.cache, if_missing=True))
         self.assertFalse(self.path.is_symlink())
         self.assertEqual(stat.S_IMODE(self.path.stat().st_mode), 0o600)
+        document = tomlkit.parse(self.path.read_text())
+        self.assertEqual(document["approval_policy"], "on-request")
+        self.assertEqual(document["approvals_reviewer"], "auto_review")
         self.write('# Codex changed this\nsandbox_mode = "read-only"\n')
         before = self.path.read_bytes()
         self.assertFalse(configure.configure(self.path, self.cache, if_missing=True))
@@ -56,6 +59,8 @@ trust_level = "trusted"
         self.assertIn('# keep roots', text)
         self.assertEqual(document["model"], "my-model")
         self.assertEqual(document["sandbox_mode"], "workspace-write")
+        self.assertEqual(document["approval_policy"], "on-request")
+        self.assertEqual(document["approvals_reviewer"], "auto_review")
         sandbox = document["sandbox_workspace_write"]
         self.assertTrue(sandbox["network_access"])
         self.assertTrue(sandbox["exclude_slash_tmp"])
@@ -63,6 +68,24 @@ trust_level = "trusted"
         self.assertEqual(document["projects"]["/my/project"]["trust_level"], "trusted")
         self.assertFalse(configure.configure(self.path, self.cache))
         self.assertEqual(self.path.read_text(), text)
+
+    def test_update_preserves_explicit_approval_settings(self):
+        for settings in (
+            'approval_policy = "never" # keep policy\n',
+            'approvals_reviewer = "user" # keep reviewer\n',
+            'approval_policy = "on-request"\napprovals_reviewer = "user"\n',
+            'approval_policy = { granular = { sandbox_approval = false } }\n',
+        ):
+            with self.subTest(settings=settings):
+                self.write(settings)
+                configure.configure(self.path, self.cache)
+                text = self.path.read_text()
+                document = tomlkit.parse(text)
+                original = tomlkit.parse(settings)
+                self.assertIn(settings, text)
+                self.assertEqual(document["approval_policy"], original.get("approval_policy", "on-request"))
+                self.assertEqual(document["approvals_reviewer"], original.get("approvals_reviewer", "auto_review"))
+                self.assertFalse(configure.configure(self.path, self.cache))
 
     def test_bad_input_is_not_overwritten(self):
         for text in ('invalid [', 'sandbox_workspace_write = false', '[sandbox_workspace_write]\nwritable_roots = "oops"'):

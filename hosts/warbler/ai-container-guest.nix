@@ -67,7 +67,7 @@ in
   programs.adminCommands.commands.update-codex = [ "${pkgs.systemd}/bin/systemctl" "--user" "start" "codex-ai-update.service" ];
   programs.adminCommands.commands.restart-codex = [ "${pkgs.systemd}/bin/systemctl" "--user" "reload" "codex-ai.service" ];
   networking.hostName = "warbler-ai";
-  imports = [ ../../modules/terminfo.nix ./ai-user-config.nix ../../nixos-modules/git-gh-credentials.nix ];
+  imports = [ ../../modules/terminfo.nix ./ai-user-config.nix ./ai-git.nix ./ai-rust.nix ../../nixos-modules/git-gh-credentials.nix ];
   system.stateVersion = "26.05";
   time.timeZone = "America/New_York";
   documentation.enable = false;

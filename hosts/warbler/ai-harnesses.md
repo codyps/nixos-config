@@ -24,9 +24,13 @@ are not restarted by these configuration hooks.
 standalone Codex install under this account. On first start it downloads and runs
 `https://chatgpt.com/codex/install.sh` as `cody-ai`. It then runs
 `codex app-server daemon bootstrap --remote-control`, enabling Codex's own
-updater. The supervisor checks the daemon every 30 seconds and starts it when missing.
-Lifecycle failures are retried without killing existing processes. Both detached children stay inside the systemd sandbox.
-The managed package tree is `~/.codex/packages/standalone`; updates survive
+updater when automatic updates are enabled. The supervisor checks the daemon
+every 30 seconds and starts it when missing. Locally pinned packages work without
+an updater. Lifecycle failures are retried without killing existing processes.
+Both detached children stay inside the systemd sandbox.
+The CLI package tree is `~/.codex/packages/standalone`; newer Codex versions
+keep a separate daemon package under `~/.codex/packages/app-server-daemon`.
+Codex manages updater eligibility and PID files. Updates survive
 reboots and are independent of `flake.lock`. First installation needs internet
 access; subsequent starts use the installed copy while Codex checks for updates.
 
@@ -35,7 +39,16 @@ access. It opens no additional firewall ports. The SSH-facing native `codex app-
 command connects to this same process, so the desktop and phone use the same
 account, history, workspaces, and service restrictions.
 
+For newer Codex versions, the host service and SSH sandbox share only
+`/tmp/codex-daemon-1001`, the AI account's mode-0700 control-socket directory.
+Their remaining temporary files stay private. The account's existing UID 1001
+is now explicit so the reserved socket path is stable.
+
 ## GitHub HTTPS authentication
+
+Both AI environments apply `Cody P Schafer <dev@codyps.com>` to the AI user's
+`~/.gitconfig` at every activation through `ai-git.nix`. Other Git settings
+are preserved; repository-local identities can still override these defaults.
 
 Warbler and its AI container set `programs.git.config.credential` to use
 `gh auth git-credential` for GitHub and Gist HTTPS URLs. Nix generates
@@ -51,6 +64,60 @@ another helper does not override the default. To opt out persistently, set an
 empty global helper for the relevant HTTPS host.
 
 ## Activate and authenticate
+
+### Setup coverage and remaining logins
+
+Nix provisions the account, authorized SSH keys, persistent private home,
+Git identity and HTTPS credential helpers, Codex installation/service and initial
+sandbox configuration, writable Python environment, and npm/Bun/pnpm paths.
+Both environments provide Make, CMake, pkg-config, and ZIP tools for common
+build/install scripts. The `ai-rust.service` bootstraps a minimal stable Rust
+toolchain through Rustup when no default is set, preserving existing defaults.
+It retries failed downloads independently of Codex and never downloads during
+Nix activation. Project-specific toolchains and dependencies remain selected
+by each project. Hermes installation and provider setup
+remain explicit steps in the [container guide](ai-container.md).
+For an immediate manual bootstrap, run `rustup default stable`.
+Repositories with a toolchain file can let rustup
+install the specified version when Cargo first runs.
+
+Check authentication inside each environment (these do not print tokens):
+
+```sh
+gh auth status
+codex login status
+```
+
+For an account that needs GitHub authentication, run:
+
+```sh
+gh auth login --hostname github.com --git-protocol https --web
+```
+
+This requires browser approval once; `gh auth setup-git` is unnecessary because
+Nix already installs the credential helper. Use HTTPS remotes: the host sandbox
+does not forward your SSH agent. Logins persist across rebuilds and reboots.
+
+Unattended GitHub provisioning is possible with a dedicated token supplied at
+runtime using `GH_TOKEN`, or `gh auth login --hostname github.com --git-protocol
+https --with-token` reading a classic PAT from stdin. Prefer `GH_TOKEN` for
+fine-grained PATs. A deployment can decrypt a SOPS secret into the target's
+private home; a host `/run/secrets` path is intentionally invisible to these
+sandboxes. No token is provisioned by this configuration. See the
+[GitHub CLI authentication documentation](https://cli.github.com/manual/gh_auth_login).
+
+For Codex, device login requires browser approval. The
+[official OpenAI documentation](https://developers.openai.com/codex/auth#login-on-headless-devices)
+also supports a one-time transfer of an existing `~/.codex/auth.json` over SSH
+to the target's private `.codex` directory (directory mode 0700, file mode 0600).
+The destination must remain writable for token refresh; do not continually
+replace it from a stale secret or mount one shared auth file into both homes.
+This configuration does not copy credentials automatically. API-key login can
+be automated, but uses API billing and does not replace ChatGPT login for
+remote control. After login or a credential transfer, restart the corresponding
+Codex service as described below or in the container guide.
+
+### Deployment and Codex pairing
 
 After reviewing/building the configuration, deploy with the existing remote
 rebuild wrapper (`nix run .#warbler-nixos-rebuild-remote -- switch`). That command
@@ -171,7 +238,7 @@ harnesses must be isolated from one another.
 SSH Bash sessions and the managed service share Git, gh, GCC (C/C++), rustup, mbx, Node.js/npm,
 Bun, uv, pnpm, Vite+ (`vp`), Python, ripgrep, and jq. The account module owns this environment directly,
 so service processes receive it without depending on Home Manager login hooks.
-Run `rustup default stable` once to select/download a Rust toolchain.
+The shared `ai-rust.service` initializes a default stable toolchain through Rustup.
 
 `npm install -g` installs under `~/.npm-global`; ordinary `npm install` uses the
 project directory. Python automatically creates a writable default virtual

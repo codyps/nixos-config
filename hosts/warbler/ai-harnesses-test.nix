@@ -17,10 +17,9 @@ pkgs.testers.runNixOSTest {
     # Offline fixture for the mutable standalone layout; the real service uses
     # OpenAI's installer. Exercise the actual pinned daemon and updater logic.
     systemd.services.codex-ai.preStart = lib.mkBefore ''
-      mkdir -p /home/cody-ai/.codex/packages/standalone/current/bin
-      # Use the binary: Nixpkgs' wrapper prepends its unpatched Bubblewrap.
-      cp ${pkgs.codex}/bin/.codex-wrapped /home/cody-ai/.codex/packages/standalone/current/bin/codex
-      chmod u+w /home/cody-ai/.codex/packages/standalone/current/bin/codex
+      mkdir -p /home/cody-ai/.codex/packages/standalone/current
+      cp -r ${import ./codex-test-package.nix { inherit pkgs; }}/. /home/cody-ai/.codex/packages/standalone/current/
+      chmod -R u+w /home/cody-ai/.codex/packages/standalone/current
     '';
     systemd.tmpfiles.rules = [
       "d /persist 0755 root root -"
@@ -31,14 +30,16 @@ pkgs.testers.runNixOSTest {
       "f /root/private-test 0644 root root -"
     ];
     environment.systemPackages = [ pkgs.python3 pkgs.jq ];
-    virtualisation.memorySize = 2048;
+    # The CLI and daemon now keep separate complete runtime packages.
+    virtualisation.diskSize = 4096;
+    virtualisation.memorySize = 4096;
   };
   testScript = ''
     import shlex
 
     machine.start()
     machine.wait_for_unit("codex-ai.service")
-    machine.wait_until_succeeds("test -S /home/cody-ai/.codex/app-server-control/app-server-control.sock")
+    machine.wait_until_succeeds("test -S /home/cody-ai/.codex/app-server-control/app-server-control.sock", timeout=120)
     assert machine.succeed("id -Gn cody-ai").strip() == "cody-ai"
     machine.fail("su - cody-ai -c 'sudo -n true'")
     machine.fail("su - cody-ai -c 'cat /home/cody/private-test'")
@@ -46,6 +47,8 @@ pkgs.testers.runNixOSTest {
     machine.succeed("ssh-keygen -q -t ed25519 -N \"\" -f /root/ai-test-key")
     machine.succeed("install -d -m 700 -o cody-ai -g cody-ai /home/cody-ai/.ssh; cp /root/ai-test-key.pub /home/cody-ai/.ssh/authorized_keys; chown cody-ai:cody-ai /home/cody-ai/.ssh/authorized_keys")
     ssh = "ssh -n -o StrictHostKeyChecking=accept-new -i /root/ai-test-key cody-ai@localhost"
+    assert machine.succeed(ssh + " 'git config user.name'").strip() == "Cody P Schafer"
+    assert machine.succeed(ssh + " 'git config user.email'").strip() == "dev@codyps.com"
     machine.succeed("python3 ${../../scripts/test-warbler-ai-terminal.py} " + ssh.replace("ssh -n ", "ssh -tt ", 1))
     # Downloaded Linux executables need the host's nix-ld entry point.
     assert "Hello, world!" in machine.succeed(ssh + " 'test ! -w /lib64/ld-linux-x86-64.so.2 && ${genericLinuxExecutable}'")
@@ -75,7 +78,7 @@ pkgs.testers.runNixOSTest {
     machine.succeed("su - cody-ai -c 'codex app-server daemon version'")
     machine.succeed("jq -e .remoteControlEnabled /home/cody-ai/.codex/app-server-daemon/settings.json")
     # The supervisor must restore a dead daemon without losing its sandbox.
-    machine.succeed("kill -KILL $(jq -r .pid /home/cody-ai/.codex/app-server-daemon/app-server.pid)")
+    machine.succeed("kill -KILL $(jq -r .pid /home/cody-ai/.codex/app-server-daemon/daemon.pid)")
     machine.wait_until_succeeds("su - cody-ai -c 'codex app-server daemon version'", timeout=90)
     machine.succeed("systemctl restart codex-ai")
     machine.wait_until_succeeds("test -S /home/cody-ai/.codex/app-server-control/app-server-control.sock")

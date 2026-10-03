@@ -1,7 +1,11 @@
 { config, lib, pkgs, ... }:
 let
   user = "cody-ai";
+  uid = 1001;
   home = "/home/${user}";
+  # New Codex releases keep the physical control socket at this reserved path.
+  # Share only this directory across the service and SSH private /tmp mounts.
+  socketDirectory = "/tmp/codex-daemon-${toString uid}";
   # The pinned Nixpkgs does not yet package Vite+'s global CLI. Use the
   # upstream GNU release and patch its loader for NixOS.
   vitePlus = pkgs.stdenvNoCC.mkDerivation rec {
@@ -32,7 +36,7 @@ let
     };
   };
   aiBubblewrap = pkgs.callPackage ./ai-bubblewrap.nix { };
-  codingTools = with pkgs; [ git gh gcc aiBubblewrap bazelisk (writeShellScriptBin "bazel" ''exec ${bazelisk}/bin/bazelisk "$@"'') rustup mbx nodejs bun uv pnpm vitePlus python3 ripgrep jq ];
+  codingTools = with pkgs; [ git gh gcc gnumake cmake pkg-config unzip zip aiBubblewrap bazelisk (writeShellScriptBin "bazel" ''exec ${bazelisk}/bin/bazelisk "$@"'') rustup mbx nodejs bun uv pnpm vitePlus python3 ripgrep jq ];
   localBinPaths = map (path: "${home}/${path}") [
     ".local/share/python-default/bin"
     ".local/bin"
@@ -112,6 +116,7 @@ let
       --dir /bin --symlink ${pkgs.bash}/bin/bash /bin/sh \
       --dir /usr/bin --symlink ${pkgs.coreutils}/bin/env /usr/bin/env \
       --proc /proc --dev /dev --tmpfs /tmp --tmpfs /var/tmp \
+      --bind ${socketDirectory} ${socketDirectory} \
       --bind ${home} ${home} --chdir "$PWD" \
       --unsetenv BASH_ENV --unsetenv ENV \
       --setenv SHELL ${pkgs.bashInteractive}/bin/bash \
@@ -197,7 +202,7 @@ let
   '';
 in
 {
-  imports = [ ./ai-user-config.nix ../../nixos-modules/git-gh-credentials.nix ];
+  imports = [ ./ai-user-config.nix ./ai-git.nix ./ai-rust.nix ../../nixos-modules/git-gh-credentials.nix ];
 
   options.services.codex-ai.stdioForwarder.enable = lib.mkEnableOption
     "the custom JSON-lines stdio compatibility adapter for Codex";
@@ -210,6 +215,7 @@ in
     users.groups.${user} = { };
     users.users.${user} = {
       isNormalUser = true;
+      inherit uid;
       description = "Cody's isolated AI harness account";
       group = user;
       extraGroups = [ ];
@@ -227,6 +233,7 @@ in
       "d ${home} 0700 ${user} ${user} -"
       "d ${home}/workspaces 0700 ${user} ${user} -"
       "d ${home}/.codex 0700 ${user} ${user} -"
+      "d ${socketDirectory} 0700 ${user} ${user} -"
       "z /home/cody 0700 cody users -"
     ];
 
@@ -282,7 +289,7 @@ in
         AmbientCapabilities = "";
         ProtectSystem = "strict";
         ProtectHome = "tmpfs";
-        BindPaths = [ home ];
+        BindPaths = [ home socketDirectory ];
         ReadWritePaths = [ home ];
         InaccessiblePaths = [ "-/persist" "-/run/secrets" "-/run/user" "-/run/dbus" "-/run/systemd/private" ];
         PrivateTmp = true;

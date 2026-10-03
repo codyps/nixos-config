@@ -13,10 +13,9 @@ pkgs.testers.runNixOSTest {
         # Keep the test offline, exercising the foreground app server.
         systemd.user.timers.codex-ai-update.enable = lib.mkForce false;
         systemd.user.services.codex-ai.preStart = ''
-          mkdir -p "$HOME/.codex/packages/standalone/current/bin"
-          # Use the binary: Nixpkgs' wrapper prepends its unpatched Bubblewrap.
-          cp ${pkgs.codex}/bin/.codex-wrapped "$HOME/.codex/packages/standalone/current/bin/codex"
-          chmod u+w "$HOME/.codex/packages/standalone/current/bin/codex"
+          mkdir -p "$HOME/.codex/packages/standalone/current"
+          cp -r ${import ./codex-test-package.nix { inherit pkgs; }}/. "$HOME/.codex/packages/standalone/current/"
+          chmod -R u+w "$HOME/.codex/packages/standalone/current"
         '';
       };
       nix.settings.allowed-users = [ "root" "cody-ai" ];
@@ -28,6 +27,7 @@ pkgs.testers.runNixOSTest {
         "f /persist/host-only 0644 root root - host-only"
       ];
       virtualisation.memorySize = 4096;
+      virtualisation.diskSize = 4096;
       virtualisation.cores = 4;
     };
     client = { ... }: {
@@ -80,6 +80,8 @@ pkgs.testers.runNixOSTest {
     host.succeed(inside + "ip -4 route show default | grep mv-eth1")
     host.fail(inside + "ip -4 route show default | grep ai-ssh")
     client.succeed(ssh + shlex.quote("set -e; test $(hostname) = warbler-ai; test $(id -un) = cody-ai; test ! -e /home/cody-ai/host-only; test ! -e /persist/host-only; /bin/bash -c 'echo bash-ok'; /bin/kill -0 $$; /usr/bin/env bash -c true; systemctl --user is-active codex-ai; test $(loginctl show-user cody-ai -p Linger --value) = yes; nix store ping --store daemon"))
+    assert client.succeed(ssh + "'git config user.name'").strip() == "Cody P Schafer"
+    assert client.succeed(ssh + "'git config user.email'").strip() == "dev@codyps.com"
     # Same service access from a background task, without an interactive login.
     client.succeed(ssh + shlex.quote("systemd-run --user --wait --pipe /bin/bash -lc 'test -S /run/user/1001/bus; systemctl --user is-active codex-ai; command -v git uv pip node; touch ~/workspaces/service-proof'"))
     # Exercise the real control socket and a Codex service child, no model/auth.

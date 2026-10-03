@@ -24,6 +24,9 @@ with subprocess.Popen(
     result = request(2, "command/exec", {
         "command": ["bash", "-c", """
 set -eux
+test "$(git config user.name)" = "Cody P Schafer"
+test "$(git config user.email)" = "dev@codyps.com"
+for tool in make cmake pkg-config unzip zip; do command -v "$tool"; done
 test "$(id -un)" = cody-ai
 test "$(id -Gn)" = cody-ai
 test ! -r /home/cody/private-test

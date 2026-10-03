@@ -20,6 +20,8 @@ with unix_connect(
     result = request(2, "command/exec", {
         "command": ["/bin/bash", "-lc", """
 set -eux
+test "$(git config user.name)" = "Cody P Schafer"
+test "$(git config user.email)" = "dev@codyps.com"
 test "$(id -un)" = cody-ai
 test "$(hostname)" = warbler-ai
 test ! -e /persist/host-only

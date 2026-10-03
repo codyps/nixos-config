@@ -78,6 +78,9 @@ ssh -t cody@warbler 'sudo nixos-container root-login ai'
 GitHub HTTPS operations default to this account's own `gh` login through
 Nix-managed `/etc/gitconfig`. See [GitHub HTTPS authentication](ai-harnesses.md#github-https-authentication)
 for defaults and repository overrides.
+The same shared module also applies your Git identity at activation. See
+[setup coverage and remaining logins](ai-harnesses.md#setup-coverage-and-remaining-logins)
+for the automated setup, login checks, and unattended credential options.
 
 ## Services and compatibility
 

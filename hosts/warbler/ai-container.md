@@ -59,6 +59,11 @@ veth pair (`10.79.0.1/24` on the host, `10.79.0.2/24` in the guest) carries the 
 traffic without changing the guest's LAN DHCP lease or default route. No
 Tailscale subnet route or separate container Tailscale identity is required.
 
+The SSH proxy stops with its socket when `tailscale0` disappears and starts
+listening again when the interface returns. Restarting Tailscale can disconnect
+proxied SSH sessions, but does not restart the AI container. This also avoids
+retaining a listener bound to a removed interface across NixOS activations.
+
 Warbler also advertises **`10.79.0.2/32`** as a Tailscale subnet route. Once
 approved in the Tailscale admin console (or by an auto-approver), clients that
 accept subnet routes can use `ssh cody-ai@10.79.0.2` on the normal port 22.

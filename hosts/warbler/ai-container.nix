@@ -46,7 +46,9 @@
   networking.firewall.interfaces.${config.services.tailscale.interfaceName}.allowedTCPPorts = [ 2223 ];
   systemd.sockets.ai-container-ssh = {
     description = "AI container SSH over Warbler Tailscale";
-    wantedBy = [ "sockets.target" ];
+    # BindToDevice stops the socket when Tailscale removes its interface.
+    # Start it again whenever the replacement device appears, including boot.
+    wantedBy = [ "sys-subsystem-net-devices-${config.services.tailscale.interfaceName}.device" ];
     socketConfig = {
       ListenStream = "2223";
       BindToDevice = config.services.tailscale.interfaceName;
@@ -56,7 +58,10 @@
   systemd.services.ai-container-ssh = {
     description = "Proxy Tailscale SSH connections to the AI container";
     requires = [ "container@ai.service" ];
-    after = [ "container@ai.service" ];
+    # Drop the inherited listener before its bound interface/socket disappears.
+    # Otherwise the old proxy prevents the replacement socket from starting.
+    bindsTo = [ "ai-container-ssh.socket" ];
+    after = [ "container@ai.service" "ai-container-ssh.socket" ];
     serviceConfig = {
       ExecStart = "${pkgs.systemd}/lib/systemd/systemd-socket-proxyd 10.79.0.2:22";
       DynamicUser = true;

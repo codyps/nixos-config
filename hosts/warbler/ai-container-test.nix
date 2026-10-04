@@ -5,7 +5,10 @@ pkgs.testers.runNixOSTest {
     host = { lib, ... }: {
       imports = [ ./ai-container.nix ];
       # Model the trusted Tailscale interface separately from the other LAN.
-      services.tailscale.interfaceName = "eth1";
+      services.tailscale.interfaceName = "testvpn";
+      networking.dhcpcd.denyInterfaces = [ "testvpn" ];
+      # Answer for the disposable interface only on its own MAC address.
+      boot.kernel.sysctl."net.ipv4.conf.all.arp_ignore" = 1;
       virtualisation.vlans = [ 1 2 ];
       containers.ai.macvlans = lib.mkForce [ "eth1" ];
       containers.ai.config = {
@@ -70,7 +73,14 @@ pkgs.testers.runNixOSTest {
     host.succeed("grep scratch-proof /var/lib/warbler-ai/tmp/ai-disk-proof")
     host.fail("test -e /tmp/ai-disk-proof")
     host.fail("runuser -u cody-ai -- test -r /var/lib/warbler-ai/tmp/ai-disk-proof")
-    host.wait_for_unit("ai-container-ssh.socket")
+    # A disposable interface models tailscaled deleting and recreating its TUN.
+    def create_vpn():
+        host.succeed("ip link add testvpn link eth1 type macvlan mode bridge")
+        host.succeed("ip address add 192.168.3.200/24 dev testvpn")
+        host.succeed("ip link set testvpn up")
+        host.wait_for_unit("ai-container-ssh.socket")
+    client.succeed("ip address add 192.168.3.1/24 dev eth1")
+    create_vpn()
     host.wait_until_succeeds("ip -4 address show ai-ssh | grep 10.79.0.1/24")
     host.wait_until_succeeds(inside + "ip -4 address show ai-ssh | grep 10.79.0.2/24")
     # Tailscale subnet traffic is SNATed to the host on this private link.
@@ -82,9 +92,20 @@ pkgs.testers.runNixOSTest {
     def host_address(interface):
         addresses = json.loads(host.succeed(f"ip -j -4 address show {interface}"))[0]["addr_info"]
         return next(address["local"] for address in addresses if address["scope"] == "global")
-    proxy_ssh = "ssh -n -o StrictHostKeyChecking=accept-new -i /root/ai-key -p 2223 cody-ai@" + host_address("eth1") + " "
+    proxy_ssh = "ssh -n -o ConnectTimeout=5 -o StrictHostKeyChecking=accept-new -i /root/ai-key -p 2223 cody-ai@192.168.3.200 "
     assert client.succeed(proxy_ssh + "hostname").strip() == "warbler-ai"
     client.fail("nc -z -w 3 " + host_address("eth2") + " 2223")
+    container_pid = host.succeed("systemctl show container@ai -p MainPID --value").strip()
+    for _ in range(2):
+        host.wait_for_unit("ai-container-ssh.service")
+        old_index = host.succeed("cat /sys/class/net/testvpn/ifindex").strip()
+        host.succeed("ip link delete testvpn")
+        host.wait_until_succeeds("test $(systemctl show ai-container-ssh.socket -p ActiveState --value) = inactive")
+        host.wait_until_succeeds("test $(systemctl show ai-container-ssh.service -p ActiveState --value) = inactive")
+        create_vpn()
+        assert host.succeed("cat /sys/class/net/testvpn/ifindex").strip() != old_index
+        client.wait_until_succeeds(proxy_ssh + "true")
+        assert host.succeed("systemctl show container@ai -p MainPID --value").strip() == container_pid
     # The private link must not replace the macvlan DHCP default route.
     host.succeed(inside + "ip -4 route show default | grep mv-eth1")
     host.fail(inside + "ip -4 route show default | grep ai-ssh")

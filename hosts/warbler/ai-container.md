@@ -94,6 +94,34 @@ for the automated setup, login checks, and unattended credential options.
 
 ## Services and compatibility
 
+### Performance and memory analysis
+
+The container includes `perf`, Valgrind (including Massif and
+Callgrind), heaptrack, GDB, strace, sysstat (`pidstat`, `iostat`, `mpstat`), htop,
+smem, GNU time, hyperfine, and FlameGraph tools. They are on the PATH for both
+SSH sessions and agent/user-service tasks.
+Their environment sets `SYSFS_PATH=/sys` so perf discovers events correctly
+through nspawn's assembled sysfs mounts.
+
+For example, run `perf stat -- ./program`,
+`perf record -g --call-graph dwarf -- ./program`, `perf report`,
+`heaptrack ./program`, `heaptrack_print heaptrack.program.*.gz`,
+`valgrind --tool=massif ./program`, or `pidstat -r -u -p PID 1`.
+Use `gdb -p PID` or `strace -p PID` to attach to a running `cody-ai` process.
+Hardware counter availability depends on the host CPU; `perf stat -e task-clock
+-- ./program` uses a software event.
+
+The host sets `kernel.perf_event_paranoid=1` for per-process user/kernel profiling
+and `kernel.yama.ptrace_scope=0` for attachment to same-user dumpable processes.
+These settings apply to **all of Warbler**, including other local users. The
+container allows the perf and debugger syscalls but grants no additional user
+capabilities or sudo access. System-wide perf (`perf -a`), raw kernel tracing,
+and inspecting other users' processes remain privileged operations.
+
+After deploying this change, restart `container@ai.service` on Warbler during
+an idle window: the nspawn syscall filter cannot be updated by guest reload.
+This restart interrupts running container sessions and tasks.
+
 The container runs its own systemd, D-Bus, and SSH server. Its `cody-ai` user
 has lingering enabled, so the user manager starts at boot and survives logout.
 SSH and agent tasks share the container filesystem and user-manager sockets.

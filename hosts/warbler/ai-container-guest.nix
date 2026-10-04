@@ -26,6 +26,9 @@ let
     "/bin"
   ]);
   codingEnvironment = {
+    # nspawn assembles /sys from bind mounts. perf's mount autodetection picks
+    # /sys/block as the root otherwise, hiding all hardware/software events.
+    SYSFS_PATH = "/sys";
     NPM_CONFIG_PREFIX = "${home}/.npm-global";
     BUN_INSTALL = "${home}/.bun";
     PNPM_HOME = "${home}/.local/share/pnpm";
@@ -174,6 +177,18 @@ in
     file
     which
     procps
+    # CPU, heap, syscall, and process/I/O profiling for AI development tasks.
+    perf
+    valgrind
+    heaptrack
+    gdb
+    strace
+    sysstat
+    htop
+    smem
+    time
+    hyperfine
+    flamegraph
     findutils
     gnugrep
     gnused

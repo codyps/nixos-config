@@ -67,6 +67,13 @@ pkgs.testers.runNixOSTest {
     host.succeed(inside + "sh -c " + shlex.quote("echo " + shlex.quote(key) + " > /home/cody-ai/.ssh/authorized_keys; chown cody-ai:cody-ai /home/cody-ai/.ssh/authorized_keys"))
     ssh = "ssh -n -o StrictHostKeyChecking=accept-new -i /root/ai-key cody-ai@192.168.1.100 "
     client.wait_until_succeeds(ssh + "true")
+    # Exercise permissions as the actual unprivileged SSH user. Software perf
+    # events work without a hardware PMU in the nested test VM.
+    client.succeed(ssh + shlex.quote("set -e; command -v perf valgrind heaptrack heaptrack_print gdb strace pidstat iostat mpstat htop smem time hyperfine flamegraph.pl; perf stat -e task-clock -- sleep 0.1"))
+    client.succeed(ssh + shlex.quote("set -e; sleep 60 & target=$!; trap 'kill $target' EXIT; gdb -nx -batch -ex \"attach $target\" -ex detach -ex quit 2>&1 | tee /tmp/gdb-profile-check; grep 'detached' /tmp/gdb-profile-check"))
+    client.succeed(ssh + shlex.quote("set -e; strace -o /tmp/strace-profile-check true; valgrind --error-exitcode=1 true"))
+    client.succeed(ssh + shlex.quote("systemd-run --user --wait --pipe perf stat -e task-clock -- sleep 0.1"))
+    client.fail(ssh + shlex.quote("perf stat -a -e task-clock -- sleep 0.1"))
     # /tmp is disk-backed, private from the host /tmp, and survives restart.
     assert host.succeed(inside + "findmnt -n -o FSTYPE -T /tmp").strip() != "tmpfs"
     client.succeed(ssh + shlex.quote("set -e; test $(stat -c %a /tmp) = 1777; echo scratch-proof > /tmp/ai-disk-proof; printf '#!/bin/sh\\nexit 0\\n' > /tmp/ai-exec-proof; chmod +x /tmp/ai-exec-proof; /tmp/ai-exec-proof"))

@@ -1,11 +1,27 @@
 { config, pkgs, ... }:
 {
+  # These controls are host-wide, not namespaced. Allow per-process profiling
+  # (including kernel time) and debugger attachment to same-UID dumpable tasks.
+  # System-wide perf and tracing other users still require privileges.
+  boot.kernel.sysctl = {
+    "kernel.perf_event_paranoid" = 1;
+    "kernel.yama.ptrace_scope" = 0;
+  };
+
   # Primary AI environment: keep its persistent home separate from the legacy host home.
   # /var/lib is already persisted on Warbler's encrypted /persist filesystem.
   containers.ai = {
     autoStart = true;
     restartIfChanged = false;
     ephemeral = false;
+    # nspawn otherwise filters perf_event_open; explicitly permit debugging
+    # syscalls too, without granting cody-ai capabilities or sudo access.
+    extraFlags = [
+      "--system-call-filter=perf_event_open"
+      "--system-call-filter=ptrace"
+      "--system-call-filter=process_vm_readv"
+      "--system-call-filter=process_vm_writev"
+    ];
     # Replace nspawn's small tmpfs with private, disk-backed scratch space.
     bindMounts."/tmp" = {
       hostPath = "/var/lib/warbler-ai/tmp";

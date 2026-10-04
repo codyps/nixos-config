@@ -20,6 +20,8 @@
       imports = [ ./ai-container-guest.nix ];
       nixpkgs.pkgs = pkgs;
       networking.interfaces.ai-ssh.ipv4.addresses = [{ address = "10.79.0.2"; prefixLength = 24; }];
+      # Allow all ports on the private link used by Tailscale's subnet route.
+      networking.firewall.trustedInterfaces = [ "ai-ssh" ];
     };
   };
   systemd.services."container@ai" = {

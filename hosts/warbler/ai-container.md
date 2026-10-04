@@ -67,6 +67,11 @@ Tailscale's default subnet SNAT provides the return path, preserving the
 container's LAN default route. The `10.78.0.0/24` range belongs to the Actions
 VM scaler and must not be reused for this container.
 
+The container trusts the private `ai-ssh` interface, so its firewall allows all
+ports and protocols through the `10.79.0.2` subnet route. Services must listen on
+that address or a wildcard address to be reachable. The LAN interface retains
+its firewall and explicit port allowances.
+
 Macvlan does not allow direct communication between the host and its own child
 interface. Administer locally through the container manager instead:
 
@@ -100,6 +105,27 @@ needed; new tmux servers and Codex sessions pick up the settings.
 support conventional scripts. `nix-ld` supports standard Linux dynamic loaders.
 This remains NixOS: software that requires apt, arbitrary FHS libraries, a
 desktop, GPU access, or privileged installation may need additional packaging.
+
+### Shell environments and history
+
+`nix-shell`, `nix develop`, and flake commands are available to `cody-ai`.
+Both `<nixpkgs>` (including `nix-shell -p`) and the `nixpkgs` flake registry entry
+use the nixpkgs source pinned by this configuration; no channel setup is needed.
+
+Interactive Bash sessions load Atuin with the shared history/search settings.
+Ctrl-R opens Atuin search; the up arrow keeps normal Bash behavior. History stays
+in the container user's home, with a socket-activated `atuin-daemon` user service.
+Existing Bash history can be imported with `atuin import bash`; syncing requires
+the user's own Atuin login.
+
+Bash also loads direnv with [nix-direnv](https://github.com/nix-community/nix-direnv),
+which caches Nix environments for faster reuse. In a project with a `flake.nix`,
+add `use flake` to `.envrc`; for a legacy `shell.nix`, use `use nix`.
+Run `direnv allow` after reviewing the file.
+Agent tasks and other noninteractive commands can use `direnv exec . COMMAND`.
+Open a new shell after activation to pick up the hooks.
+
+### Agent services
 
 Codex runs in the foreground as a **user** service. Systemd tracks the actual
 app-server process; there is no detached-daemon PID-file watchdog or native
@@ -222,9 +248,11 @@ require an explicit restart after the host switch:
 ssh cody@warbler 'sudo systemctl restart container@ai'
 ```
 
-The offline two-machine VM test verifies a separate DHCP lease, SSH, filesystem
+The offline two-machine VM test verifies a separate DHCP lease, SSH, unrestricted
+private-interface service access with LAN filtering, filesystem
 separation, `/bin/bash`, lingering user systemd, real Codex command execution
-with user-service access, and state surviving container restart. It uses the
+with user-service access, legacy Nix shells, cached flake environments, Atuin
+history, and state surviving container restart. It uses the
 pinned Codex package as an installer fixture. It does not authenticate to
 providers, install Hermes from the internet, prove LAN DHCP on physical hardware,
 or establish desktop/phone pairing.

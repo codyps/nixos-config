@@ -1,4 +1,4 @@
-{ lib, pkgs, ... }:
+{ config, lib, pkgs, ... }:
 let
   user = "cody-ai";
   home = "/home/${user}";
@@ -117,6 +117,31 @@ in
   services.dbus.enable = true;
   programs.nix-ld.enable = true;
   nix.settings.experimental-features = [ "nix-command" "flakes" ];
+  # Containers do not inherit nixosSystem's nixpkgs registry/NIX_PATH pin.
+  # Make both nix-shell -p and nixpkgs# references use our existing sources.
+  nixpkgs.flake.source = builtins.path { path = pkgs.path; name = "source"; };
+  # Legacy shells should resolve locally without fetching the flake registry.
+  nix.settings.nix-path = [ "nixpkgs=${config.nixpkgs.flake.source}" ];
+
+  programs.atuin = {
+    enable = true;
+    enableBashIntegration = true;
+    flags = [ "--disable-up-arrow" ];
+    daemon.enable = true;
+    settings = lib.recursiveUpdate
+      (builtins.fromTOML (builtins.readFile ../../config/.config/atuin/config.toml))
+      {
+        daemon = {
+          systemd_socket = true;
+          socket_path = "$XDG_RUNTIME_DIR/atuin/atuin.sock";
+        };
+      };
+  };
+  programs.direnv = {
+    enable = true;
+    enableBashIntegration = true;
+    nix-direnv.enable = true;
+  };
 
   environment.systemPackages = (with pkgs; [
     bashInteractive
@@ -166,7 +191,10 @@ in
   # User services (including Hermes-generated units) must work without a login.
   environment.etc."environment.d/60-ai.conf".text =
     lib.concatStringsSep "\n" (lib.mapAttrsToList (name: value: "${name}=${value}")
-      (codingEnvironment // { PATH = toolPath; }));
+      (codingEnvironment // {
+        PATH = toolPath;
+        inherit (config.environment.variables) ATUIN_CONFIG_DIR DIRENV_CONFIG;
+      }));
   systemd.tmpfiles.rules = [
     "d ${home}/workspaces 0700 ${user} ${user} -"
     "d ${home}/.codex 0700 ${user} ${user} -"

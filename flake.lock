@@ -580,11 +580,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1791006512,
-        "narHash": "sha256-N1yD7qoiM0gKomqRvw94y7K/PAB/b3I4eo58yQmR8t4=",
+        "lastModified": 1791087523,
+        "narHash": "sha256-DxTZrjzP7divxd1w8lXn3XYlb5CB0yK4se9QnV2FflQ=",
         "owner": "codyps",
         "repo": "zpl",
-        "rev": "f75589b8b7fdf76bdd3a4771d8683fadb0a701a7",
+        "rev": "f12d04498d102dd75f9425087205657edb317548",
         "type": "github"
       },
       "original": {

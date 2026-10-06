@@ -45,6 +45,10 @@ See [validation results](macos-image-validation.md) for the tested boundary and 
 
 ## AI harness account
 
+The [Hindsight memory server](hindsight.md) provides shared REST and MCP memory
+access over Tailscale and the private AI link. Provider setup and activation
+are pending; do not activate while warbler-ai is doing work.
+
 Use the [primary AI container](ai-container.md), `warbler-ai`, for Codex, Hermes,
 and other harnesses. It provides its own LAN DHCP address and user systemd;
 `cody-ai` can manage its services without host administrator access.

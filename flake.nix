@@ -5,7 +5,7 @@
     zpl.inputs.nixpkgs.follows = "nixpkgs";
     zpl.inputs.nixpkgs-intel-darwin.follows = "nixpkgs-darwin";
     zpl.inputs.flake-utils.follows = "flake-utils";
-    atuin.url = "github:codyps/atuin/fuzzy-scoring-allocations";
+    atuin.url = "github:codyps/atuin/fuzzy-scoring-allocations-18.23.0";
     atuin.inputs.nixpkgs.follows = "nixpkgs";
     nix-darwin.url = "github:LnL7/nix-darwin";
     nix-darwin.inputs.nixpkgs.follows = "nixpkgs";

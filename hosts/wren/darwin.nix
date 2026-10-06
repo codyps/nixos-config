@@ -28,7 +28,14 @@
   users.users.cody = {
     name = "cody";
     home = "/Users/cody";
+    # Apple's zsh cannot discover Ghostty terminfo from session search paths.
+    shell = pkgs.zsh;
   };
+  # Existing admin accounts are not in users.knownUsers, so the users module
+  # does not apply their shell setting. Change only the login-shell property.
+  system.activationScripts.postActivation.text = ''
+    /usr/bin/dscl . -create /Users/cody UserShell ${pkgs.zsh}/bin/zsh
+  '';
 
   nix.enable = true;
   nix.package = pkgs.lix;

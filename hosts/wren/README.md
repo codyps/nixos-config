@@ -38,6 +38,8 @@ and preserve existing files before retrying activation.
 
 Wren disables idle sleep and sleep from the power button, restarts after power
 failure, and enables Apple's SSH server. Display sleep remains independent.
+The `cody` account accepts the shared public keys in `nixos/ssh-auth.nix` for
+SSH login.
 Weekly Nix garbage collection runs Sunday at 03:15 and deletes generations
 older than 30 days before collecting unreferenced store paths. Keep a GC root
 for any older generation needed for long-term recovery. Build-time APFS store

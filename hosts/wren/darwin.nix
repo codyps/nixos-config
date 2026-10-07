@@ -28,6 +28,7 @@
   users.users.cody = {
     name = "cody";
     home = "/Users/cody";
+    openssh.authorizedKeys.keys = (import ../../nixos/ssh-auth.nix).authorizedKeys;
     # Apple's zsh cannot discover Ghostty terminfo from session search paths.
     shell = pkgs.zsh;
   };

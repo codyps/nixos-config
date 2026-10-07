@@ -74,6 +74,48 @@ Inspect power settings with `pmset -g custom` and the GC job with
 `sudo launchctl print system/org.nixos.nix-gc`. Builds do not verify these
 activation and recovery behaviors.
 
+## Codex remote control
+
+The `org.nixos.codex-remote-control` system launchd job starts at boot as `cody`,
+without a GUI login. It bootstraps Codex's native daemon with remote control
+enabled, reuses an existing daemon, and checks every 30 seconds that it is
+running. It uses
+`/Users/cody/.codex`, including the existing credentials, configuration, and
+mutable standalone/daemon packages. If the standalone package is absent, it
+runs OpenAI's installer as `cody`. It opens a local Unix socket; remote control
+uses Codex's outbound connection.
+
+After rebuilding, run these commands as `cody`:
+
+```sh
+codex login status
+codex login --device-auth # Only if not already authenticated.
+codex remote-control pair
+sys codex-status
+sys restart-codex
+tail -n 100 ~/.codex-remote-control.log
+```
+
+`sys restart-codex` requests a native daemon restart and can interrupt active
+work. Codex manages its own package updates according to its native settings.
+launchd leaves the native daemon alive when reloading the watchdog. Codex's
+bootstrap may restart an existing daemon when enabling remote control, so the
+initial migration can briefly interrupt sessions.
+Stopping the watchdog alone does not stop the native daemon; to stop everything,
+unload the launchd job first, then run `codex app-server daemon stop` as `cody`.
+The watchdog log is append-only; periodically
+truncate it in place with `truncate -s 0 ~/.codex-remote-control.log`.
+
+Verify remote connectivity and recovery after a reboot without GUI login.
+Credentials must be usable without unlocking the login Keychain. Builds alone
+do not verify this behavior.
+
+Wren also applies a Home Manager compatibility fix for macOS 15: unloading
+LaunchAgents uses `launchctl bootout` and a short delay instead of the macOS
+26-only `--wait` flag. This allows changed Atuin agents to reload during
+activation. Repeating an activation alone would otherwise skip the reload
+after the new plist had already been copied over the old one.
+
 ## Remote Nix builds
 
 The hidden `nix-ssh` account (UID 450) accepts the shared keys in

@@ -1,6 +1,6 @@
 { lib, pkgs, ... }:
 {
-  imports = [ ../../nix-darwin/modules/remote-builder.nix ];
+  imports = [ ../../nix-darwin/modules/remote-builder.nix ../../nix-darwin/modules/codex-remote-control.nix ];
 
   # Intel Mac mini (Macmini8,1), six-core Core i7, 32 GiB RAM.
   nixpkgs.hostPlatform = "x86_64-darwin";
@@ -25,6 +25,7 @@
   };
 
   system.primaryUser = "cody";
+  services.codex-remote-control.enable = true;
   users.users.cody = {
     name = "cody";
     home = "/Users/cody";
@@ -59,6 +60,7 @@
   # Home Manager initializes completions after adding the user profile to fpath.
   programs.zsh.enableGlobalCompInit = false;
 
+  home-manager.users.cody.imports = [ ../../home-manager/launchd-macos-15.nix ];
   # Unattended commits must not wait for an interactive GPG unlock.
   home-manager.users.cody.programs.git.signing.signByDefault = lib.mkForce false;
 }

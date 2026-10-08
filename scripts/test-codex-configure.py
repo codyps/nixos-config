@@ -69,6 +69,19 @@ trust_level = "trusted"
         self.assertFalse(configure.configure(self.path, self.cache))
         self.assertEqual(self.path.read_text(), text)
 
+    def test_update_retires_legacy_cargo_cache_root_without_deleting_data(self):
+        legacy = self.cache / "cargo-targets"
+        legacy.mkdir(parents=True)
+        (legacy / "proof").write_text("cached build")
+        self.write('[sandbox_workspace_write]\nwritable_roots = ['
+                   + repr(str(legacy)) + ', "/custom/cargo-targets"]\n')
+        configure.configure(self.path, self.cache)
+        roots = tomlkit.parse(self.path.read_text())["sandbox_workspace_write"]["writable_roots"]
+        self.assertNotIn(str(legacy), roots)
+        self.assertIn("/custom/cargo-targets", roots)
+        self.assertEqual((legacy / "proof").read_text(), "cached build")
+        self.assertFalse(configure.configure(self.path, self.cache))
+
     def test_update_preserves_explicit_approval_settings(self):
         for settings in (
             'approval_policy = "never" # keep policy\n',

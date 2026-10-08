@@ -3,7 +3,11 @@ let
   user = "cody-ai";
   home = "/home/${user}";
   inherit (import ../../nixos/ssh-auth.nix) authorizedKeys;
+  mbxShimDirectory = "${home}/.local/share/mbx/bin";
+  cargoShim = import ../../nixpkgs/mbx-cargo-shim.nix { inherit pkgs; };
+  mbxTarget = pkgs.writeText "mbx-target" "${pkgs.mbx}/bin/mbx\n";
   localPaths = map (path: "${home}/${path}") [
+    ".local/share/mbx/bin"
     ".local/bin"
     ".local/share/python-default/bin"
     ".cargo/bin"
@@ -144,6 +148,20 @@ in
     enable = true;
     enableBashIntegration = true;
     nix-direnv.enable = true;
+    direnvrcExtra = lib.mkAfter ''
+      # Restore Cargo shim priority after a development shell changes PATH.
+      _mbx_direnv_exit() {
+        local status=$?
+        local shim=${lib.escapeShellArg mbxShimDirectory}
+        if [[ -x "$shim/cargo" && ":$PATH:" == *":$shim:"* ]]; then
+          PATH_add "$shim"
+        fi
+        "$direnv" dump json "" >&3
+        trap - EXIT
+        exit "$status"
+      }
+      trap _mbx_direnv_exit EXIT
+    '';
   };
 
   environment.systemPackages = (with pkgs; [
@@ -211,6 +229,12 @@ in
         inherit (config.environment.variables) ATUIN_CONFIG_DIR DIRENV_CONFIG;
       }));
   systemd.tmpfiles.rules = [
+    "d ${home}/.local 0755 ${user} ${user} -"
+    "d ${home}/.local/share 0755 ${user} ${user} -"
+    "d ${home}/.local/share/mbx 0755 ${user} ${user} -"
+    "d ${home}/.local/share/mbx/bin 0755 ${user} ${user} -"
+    "L+ ${mbxShimDirectory}/cargo - ${user} ${user} - ${cargoShim}"
+    "L+ ${mbxShimDirectory}/mbx-target - ${user} ${user} - ${mbxTarget}"
     "d ${home}/workspaces 0700 ${user} ${user} -"
     "d ${home}/.codex 0700 ${user} ${user} -"
     # Hermes-generated units may omit the Nix profile from their PATH.

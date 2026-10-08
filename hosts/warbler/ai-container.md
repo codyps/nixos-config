@@ -289,3 +289,13 @@ history, and state surviving container restart. It uses the
 pinned Codex package as an installer fixture. It does not authenticate to
 providers, install Hermes from the internet, prove LAN DHCP on physical hardware,
 or establish desktop/phone pairing.
+
+### Cargo caching
+
+Plain `cargo` uses mbx through the upstream standalone shim at
+`~/.local/share/mbx/bin/cargo`. NixOS installs the shim and its `mbx-target`
+without a mutable setup step. SSH, Codex, user services, and direnv place it
+before Rustup on PATH. Rustup still selects the underlying toolchain.
+`mbx doctor` should report a passing setup check; `MBX_DISABLE=1 cargo ...`
+bypasses caching. Existing agent processes pick up the new service PATH when
+they next start.

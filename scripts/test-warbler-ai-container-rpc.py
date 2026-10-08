@@ -30,6 +30,8 @@ test -S /run/user/1001/bus
 systemctl --user is-active codex-ai
 systemd-run --user --wait --pipe /bin/bash -c 'echo gateway-service-ok'
 command -v git uv pip node
+test "$(command -v cargo)" = /home/cody-ai/.local/share/mbx/bin/cargo
+mbx doctor --json | jq -e '.checks[] | select(.name == "setup") | .severity == "pass"'
 touch ~/workspaces/codex-proof
 """],
         "cwd": "/home/cody-ai/workspaces",

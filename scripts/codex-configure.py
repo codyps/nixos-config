@@ -9,7 +9,7 @@ import tempfile
 import tomlkit
 
 
-CACHES = ("bazel", "bazelisk", "cargo-targets", "gh", "mbx", "nix", "uv")
+CACHES = ("bazel", "bazelisk", "gh", "mbx", "nix", "uv")
 
 
 def configure(path, cache_home, *, if_missing=False):
@@ -30,6 +30,10 @@ def configure(path, cache_home, *, if_missing=False):
     roots = sandbox["writable_roots"]
     if not isinstance(roots, tomlkit.items.Array) or not all(isinstance(root, str) for root in roots):
         raise ValueError("sandbox_workspace_write.writable_roots must be an array of strings")
+    # Retire the exact cache root formerly managed by this script.
+    legacy_root = str(cache_home / "cargo-targets")
+    while legacy_root in roots:
+        roots.remove(legacy_root)
     document["sandbox_mode"] = "workspace-write"
     document.setdefault("approval_policy", "on-request")
     document.setdefault("approvals_reviewer", "auto_review")

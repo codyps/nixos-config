@@ -67,6 +67,10 @@ pkgs.testers.runNixOSTest {
     host.succeed(inside + "sh -c " + shlex.quote("echo " + shlex.quote(key) + " > /home/cody-ai/.ssh/authorized_keys; chown cody-ai:cody-ai /home/cody-ai/.ssh/authorized_keys"))
     ssh = "ssh -n -o StrictHostKeyChecking=accept-new -i /root/ai-key cody-ai@192.168.1.100 "
     client.wait_until_succeeds(ssh + "true")
+    # Plain Cargo must select the upstream shim in SSH and user services.
+    mbx_check = "test $(command -v cargo) = /home/cody-ai/.local/share/mbx/bin/cargo; mbx doctor --json | jq -e '.checks[] | select(.name == \"setup\") | .severity == \"pass\"'"
+    client.succeed(ssh + shlex.quote("set -e; " + mbx_check))
+    client.succeed(ssh + shlex.quote("systemd-run --user --wait --pipe bash -ec " + shlex.quote(mbx_check)))
     # Exercise permissions as the actual unprivileged SSH user. Software perf
     # events work without a hardware PMU in the nested test VM.
     client.succeed(ssh + shlex.quote("set -e; command -v perf valgrind heaptrack heaptrack_print gdb strace pidstat iostat mpstat htop smem time hyperfine flamegraph.pl; perf stat -e task-clock -- sleep 0.1"))
@@ -136,7 +140,7 @@ pkgs.testers.runNixOSTest {
         devShells.${pkgs.stdenv.hostPlatform.system}.default =
           nixpkgs.legacyPackages.${pkgs.stdenv.hostPlatform.system}.mkShell {
             packages = [ nixpkgs.legacyPackages.${pkgs.stdenv.hostPlatform.system}.hello ];
-            shellHook = "export AI_SHELL_PROOF=flake";
+            shellHook = "export AI_SHELL_PROOF=flake; export PATH=${pkgs.rustup}/bin:$PATH";
           };
       };
     }
@@ -148,6 +152,7 @@ pkgs.testers.runNixOSTest {
     client.succeed(ssh + shlex.quote("systemd-run --user --wait --pipe direnv exec " + shell_dir + " bash -c 'test \"$AI_SHELL_PROOF\" = flake && hello'"))
     assert client.succeed(ssh + "'git config user.name'").strip() == "Cody P Schafer"
     assert client.succeed(ssh + "'git config user.email'").strip() == "dev@codyps.com"
+    client.succeed(ssh + shlex.quote("cd " + shell_dir + "; direnv exec . bash -ec " + shlex.quote(mbx_check)))
     # Same service access from a background task, without an interactive login.
     client.succeed(ssh + shlex.quote("systemd-run --user --wait --pipe /bin/bash -lc 'test -S /run/user/1001/bus; systemctl --user is-active codex-ai; command -v git uv pip node; touch ~/workspaces/service-proof'"))
     # Exercise the real control socket and a Codex service child, no model/auth.

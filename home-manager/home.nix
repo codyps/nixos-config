@@ -1,46 +1,10 @@
-{ config, lib, pkgs, ... }:
-let
-  default-cache-subdirectory =
-    if pkgs.stdenv.hostPlatform.isDarwin then
-      "Library/Caches"
-    else
-      ".cache";
-
-  cargo-with-cached-target = pkgs.writeShellApplication {
-    name = "cargo";
-    runtimeInputs = with pkgs; [
-      coreutils
-      jq
-    ];
-    text = ''
-      export CARGO_WRAPPER_REAL_CARGO=${lib.escapeShellArg "${pkgs.rustup}/bin/cargo"}
-      export CARGO_WRAPPER_DEFAULT_CACHE_SUBDIRECTORY=${lib.escapeShellArg default-cache-subdirectory}
-      ${builtins.readFile ../scripts/cargo-with-cached-target.sh}
-    '';
-  };
-  cargo-gc = pkgs.writeShellApplication {
-    name = "cargo-gc";
-    text = ''
-      exec ${pkgs.python3}/bin/python3 ${../scripts/cargo-gc.py} "$@"
-    '';
-  };
-in
+{ pkgs, ... }:
 {
   imports = [
     ../modules/admin-commands.nix
     ./home-minimal.nix
     ./mbx.nix
   ];
-
-  options.programs.cargo-target-cache.enable = lib.mkOption {
-    type = lib.types.bool;
-    default = true;
-    description = "Wrap Cargo to redirect workspace target directories into the shared cache.";
-  };
-
-  config.programs.adminCommands.commands = lib.mkIf config.programs.cargo-target-cache.enable {
-    cargo-gc = [ "${cargo-gc}/bin/cargo-gc" ];
-  };
 
   config.programs.mbx.enable = true;
 
@@ -75,8 +39,5 @@ in
     pkgs.watch
     pkgs.yt-dlp
 
-  ] ++ lib.optionals config.programs.cargo-target-cache.enable [
-    (lib.hiPrio cargo-with-cached-target)
-    cargo-gc
   ];
 }

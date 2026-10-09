@@ -85,9 +85,16 @@
               url = "https://static.rust-lang.org/dist/channel-rust-${(builtins.fromTOML (builtins.readFile (atuin + "/rust-toolchain.toml"))).toolchain.channel}.toml";
               sha256 = "sha256-P30Tm3O7vQAE725YtDCDHGjNrSsfZO4us11UwJGZSJo=";
             })).defaultToolchain;
-            caddy = prev.callPackage (nixpkgsSource + "/pkgs/by-name/ca/caddy/package.nix") {
-              inherit caddy;
-            };
+            caddy =
+              let
+                package = nixpkgsSource + "/pkgs/by-name/ca/caddy/package.nix";
+                args = builtins.functionArgs (import package);
+              in
+              # Older pins need an explicit self-reference for withPlugins;
+              # newer nixpkgs uses finalAttrs.finalPackage internally.
+              prev.callPackage package (prev.lib.optionalAttrs (args ? caddy) {
+                inherit caddy;
+              });
           in
           {
             inherit caddy;

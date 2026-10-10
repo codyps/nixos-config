@@ -10,7 +10,7 @@ when rebuilding. The host home is not mounted into the container.
 ## Network and login
 
 The container has a private network namespace and a macvlan on wired `eno1`.
-It requests its own LAN DHCP lease with MAC `02:57:41:52:41:49` and hostname
+It requests its own LAN DHCP lease with a fixed, locally administered MAC and hostname
 `warbler-ai`. Reserve that MAC on the router for a stable IP. This is a separate
 LAN address, not a separate VLAN or a restriction on outbound LAN access.
 Warbler's existing interface, DHCP identity, and SSH endpoint are unchanged.

@@ -9,7 +9,7 @@
     disk = {
       root = {
         type = "disk";
-        device = "/dev/disk/by-id/scsi-0QEMU_QEMU_HARDDISK_drive-scsi0-0-0-0";
+        device = "/dev/disk/by-id/${(import ../../lib/hardware-identities.nix) "robin" "installDiskId"}";
         content = {
           type = "gpt";
           partitions = {

@@ -40,7 +40,7 @@
 
   fileSystems."/boot" =
     {
-      device = "/dev/disk/by-uuid/BCC5-A317";
+      device = "/dev/disk/by-uuid/${(import ../../lib/hardware-identities.nix) "forbes" "bootUuid"}";
       fsType = "vfat";
     };
 

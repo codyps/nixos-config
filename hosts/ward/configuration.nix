@@ -73,7 +73,7 @@ in
 
     luks.devices = {
       luksroot = {
-        device = "/dev/disk/by-uuid/b8de49f4-4952-4a22-8d8c-f616b77e982e";
+        device = "/dev/disk/by-uuid/${(import ../../lib/hardware-identities.nix) "ward" "rootLuksUuid"}";
         allowDiscards = true;
       };
     };
@@ -423,7 +423,7 @@ in
   networking.firewall.allowedTCPPorts = [ 80 443 ];
 
   networking.hostName = "ward";
-  networking.hostId = "5c794628";
+  networking.hostId = "${(import ../../lib/hardware-identities.nix) "ward" "zfsHostId"}";
 
   systemd.network = {
     enable = true;

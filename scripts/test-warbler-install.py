@@ -19,6 +19,9 @@ spec.loader.exec_module(installer)
 
 class InstallTests(unittest.TestCase):
     def setUp(self):
+        inventory = patch.object(installer.hardware, "read_inventory", return_value={"warbler": {"rootVolumeKeyId": "a" * 64}})
+        inventory.start()
+        self.addCleanup(inventory.stop)
         output = contextlib.redirect_stdout(io.StringIO())
         output.__enter__()
         self.addCleanup(output.__exit__, None, None, None)
@@ -84,7 +87,7 @@ class InstallTests(unittest.TestCase):
                     patch.object(installer, "run", return_value=b"flake.nix\0"):
                 archive = installer.source_archive()
             with tarfile.open(fileobj=io.BytesIO(archive), mode="r:gz") as contents:
-                self.assertEqual(contents.getnames(), ["flake.nix"])
+                self.assertEqual(contents.getnames(), ["flake.nix", "hardware-identities.json", ".hardware-source-files.json"])
 
     def test_source_refuses_tracked_keys(self):
         with patch.object(installer, "run", return_value=b"keys/private\0"):
@@ -195,7 +198,7 @@ class InstallTests(unittest.TestCase):
             else:
                 installer.install("/external")
                 self.assertFalse(any("warbler-bootstrap" in cmd for cmd in calls))
-                clear_pin = next(i for i, cmd in enumerate(calls) if "printf 'null" in cmd)
+                clear_pin = next(i for i, cmd in enumerate(calls) if "['rootVolumeKeyId'] = None" in cmd)
                 build = next(i for i, cmd in enumerate(calls) if " build --accept-flake-config" in cmd)
                 transfer = next(i for i, cmd in enumerate(calls) if "tar -xf -" in cmd)
                 installation = next(i for i, cmd in enumerate(calls) if "nixos-install --" in cmd)
@@ -225,22 +228,22 @@ class InstallTests(unittest.TestCase):
             root = Path(temporary) / "paths with spaces"
             helper = root / "system/sw/bin/root-volume-key-id"
             helper.parent.mkdir(parents=True)
-            output = root / "checkout/hosts/warbler/volume-identity.nix"
+            output = root / "checkout/hardware-identities.json"
             output.parent.mkdir(parents=True)
             script = installer.volume_identity_script(root / "system", root / "checkout")
             for value, status in [("b" * 64, 0), ("invalid", 0), ("c" * 64, 1)]:
                 with self.subTest(value=value, status=status):
-                    output.write_text('"existing-pin"\n')
+                    output.write_text(json.dumps({"warbler": {"rootVolumeKeyId": "existing-pin"}, "other": "preserved"}))
                     helper.write_text(f"#!/bin/sh\nprintf '%s\\n' '{value}'\nexit {status}\n")
                     helper.chmod(0o700)
                     result = subprocess.run(["bash", "-eu", "-c", script], capture_output=True)
                     self.assertEqual(result.stdout, b"")
                     if value == "b" * 64:
                         self.assertEqual(result.returncode, 0)
-                        self.assertEqual(output.read_text(), f'"{value}"\n')
+                        self.assertEqual(json.loads(output.read_text()), {"warbler": {"rootVolumeKeyId": value}, "other": "preserved"})
                     else:
                         self.assertNotEqual(result.returncode, 0)
-                        self.assertEqual(output.read_text(), '"existing-pin"\n')
+                        self.assertEqual(json.loads(output.read_text())["warbler"]["rootVolumeKeyId"], "existing-pin")
 
 
 if __name__ == "__main__":

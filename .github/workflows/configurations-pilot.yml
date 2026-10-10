@@ -41,6 +41,25 @@ jobs:
           ref: ${{ inputs.ref || github.sha }}
           persist-credentials: false
       - uses: cachix/install-nix-action@b85815f71a6de0ddee80b8a80a98d43f4bcc66c7 # v31
+      - name: Prepare hardware inventory outside Git
+        env:
+          SOPS_AGE_KEY: ${{ secrets.HARDWARE_IDENTITIES_AGE_KEY }}
+        run: |
+          if [ -n "$SOPS_AGE_KEY" ]; then
+            nix shell --inputs-from . nixpkgs#sops --command \
+              python3 scripts/hardware-identities.py prepare "$RUNNER_TEMP/hardware-source"
+            echo "HARDWARE_SOURCE=$RUNNER_TEMP/hardware-source" >> "$GITHUB_ENV"
+            echo "HARDWARE_NIXOS=true" >> "$GITHUB_ENV"
+          elif [ "${{ github.event_name }}" = pull_request ]; then
+            echo "HARDWARE_SOURCE=$GITHUB_WORKSPACE" >> "$GITHUB_ENV"
+            echo "HARDWARE_NIXOS=false" >> "$GITHUB_ENV"
+            echo '::notice::Hardware inventory key unavailable; NixOS configuration builds are omitted.'
+          else
+            echo '::error::Set the inventory-only HARDWARE_IDENTITIES_AGE_KEY Actions secret.'
+            exit 1
+          fi
+      - name: Test hardware provisioning
+        run: python3 scripts/test-hardware-identities.py
       - name: Test pilot reporting
         run: python3 scripts/test-configuration-pilot.py
       - name: Test Caddy hash updater
@@ -52,14 +71,18 @@ jobs:
       - name: Test dynamic builder modules
         run: nix eval --impure --json --option eval-cache false --file scripts/test-nix-dynamic-machines-modules.nix
       - name: Check persistent cache settings for every configuration
+        if: env.HARDWARE_NIXOS == 'true'
+        working-directory: ${{ env.HARDWARE_SOURCE }}
         run: |
           nix eval --accept-flake-config --no-update-lock-file --impure --json \
             --expr 'let flake = builtins.getFlake ("path:" + toString ./.); in import (flake.outPath + "/scripts/check-nix-caches.nix") flake'
       - name: Discover configuration and package targets
         id: matrix
         run: |
+          cd "$HARDWARE_SOURCE"
           nix eval --accept-flake-config --no-update-lock-file --impure --json \
-            --expr 'let flake = builtins.getFlake ("path:" + toString ./.); in import (flake.outPath + "/scripts/configuration-matrix.nix") flake' > matrix.json
+            --expr 'let flake = builtins.getFlake ("path:" + toString ./.); selected = if builtins.getEnv "HARDWARE_NIXOS" == "true" then flake else flake // { nixosConfigurations = {}; }; in import (flake.outPath + "/scripts/configuration-matrix.nix") selected' > "$GITHUB_WORKSPACE/matrix.json"
+          cd "$GITHUB_WORKSPACE"
           jq -e '.include | length > 0' matrix.json
           echo "configurations=$(jq -c . matrix.json)" >> "$GITHUB_OUTPUT"
           {
@@ -98,6 +121,23 @@ jobs:
           test -n "$CACHIX_AUTH_TOKEN" || { echo 'Set the CACHIX_AUTH_TOKEN repository secret.'; exit 1; }
 
       - uses: cachix/install-nix-action@b85815f71a6de0ddee80b8a80a98d43f4bcc66c7 # v31
+      - name: Prepare hardware inventory outside Git
+        env:
+          SOPS_AGE_KEY: ${{ secrets.HARDWARE_IDENTITIES_AGE_KEY }}
+        run: |
+          if [ -n "$SOPS_AGE_KEY" ]; then
+            nix shell --inputs-from . nixpkgs#sops --command \
+              python3 scripts/hardware-identities.py prepare "$RUNNER_TEMP/hardware-source"
+            echo "HARDWARE_SOURCE=$RUNNER_TEMP/hardware-source" >> "$GITHUB_ENV"
+            echo "HARDWARE_NIXOS=true" >> "$GITHUB_ENV"
+          elif [ "${{ github.event_name }}" = pull_request ]; then
+            echo "HARDWARE_SOURCE=$GITHUB_WORKSPACE" >> "$GITHUB_ENV"
+            echo "HARDWARE_NIXOS=false" >> "$GITHUB_ENV"
+            echo '::notice::Hardware inventory key unavailable; NixOS configuration builds are omitted.'
+          else
+            echo '::error::Set the inventory-only HARDWARE_IDENTITIES_AGE_KEY Actions secret.'
+            exit 1
+          fi
       - uses: cachix/cachix-action@38b082610b782e7e93e209c35fd730d399dee866 # v17
         if: vars.CACHIX_CACHE != ''
         with:
@@ -105,7 +145,7 @@ jobs:
           skipPush: true
 
       - name: Build target and measure resources
-        run: python3 scripts/configuration-pilot.py "$CONFIGURATION_TARGET"
+        run: python3 scripts/configuration-pilot.py "path:$HARDWARE_SOURCE#${CONFIGURATION_TARGET#.#}"
 
       - name: Publish target runtime closure
         if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main' && (inputs.publish || (github.event_name == 'push' && inputs.ref == ''))

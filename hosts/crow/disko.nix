@@ -4,7 +4,7 @@
     disk.system = {
       type = "disk";
       # Inspected on the installer: WD_BLACK SN850X 4000GB. Formatting erases NTFS.
-      device = "/dev/disk/by-id/nvme-eui.e8238fa6bf530001001b448b4036d241";
+      device = "/dev/disk/by-id/${(import ../../lib/hardware-identities.nix) "crow" "installDiskId"}";
       content = {
         type = "gpt";
         partitions = {

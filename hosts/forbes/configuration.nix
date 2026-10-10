@@ -18,13 +18,13 @@
   boot.loader.systemd-boot.enable = true;
   boot.loader.efi.canTouchEfiVariables = true;
   boot.initrd.luks.devices.rcrypt = {
-    device = "/dev/disk/by-uuid/b69e866c-c9f1-48ad-bc0d-1867d1259e38";
+    device = "/dev/disk/by-uuid/${(import ../../lib/hardware-identities.nix) "forbes" "rootLuksUuid"}";
     allowDiscards = true;
     bypassWorkqueues = true;
   };
 
   networking.hostName = "forbes"; # Define your hostname.
-  networking.hostId = "69f47595";
+  networking.hostId = "${(import ../../lib/hardware-identities.nix) "forbes" "zfsHostId"}";
   # Pick only one of the below networking options.
   # networking.wireless.enable = true;  # Enables wireless support via wpa_supplicant.
   networking.networkmanager.enable = true; # Easiest to use and most distros use this by default.

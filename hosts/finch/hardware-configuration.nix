@@ -31,7 +31,7 @@
 
   fileSystems."/boot" =
     {
-      device = "/dev/disk/by-uuid/bb208bef-1c49-4c3f-adb1-969039d27c07";
+      device = "/dev/disk/by-uuid/${(import ../../lib/hardware-identities.nix) "finch" "bootUuid"}";
       fsType = "ext4";
     };
 

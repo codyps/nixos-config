@@ -227,7 +227,7 @@ in
   networking.firewall.allowPing = true;
 
   networking.hostName = "arnold";
-  networking.hostId = "5c794628";
+  networking.hostId = "${(import ../../lib/hardware-identities.nix) "arnold" "zfsHostId"}";
 
   systemd.network =
     let
@@ -426,37 +426,37 @@ in
     mode = "0600";
     text = ''
       # <volume-name> <encrypted-device> [key-file] [options]
-      z10.1   UUID=0ba5ea88-895d-416c-ae69-a011852c1afd /persist/etc/secret/luks1 discard,no-read-workqueue,no-write-workqueue,same-cpu-crypt
-      z8.1    UUID=6d64f9c2-c7c1-44b5-be99-58fdc2251c37 /persist/etc/secret/luks1 discard,no-read-workqueue,no-write-workqueue,same-cpu-crypt
-      z8.2    UUID=d353aef3-4afa-4f8a-9f60-4c233dd3feae /persist/etc/secret/luks1 discard,no-read-workqueue,no-write-workqueue,same-cpu-crypt
-      z10.2   UUID=f5cc9098-95b9-4592-8704-02de317ff4a8 /persist/etc/secret/luks1 discard,no-read-workqueue,no-write-workqueue,same-cpu-crypt
-      z10.3   UUID=999355cf-19c4-43be-aff8-4ba5b30f82c7 /persist/etc/secret/luks1 discard,no-read-workqueue,no-write-workqueue,same-cpu-crypt
-      z8.3    UUID=cb092159-d4cb-402f-a46d-68ecab77120a /persist/etc/secret/luks1 discard,no-read-workqueue,no-write-workqueue,same-cpu-crypt
-      z10.4   UUID=a2c194b0-e0cb-45da-88e2-b363ade7f274 /persist/etc/secret/luks1 discard,no-read-workqueue,no-write-workqueue,same-cpu-crypt
-      z10.5   UUID=531546f7-f110-4507-bf87-56c7323a4be8 /persist/etc/secret/luks1 discard,no-read-workqueue,no-write-workqueue,same-cpu-crypt
-      z8.4    UUID=b1981692-b6d2-4865-8979-dc934a772f50 /persist/etc/secret/luks1 discard,no-read-workqueue,no-write-workqueue,same-cpu-crypt
-      z10.6   UUID=daba9c63-0d4a-41a7-9dd4-16eb50357bea /persist/etc/secret/luks1 discard,no-read-workqueue,no-write-workqueue,same-cpu-crypt
-      z8.5    UUID=b0d47313-23ee-47cb-a452-ba4a65899afe /persist/etc/secret/luks1 discard,no-read-workqueue,no-write-workqueue,same-cpu-crypt
-      z12.0   UUID=bb711a67-822b-4a50-8e52-2664de603c12 /persist/etc/secret/luks1 discard,no-read-workqueue,no-write-workqueue,same-cpu-crypt
-      z12.1   UUID=5f80c366-4ef8-4441-b924-042630b8b5e2 /persist/etc/secret/luks1 discard,no-read-workqueue,no-write-workqueue,same-cpu-crypt
-      z12.2   UUID=9aadb907-6c4a-469b-b795-f15ae210a421 /persist/etc/secret/luks1 discard,no-read-workqueue,no-write-workqueue,same-cpu-crypt
-      z12.3   UUID=43faab20-d5ee-4a0d-9bc8-06515ccd67ad /persist/etc/secret/luks1 discard,no-read-workqueue,no-write-workqueue,same-cpu-crypt
-      z12.4   UUID=03bd7fae-79fb-4f71-9fae-4ee95b39aa77 /persist/etc/secret/luks1 discard,no-read-workqueue,no-write-workqueue,same-cpu-crypt
-      z12.5   UUID=7328ac33-263b-4b35-addd-a5a1934f1cea /persist/etc/secret/luks1 discard,no-read-workqueue,no-write-workqueue,same-cpu-crypt
-      z12.6   UUID=329d228e-ec27-4842-b0ab-a3e029044aba /persist/etc/secret/luks1 discard,no-read-workqueue,no-write-workqueue,same-cpu-crypt
-      z12.7   UUID=8038c355-bc65-4cb1-a823-622f11d6a828 /persist/etc/secret/luks1 discard,no-read-workqueue,no-write-workqueue,same-cpu-crypt
-      z12.8   UUID=71bd51ee-9112-4707-b5e0-6a2be2e83d0a /persist/etc/secret/luks1 discard,no-read-workqueue,no-write-workqueue,same-cpu-crypt
-      z14.0   UUID=327b64ab-b1c0-4494-9b5b-3a6007e9afcc /persist/etc/secret/luks1 discard,no-read-workqueue,no-write-workqueue,same-cpu-crypt
-      z14.1   UUID=4aea7cc3-224f-4ad9-83f4-d687103ad35e /persist/etc/secret/luks1 discard,no-read-workqueue,no-write-workqueue,same-cpu-crypt
-      z14.2   UUID=3fc04e0d-251b-4cec-8172-12c603c58284 /persist/etc/secret/luks1 discard,no-read-workqueue,no-write-workqueue,same-cpu-crypt
-      z14.3   UUID=e5b69a87-e02c-4b14-be58-6109488e172a /persist/etc/secret/luks1 discard,no-read-workqueue,no-write-workqueue,same-cpu-crypt
+      z10.1   UUID=${(import ../../lib/hardware-identities.nix) "arnold" "luks_z10_1_uuid"} /persist/etc/secret/luks1 discard,no-read-workqueue,no-write-workqueue,same-cpu-crypt
+      z8.1    UUID=${(import ../../lib/hardware-identities.nix) "arnold" "luks_z8_1_uuid"} /persist/etc/secret/luks1 discard,no-read-workqueue,no-write-workqueue,same-cpu-crypt
+      z8.2    UUID=${(import ../../lib/hardware-identities.nix) "arnold" "luks_z8_2_uuid"} /persist/etc/secret/luks1 discard,no-read-workqueue,no-write-workqueue,same-cpu-crypt
+      z10.2   UUID=${(import ../../lib/hardware-identities.nix) "arnold" "luks_z10_2_uuid"} /persist/etc/secret/luks1 discard,no-read-workqueue,no-write-workqueue,same-cpu-crypt
+      z10.3   UUID=${(import ../../lib/hardware-identities.nix) "arnold" "luks_z10_3_uuid"} /persist/etc/secret/luks1 discard,no-read-workqueue,no-write-workqueue,same-cpu-crypt
+      z8.3    UUID=${(import ../../lib/hardware-identities.nix) "arnold" "luks_z8_3_uuid"} /persist/etc/secret/luks1 discard,no-read-workqueue,no-write-workqueue,same-cpu-crypt
+      z10.4   UUID=${(import ../../lib/hardware-identities.nix) "arnold" "luks_z10_4_uuid"} /persist/etc/secret/luks1 discard,no-read-workqueue,no-write-workqueue,same-cpu-crypt
+      z10.5   UUID=${(import ../../lib/hardware-identities.nix) "arnold" "luks_z10_5_uuid"} /persist/etc/secret/luks1 discard,no-read-workqueue,no-write-workqueue,same-cpu-crypt
+      z8.4    UUID=${(import ../../lib/hardware-identities.nix) "arnold" "luks_z8_4_uuid"} /persist/etc/secret/luks1 discard,no-read-workqueue,no-write-workqueue,same-cpu-crypt
+      z10.6   UUID=${(import ../../lib/hardware-identities.nix) "arnold" "luks_z10_6_uuid"} /persist/etc/secret/luks1 discard,no-read-workqueue,no-write-workqueue,same-cpu-crypt
+      z8.5    UUID=${(import ../../lib/hardware-identities.nix) "arnold" "luks_z8_5_uuid"} /persist/etc/secret/luks1 discard,no-read-workqueue,no-write-workqueue,same-cpu-crypt
+      z12.0   UUID=${(import ../../lib/hardware-identities.nix) "arnold" "luks_z12_0_uuid"} /persist/etc/secret/luks1 discard,no-read-workqueue,no-write-workqueue,same-cpu-crypt
+      z12.1   UUID=${(import ../../lib/hardware-identities.nix) "arnold" "luks_z12_1_uuid"} /persist/etc/secret/luks1 discard,no-read-workqueue,no-write-workqueue,same-cpu-crypt
+      z12.2   UUID=${(import ../../lib/hardware-identities.nix) "arnold" "luks_z12_2_uuid"} /persist/etc/secret/luks1 discard,no-read-workqueue,no-write-workqueue,same-cpu-crypt
+      z12.3   UUID=${(import ../../lib/hardware-identities.nix) "arnold" "luks_z12_3_uuid"} /persist/etc/secret/luks1 discard,no-read-workqueue,no-write-workqueue,same-cpu-crypt
+      z12.4   UUID=${(import ../../lib/hardware-identities.nix) "arnold" "luks_z12_4_uuid"} /persist/etc/secret/luks1 discard,no-read-workqueue,no-write-workqueue,same-cpu-crypt
+      z12.5   UUID=${(import ../../lib/hardware-identities.nix) "arnold" "luks_z12_5_uuid"} /persist/etc/secret/luks1 discard,no-read-workqueue,no-write-workqueue,same-cpu-crypt
+      z12.6   UUID=${(import ../../lib/hardware-identities.nix) "arnold" "luks_z12_6_uuid"} /persist/etc/secret/luks1 discard,no-read-workqueue,no-write-workqueue,same-cpu-crypt
+      z12.7   UUID=${(import ../../lib/hardware-identities.nix) "arnold" "luks_z12_7_uuid"} /persist/etc/secret/luks1 discard,no-read-workqueue,no-write-workqueue,same-cpu-crypt
+      z12.8   UUID=${(import ../../lib/hardware-identities.nix) "arnold" "luks_z12_8_uuid"} /persist/etc/secret/luks1 discard,no-read-workqueue,no-write-workqueue,same-cpu-crypt
+      z14.0   UUID=${(import ../../lib/hardware-identities.nix) "arnold" "luks_z14_0_uuid"} /persist/etc/secret/luks1 discard,no-read-workqueue,no-write-workqueue,same-cpu-crypt
+      z14.1   UUID=${(import ../../lib/hardware-identities.nix) "arnold" "luks_z14_1_uuid"} /persist/etc/secret/luks1 discard,no-read-workqueue,no-write-workqueue,same-cpu-crypt
+      z14.2   UUID=${(import ../../lib/hardware-identities.nix) "arnold" "luks_z14_2_uuid"} /persist/etc/secret/luks1 discard,no-read-workqueue,no-write-workqueue,same-cpu-crypt
+      z14.3   UUID=${(import ../../lib/hardware-identities.nix) "arnold" "luks_z14_3_uuid"} /persist/etc/secret/luks1 discard,no-read-workqueue,no-write-workqueue,same-cpu-crypt
 
-      i01     UUID=72bf8068-6563-4f66-babc-4e337922b4ed /persist/etc/secret/luks1 discard,no-read-workqueue,no-write-workqueue,same-cpu-crypt
+      i01     UUID=${(import ../../lib/hardware-identities.nix) "arnold" "luks_i01_uuid"} /persist/etc/secret/luks1 discard,no-read-workqueue,no-write-workqueue,same-cpu-crypt
 
-      f01     UUID=bd3095e7-685a-4ae1-9a28-00ce02bbf04f /persist/etc/secret/luks1 discard,no-read-workqueue,no-write-workqueue,same-cpu-crypt
+      f01     UUID=${(import ../../lib/hardware-identities.nix) "arnold" "luks_f01_uuid"} /persist/etc/secret/luks1 discard,no-read-workqueue,no-write-workqueue,same-cpu-crypt
 
-      ru1     UUID=36610bd4-182e-408e-85d8-c13c67ebd9fb /persist/etc/secret/luks1 discard,no-read-workqueue,no-write-workqueue,same-cpu-crypt
-      pair1   UUID=9c8e2760-6dd6-486d-b11a-41d90206f557 /persist/etc/secret/luks1 discard,no-read-workqueue,no-write-workqueue,same-cpu-crypt
+      ru1     UUID=${(import ../../lib/hardware-identities.nix) "arnold" "luks_ru1_uuid"} /persist/etc/secret/luks1 discard,no-read-workqueue,no-write-workqueue,same-cpu-crypt
+      pair1   UUID=${(import ../../lib/hardware-identities.nix) "arnold" "luks_pair1_uuid"} /persist/etc/secret/luks1 discard,no-read-workqueue,no-write-workqueue,same-cpu-crypt
       #rl1     
     '';
   };

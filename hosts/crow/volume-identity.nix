@@ -1,1 +1,1 @@
-"e5408f5489852beb2cc8e15903e590271a860b3c525e35770f239a1f81805880"
+(import ../../lib/hardware-identities.nix) "crow" "rootVolumeKeyId"

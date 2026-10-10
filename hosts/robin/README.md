@@ -1,7 +1,11 @@
 # Robin installation
 
-Robin is a BIOS-booted x86_64 KVM guest. Its disk is identified by
-`/dev/disk/by-id/scsi-0QEMU_QEMU_HARDDISK_drive-scsi0-0-0-0`.
+Build and installation commands below require a [prepared hardware inventory
+checkout](../../docs/hardware-identities.md). The remote rebuild helper prepares
+it automatically; direct Nix commands must run inside that prepared checkout.
+
+Robin is a BIOS-booted x86_64 KVM guest. Its disk selector is configured in
+`disko.nix`.
 
 Storage: GPT → 1 MiB BIOS embedding partition + 2 GiB unencrypted `/boot`
 + LUKS2 → `robin-vg` LVM → 4 GiB swap + remaining space for the `robin`
@@ -22,7 +26,7 @@ nix run .#nixos-rebuild-remote -- robin switch
 This archives the checkout and its flake inputs into Robin's Nix store over
 SSH as `cody@robin`, then runs `sudo nixos-rebuild` there using the archived
 source. The default action is `boot`: install the next boot generation without
-rebooting. Tracked uncommitted edits are included; add new files to Git first.
+rebooting. Tracked edits and untracked source files are included; Git-ignored files are excluded.
 The SSH name `robin` must resolve or be configured in your SSH config.
 Supported actions are `boot`, `switch`, `test`, `build`, `dry-build`, and
 `dry-activate`. The shortcut `nix run .#robin-nixos-rebuild-remote -- switch`

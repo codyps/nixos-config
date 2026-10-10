@@ -1,9 +1,12 @@
 # Crow
 
+Build and installation commands below require a [prepared hardware inventory
+checkout](../../docs/hardware-identities.md). The remote rebuild helper prepares
+it automatically; direct Nix commands must run inside that prepared checkout.
+
 Crow is an x86_64 AMD machine with 64 GB RAM, UEFI, and TPM 2.0.
-Wi-Fi is `wlp6s0` (`mt7921e`, permanent address `44:0f:b4:22:d8:38`).
-The WD_BLACK SN850X 4000GB is identified by
-`/dev/disk/by-id/nvme-eui.e8238fa6bf530001001b448b4036d241`.
+Wi-Fi is `wlp6s0` (`mt7921e`). The installation disk is a WD_BLACK SN850X
+4000GB; its exact device selector is configured in `disko.nix`.
 
 ## Storage and boot
 
@@ -20,7 +23,7 @@ homes, Nix store, system state, SSH identity, and container storage survive.
 Never run Warbler's reset script against this machine: its filesystem is
 directly on `cryptroot`, while Crow's filesystem is on the root LV.
 
-`volume-identity.nix` records the installed volume's public identity. Use `.#crow`
+`volume-identity.nix` reads the installed volume identity from the prepared inventory. Use `.#crow`
 throughout: staged provisioning defers credentials and TPM policy until the
 pinned host boots with Secure Boot enabled. The first unlock is at the console.
 Signing keys must exist before boot-file installation. Neither the configuration
@@ -107,8 +110,8 @@ Ethernet is not required. Firmware menus may differ from Warbler's HP machine.
    the installer SSH key pair in a private location outside the checkout; it must
    survive the installer reboot. Prepare a separate LUKS recovery password in
    the root-owned mode-0600 installer file `/run/crow-luks-password`.
-2. For a fresh format, set `hosts/crow/volume-identity.nix` to `null` in the
-   installation checkout so it cannot reuse the previous disk identity.
+2. For a fresh format, set `crow.rootVolumeKeyId` to `null` in the
+   prepared checkout's `hardware-identities.json` so it cannot reuse the previous disk identity.
    Build and review the disk script. Running it is the destructive operation:
    `nix build --no-link --print-out-paths path:.#nixosConfigurations.crow.config.system.build.diskoScript`.
    Only after approval, run that exact script on the installer. Verify `/mnt`,
@@ -129,8 +132,8 @@ Ethernet is not required. Firmware menus may differ from Warbler's HP machine.
    persistent files, swap, and container connectivity. Back up existing firmware
    keys with `sudo sys backup-secure-boot`, then complete the documented manual
    Secure Boot enrollment and cold-boot verification.
-6. Obtain `sudo sys root-volume-key-id` and record the quoted public value in
-   `hosts/crow/volume-identity.nix`; never reuse Warbler's value or a test pin.
+6. Obtain `sudo sys root-volume-key-id` and record the value in
+   `crow.rootVolumeKeyId` in both the prepared inventory and the SOPS-encrypted source; never reuse Warbler's value or a test pin.
    Rebuild `.#crow`; the hook automatically generates the initrd SSH host key
    and seals available credentials. No manual SSH key generation is needed.
    Run `sudo sys setup-unlock-tailscale` to provision the separate `crow-unlock`

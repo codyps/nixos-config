@@ -34,7 +34,7 @@
 
   fileSystems."/boot" =
     {
-      device = "/dev/disk/by-uuid/D6E6-B9F1";
+      device = "/dev/disk/by-uuid/${(import ../../lib/hardware-identities.nix) "calvin" "bootUuid"}";
       fsType = "vfat";
     };
 

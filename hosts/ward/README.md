@@ -1,10 +1,14 @@
 # Ward recovery and secure unlock
 
-Ward uses LUKS2 (`b8de49f4-4952-4a22-8d8c-f616b77e982e`, mapper
-`luksroot`), then LVM (`ward/zroot`, `ward/swap`), then the `ward` ZFS pool.
-Do not run disko or format these existing devices. The EFI filesystem is
-`D04B-D453`. Wired networking is `enp3s0` (igc); both boot stages use its MAC
-as the DHCP client identifier. The machine has a TPM 2.0.
+Build and installation commands below require a [prepared hardware inventory
+checkout](../../docs/hardware-identities.md). The remote rebuild helper prepares
+it automatically; direct Nix commands must run inside that prepared checkout.
+
+Ward uses LUKS2 (mapper `luksroot`), then LVM (`ward/zroot`, `ward/swap`),
+then the `ward` ZFS pool. Do not run disko or format these existing devices.
+Disk selectors are defined in `configuration.nix` and `hardware-configuration.nix`.
+Wired networking is `enp3s0` (igc); both boot stages use its MAC as the DHCP
+client identifier. The machine has a TPM 2.0.
 
 ## Storage and recovery
 

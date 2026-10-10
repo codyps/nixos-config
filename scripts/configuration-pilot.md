@@ -58,3 +58,9 @@ On standalone Home Manager installations using a separately managed multi-user
 daemon, its administrator must also authorize the cache if the user is untrusted.
 The Docker builder's `nix.conf` carries matching settings; rebuild/recreate the
 builder using its setup instructions to apply them to an existing container.
+
+NixOS builds require the inventory-only `HARDWARE_IDENTITIES_AGE_KEY` Actions
+secret. CI decrypts hardware inventory into a temporary source snapshot outside
+Git. Pull requests without the key omit NixOS targets and report the omission;
+main and scheduled runs fail if it is missing. See
+[hardware provisioning](../docs/hardware-identities.md) for local builds and key scope.

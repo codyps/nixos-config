@@ -34,3 +34,5 @@ Use concise imperative commit subjects, following history: `Configure shared Cac
 Keep secrets encrypted with SOPS using `.sops.yaml`; never commit decrypted credentials or private keys. Review host-specific documentation before installation, disk changes, or deployment.
 
 Do not add unique hardware identifiers, such as MAC addresses, serial numbers, or EUIs, to any repository file without explicit user approval. This applies to configuration, documentation, tests, and generated files. Use placeholders in examples; discovering an identifier or finding existing identifiers in the repository does not authorize adding it.
+
+Existing hardware identifiers are stored in `secrets/hardware-identities.json` with SOPS. Use `sys hardware-source` or `scripts/hardware-identities.py` to prepare builds outside the checkout; see `docs/hardware-identities.md`. Plaintext identifiers are allowed in installed configuration and build outputs, but never add decrypted inventory to Git. Preserve inventory values when refactoring device selection or boot behavior.

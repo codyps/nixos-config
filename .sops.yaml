@@ -7,6 +7,17 @@ keys:
   - &host_warbler age1yjc0dcsfhndjmyk4elruu5k8mdytt6w7u7t26mlkj7lp6rn6ufcszf6gn2
   - &host_crow age1crtg5zvzrp0axpfhr8pmwn237hg5kpl8ggmv8gxaxmgny0knkq4sgrggwc
 creation_rules:
+  - path_regex: secrets/hardware-identities\.json$
+    pgp:
+    - *admin_cody
+    age:
+    - age1sdlhp3m5ru3x3qu34g3aeefqdtaj4h9xtnur5g05kedgxzsjv9cs8s86nl
+    - *host_arnold
+    - *host_ward
+    - *host_u3
+    - *host_robin
+    - *host_warbler
+    - *host_crow
   - path_regex: secrets/[^/]+\.(yaml|json|env|ini)$
     key_groups:
     - pgp:

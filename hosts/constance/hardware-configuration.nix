@@ -16,7 +16,7 @@
 
   fileSystems."/" =
     {
-      device = "/dev/disk/by-uuid/bfeb75d5-84a7-45be-8ea7-6b5e94040ed6";
+      device = "/dev/disk/by-uuid/${(import ../../lib/hardware-identities.nix) "constance" "rootUuid"}";
       fsType = "ext4";
     };
 

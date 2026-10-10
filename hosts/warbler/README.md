@@ -1,5 +1,9 @@
 # Warbler
 
+Build and installation commands below require a [prepared hardware inventory
+checkout](../../docs/hardware-identities.md). The remote rebuild helper prepares
+it automatically; direct Nix commands must run inside that prepared checkout.
+
 The reusable module and setup commands are documented in [Secure unlock](../../docs/secure-unlock.md).
 
 Warbler is an x86_64 AMD machine with 64 GB RAM, UEFI, and TPM 2.0.
@@ -16,7 +20,7 @@ nix run .#nixos-rebuild-remote -- warbler
 This archives the checkout and its flake inputs into Warbler's Nix store over
 SSH as `cody@warbler`, then runs `sudo nixos-rebuild boot` there using the
 archived source. It installs the next boot generation without rebooting.
-Tracked uncommitted edits are included; add new files to Git first.
+Tracked edits and untracked source files are included; Git-ignored files are excluded.
 To select another rebuild action, use e.g.
 `nix run .#nixos-rebuild-remote -- warbler switch` or `warbler build`.
 The existing `nix run .#warbler-nixos-rebuild-remote` shortcut remains available.
@@ -92,14 +96,14 @@ or the digest stored in the LUKS header. Changing the volume key, UUID, or
 mapper name requires a new pin. Changing the recovery password does not.
 
 Use `.#warbler` at every stage. For a freshly formatted disk, set
-`volume-identity.nix` to `null` in the installation checkout first. Staged
+`warbler.rootVolumeKeyId` to `null` in the prepared `hardware-identities.json` first. Staged
 provisioning omits recovery credentials and TPM unlock until the new pin is
 recorded and the installed host boots with Secure Boot enabled.
 The remote installer records the freshly formatted volume's identity in
-`hosts/warbler/volume-identity.nix` in the installed checkout. For a manual
+`warbler.rootVolumeKeyId` in the installed checkout's `hardware-identities.json`. For a manual
 installation, obtain the identity on the trusted installed system and update
-that file before building the normal configuration. `configuration.nix` imports
-it as `boot.secureUnlock.rootVolumeKeyId`; the repository retains the current installation's
+that file and the SOPS-encrypted inventory before building the normal configuration. `configuration.nix` imports
+it as `boot.secureUnlock.rootVolumeKeyId`; the SOPS inventory retains the current installation's
 known identity. Never automatically
 learn the expected identity from a disk during boot. An unpinned configuration
 cannot enable remote or TPM unlock. Pinning authenticates volume identity,
@@ -130,8 +134,9 @@ sudo nix run .#luks-volume-key-id -- --device /dev/sdb2 --name data
 ```
 
 Enter the LUKS recovery passphrase. The command prints just the 64-character
-public ID to stdout; save it as a quoted Nix string in
-`hosts/warbler/volume-identity.nix`. It reads the configured LUKS device and
+public ID to stdout; save it as the JSON string `warbler.rootVolumeKeyId` in
+the prepared `hardware-identities.json` and update the SOPS-encrypted inventory.
+It reads the configured LUKS device and
 derives the ID for mapper name `cryptroot`, without opening a mapping,
 changing the header, or writing the raw volume key to a file. The derivation
 matches [systemd's volume-key identity](https://github.com/systemd/systemd/blob/main/src/shared/cryptsetup-util.c).
@@ -282,7 +287,7 @@ and `build` runs are optional rehearsals, not required installation steps.
   the installer retains its private local copy.
   After formatting, it derives the new root-volume identity using the recovery
   passphrase file and records it in the installed checkout's
-  `hosts/warbler/volume-identity.nix`. It does not print the identity or modify
+  `warbler.rootVolumeKeyId` in the prepared `hardware-identities.json`. It does not print the identity or modify
   the source checkout on the Mac. Preserve that installed file when updating
   the checkout; copying another installation's pin will prevent unlocking.
   Before a later deployment from the Mac, copy the installed public identity
@@ -371,10 +376,11 @@ the TPM helper. Commands below are instructions, not evidence of installation.
    through installation. The later BIOS visits only clear keys after backup
    and enable Secure Boot after enrollment.
 
-2. **Live USB: prepare the checkout:** obtain this flake checkout on the live host. Enter a root shell (`sudo -i`) and
-   `cd` to that checkout. All installer commands below run there as root.
+2. **Live USB: prepare the checkout:** obtain a prepared hardware-inventory
+   checkout on the live host (see the provisioning link above). Enter a root
+   shell (`sudo -i`) and `cd` to it. All installer commands below run there as root.
    Use `.#warbler` throughout. Before formatting a new volume, write `null`
-   to `hosts/warbler/volume-identity.nix` in this installation checkout. Do not
+   to `warbler.rootVolumeKeyId` in this prepared checkout's `hardware-identities.json`. Do not
    clear the valid pin when repairing an existing volume. Initial unlocking
    uses the console; administration after boot is via wired SSH. The shared
    hook defers credential sealing until the pinned installed host boots with
@@ -511,7 +517,7 @@ the TPM helper. Commands below are instructions, not evidence of installation.
 
 9. **Prepare remote unlock and optional disk enrollment in one rebuild.**
    Work from `/persist/nixos-config`. The remote installer has already recorded
-   the new volume identity in `hosts/warbler/volume-identity.nix`. For a manual
+   the new volume identity in `warbler.rootVolumeKeyId` in the prepared `hardware-identities.json`. For a manual
    install, run `sudo sys root-volume-key-id` and save the returned ID as a
    quoted Nix string in that file. Never reuse the previous installation's pin.
 

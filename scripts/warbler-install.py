@@ -3,6 +3,7 @@
 
 import argparse
 import io
+import importlib.util
 import json
 import os
 from pathlib import Path
@@ -13,6 +14,10 @@ import sys
 import tarfile
 import tempfile
 import uuid
+
+hardware_spec = importlib.util.spec_from_file_location("hardware", Path(__file__).with_name("hardware-identities.py"))
+hardware = importlib.util.module_from_spec(hardware_spec)
+hardware_spec.loader.exec_module(hardware)
 
 REPO = Path(__file__).resolve().parents[1]
 TARGET = "nixos@nixos.bed.einic.org"
@@ -192,16 +197,23 @@ def source_archive():
             if not raw:
                 continue
             relative = Path(os.fsdecode(raw))
-            if relative.is_absolute() or ".." in relative.parts or relative.parts[0] in (".git", "keys"):
+            if relative.is_absolute() or ".." in relative.parts or relative.parts[0] in (".git", "keys") or str(relative) in (hardware.INVENTORY, hardware.MANIFEST):
                 raise RuntimeError("Unsafe or private path in source inventory")
             source = REPO / relative
-            if source.is_symlink():
-                raise RuntimeError("Source symlinks require review before installation")
+            if source.is_symlink() and (not source.resolve().is_relative_to(REPO.resolve()) or not source.is_file() or os.fsencode(str(source.resolve().relative_to(REPO.resolve()))) not in names):
+                raise RuntimeError("External source symlinks require review before installation")
             if not source.exists():  # Preserve local tracked deletions.
                 continue
             if not source.is_file():
                 raise RuntimeError("Only regular source files may be transferred")
             archive.add(source, arcname=str(relative), recursive=False)
+        for name, value in ((hardware.INVENTORY, hardware.read_inventory(REPO)),
+                            (hardware.MANIFEST, archive.getnames())):
+            data = (json.dumps(value, indent=2) + "\n").encode()
+            entry = tarfile.TarInfo(name)
+            entry.size = len(data)
+            entry.mode = 0o600
+            archive.addfile(entry, io.BytesIO(data))
     return buffer.getvalue()
 
 
@@ -243,14 +255,25 @@ def secret_archive(directory):
 def volume_identity_script(system, checkout):
     """Pin only the freshly installed volume, using its existing recovery input."""
     helper = shlex.quote(str(Path(system) / "sw/bin/root-volume-key-id"))
-    output = shlex.quote(str(Path(checkout) / "hosts/warbler/volume-identity.nix"))
+    output = shlex.quote(str(Path(checkout) / hardware.INVENTORY))
     return f"""
 warbler_volume_key_id=$({helper} --key-file /tmp/warbler-luks-password)
 if [[ ! "$warbler_volume_key_id" =~ ^[0-9a-f]{{64}}$ ]]; then
     echo 'Invalid root volume identity; refusing to record it.' >&2
     exit 1
 fi
-printf '\"%s\"\\n' "$warbler_volume_key_id" > {output}
+python3 - {output} "$warbler_volume_key_id" <<'PYTHON'
+import json, os, sys, tempfile
+from pathlib import Path
+path = Path(sys.argv[1])
+data = json.loads(path.read_text())
+data["warbler"]["rootVolumeKeyId"] = sys.argv[2]
+fd, temporary = tempfile.mkstemp(dir=path.parent)
+with os.fdopen(fd, "w") as stream:
+    json.dump(data, stream)
+    stream.write("\\n")
+os.replace(temporary, path)
+PYTHON
 unset warbler_volume_key_id
 """
 
@@ -263,7 +286,7 @@ def install(directory, *, build_only=False):
         print(f"Initial account passwords retained locally: {directory / 'account-passwords'} (not printed)")
     verify_registered_host_key(directory)
     inspect_target()
-    # Nothing secret goes in source or the Nix input. Stage only in live RAM.
+    # Hardware identifiers enter the prepared source; passwords and private keys stay separate.
     work = ssh("mktemp -d /run/warbler-install.XXXXXXXX").decode().strip()
     if not re.fullmatch(r"/run/warbler-install\.[A-Za-z0-9]+", work):
         raise RuntimeError("Unexpected staging path")
@@ -273,7 +296,11 @@ def install(directory, *, build_only=False):
         ssh(f"tar -xzf - --no-same-owner -C {q}/source", source_archive())
         # Formatting creates a new volume identity. Clear only the disposable
         # install source's old pin; save the new public identity after formatting.
-        ssh(f"printf 'null\\n' > {q}/source/hosts/warbler/volume-identity.nix")
+        ssh(f"python3 - {q}/source/hardware-identities.json <<'PYTHON'\n"
+            "import json, sys\nfrom pathlib import Path\n"
+            "path = Path(sys.argv[1])\ndata = json.loads(path.read_text())\n"
+            "data['warbler']['rootVolumeKeyId'] = None\n"
+            "path.write_text(json.dumps(data) + '\\n')\nPYTHON")
         print("Building attended system and disko on the live host (no secrets supplied)...", flush=True)
         root = f"cd {q}/source; "
         configured = ssh(root + f"{NIX} eval --raw {CONFIG}.disko.devices.disk.system.device").decode()

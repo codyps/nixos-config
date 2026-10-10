@@ -127,7 +127,7 @@ in
     };
   };
 
-  networking.hostId = "4129717c";
+  networking.hostId = "${(import ../../lib/hardware-identities.nix) "robin" "zfsHostId"}";
   networking.hostName = "robin";
   networking.useDHCP = false;
 

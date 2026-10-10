@@ -1,5 +1,9 @@
 # Mifflin VMware integration
 
+Build and installation commands below require a [prepared hardware inventory
+checkout](../../docs/hardware-identities.md). The remote rebuild helper prepares
+it automatically; direct Nix commands must run inside that prepared checkout.
+
 ## Guest integration
 
 Mifflin uses VMware Fusion with Plasma Wayland. A loaded balloon driver confirms

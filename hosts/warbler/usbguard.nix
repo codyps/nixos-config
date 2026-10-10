@@ -14,7 +14,7 @@
     rules = ''
       # Logitech receiver inspected on Warbler, 2026-09-16. Keep in this port.
       # Do not pin parent-hash: root-hub descriptors change with kernel updates.
-      allow id 046d:c52b hash "djeL7wNsJBQMuBiqUyWflgupndhsbPkbOih8g3L6OeA=" via-port "6-2" with-interface equals { 03:01:01 03:01:02 03:00:00 }
+      allow id 046d:c52b hash "${(import ../../lib/hardware-identities.nix) "warbler" "usbReceiverHash"}" via-port "6-2" with-interface equals { 03:01:01 03:01:02 03:00:00 }
     '';
   };
 }

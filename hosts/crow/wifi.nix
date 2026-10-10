@@ -34,7 +34,7 @@
   systemd.network = {
     enable = true;
     links."10-crow-wifi" = {
-      matchConfig.PermanentMACAddress = "44:0f:b4:22:d8:38";
+      matchConfig.PermanentMACAddress = "${(import ../../lib/hardware-identities.nix) "crow" "wifiMac"}";
       linkConfig.Name = "wlp6s0";
     };
     networks."20-wifi" = {

@@ -1,0 +1,93 @@
+{
+  "forbes": {
+    "rootLuksUuid": "string",
+    "zfsHostId": "string",
+    "bootUuid": "string"
+  },
+  "warbler": {
+    "rootVolumeKeyId": "string",
+    "aiMac": "string",
+    "wiredDuid": "string",
+    "wiredIaid": "integer",
+    "usbReceiverHash": "string"
+  },
+  "arnold": {
+    "luks_z10_1_uuid": "string",
+    "luks_z8_1_uuid": "string",
+    "luks_z8_2_uuid": "string",
+    "luks_z10_2_uuid": "string",
+    "luks_z10_3_uuid": "string",
+    "luks_z8_3_uuid": "string",
+    "luks_z10_4_uuid": "string",
+    "luks_z10_5_uuid": "string",
+    "luks_z8_4_uuid": "string",
+    "luks_z10_6_uuid": "string",
+    "luks_z8_5_uuid": "string",
+    "luks_z12_0_uuid": "string",
+    "luks_z12_1_uuid": "string",
+    "luks_z12_2_uuid": "string",
+    "luks_z12_3_uuid": "string",
+    "luks_z12_4_uuid": "string",
+    "luks_z12_5_uuid": "string",
+    "luks_z12_6_uuid": "string",
+    "luks_z12_7_uuid": "string",
+    "luks_z12_8_uuid": "string",
+    "luks_z14_0_uuid": "string",
+    "luks_z14_1_uuid": "string",
+    "luks_z14_2_uuid": "string",
+    "luks_z14_3_uuid": "string",
+    "luks_i01_uuid": "string",
+    "luks_f01_uuid": "string",
+    "luks_ru1_uuid": "string",
+    "luks_pair1_uuid": "string",
+    "zfsHostId": "string",
+    "bootUuid": "string",
+    "bootSecondaryUuid": "string"
+  },
+  "crow": {
+    "rootVolumeKeyId": "string",
+    "installDiskId": "string",
+    "wifiMac": "string"
+  },
+  "mifflin": {
+    "rootUuid": "string",
+    "bootUuid": "string",
+    "swapUuid": "string"
+  },
+  "constance": {
+    "rootUuid": "string"
+  },
+  "finch": {
+    "zfsHostId": "string",
+    "bootUuid": "string"
+  },
+  "ward": {
+    "rootVolumeKeyId": "string",
+    "rootLuksUuid": "string",
+    "zfsHostId": "string",
+    "bootUuid": "string"
+  },
+  "maclay": {
+    "rootUuid": "string",
+    "bootUuid": "string",
+    "swapUuid": "string"
+  },
+  "robin": {
+    "zfsHostId": "string",
+    "installDiskId": "string"
+  },
+  "adams": {
+    "rootUuid": "string",
+    "bootUuid": "string"
+  },
+  "calvin": {
+    "rootLuksUuid": "string",
+    "zfsHostId": "string",
+    "bootUuid": "string"
+  },
+  "trunix": {
+    "rootUuid": "string",
+    "bootUuid": "string",
+    "swapUuid": "string"
+  }
+}

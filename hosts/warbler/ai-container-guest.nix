@@ -84,7 +84,7 @@ in
     enable = true;
     networks."10-lan" = {
       matchConfig.Name = "mv-eno1";
-      linkConfig.MACAddress = "02:57:41:52:41:49";
+      linkConfig.MACAddress = "${(import ../../lib/hardware-identities.nix) "warbler" "aiMac"}";
       networkConfig = { DHCP = "yes"; IPv6AcceptRA = true; };
       dhcpV4Config = { ClientIdentifier = "mac"; SendHostname = true; };
     };

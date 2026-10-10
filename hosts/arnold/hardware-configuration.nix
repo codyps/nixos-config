@@ -34,14 +34,14 @@
 
   fileSystems."/boot.d/0" =
     {
-      device = "/dev/disk/by-uuid/6F1B-13E7";
+      device = "/dev/disk/by-uuid/${(import ../../lib/hardware-identities.nix) "arnold" "bootUuid"}";
       fsType = "vfat";
       options = [ "fmask=0137" "dmask=0022" ];
     };
 
   fileSystems."/boot.d/1" =
     {
-      device = "/dev/disk/by-uuid/6EC1-2C8B";
+      device = "/dev/disk/by-uuid/${(import ../../lib/hardware-identities.nix) "arnold" "bootSecondaryUuid"}";
       fsType = "vfat";
       options = [ "fmask=0137" "dmask=0022" ];
     };

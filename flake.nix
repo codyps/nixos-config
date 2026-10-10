@@ -59,7 +59,7 @@
   outputs = { self, zpl, atuin, nixpkgs, nixpkgs-darwin, flake-utils, nix-darwin, nix-darwin-26-05, home-manager, home-manager-26-05, nixos-wsl, nixos-vscode-server, impermanence, sops-nix, disko, lanzaboote, clipway }:
     let
       withCommonModules = constructor: args: constructor (args // {
-        modules = [ ./modules/nix-cache.nix ./modules/terminfo.nix ./modules/admin-commands.nix ] ++ args.modules;
+        modules = [ ./modules/nix-cache.nix ./modules/terminfo.nix ./modules/admin-commands.nix ./modules/hardware-identities.nix ] ++ args.modules;
       });
       mkOverlays = nixpkgsSource: [
         (final: prev:
@@ -176,6 +176,12 @@
         in
         {
           checks = {
+            hardware-identities = pkgs.runCommand "test-hardware-identities" { nativeBuildInputs = [ pkgs.python3 pkgs.git ]; } ''
+              cp ${./scripts/hardware-identities.py} hardware-identities.py
+              cp ${./scripts/test-hardware-identities.py} test-hardware-identities.py
+              python3 test-hardware-identities.py
+              touch "$out"
+            '';
             admin-commands = pkgs.runCommand "test-admin-commands" { nativeBuildInputs = [ pkgs.python3 ]; } ''
               SYS_DISPATCHER=${./scripts/sys.py} python3 ${./scripts/test-sys.py}
               touch "$out"
@@ -231,7 +237,7 @@
             nix-dynamic-machines = pkgs.nix-dynamic-machines;
             nixos-rebuild-remote = pkgs.writeShellApplication {
               name = "nixos-rebuild-remote";
-              runtimeInputs = [ pkgs.nix pkgs.openssh pkgs.jq ];
+              runtimeInputs = [ pkgs.nix pkgs.openssh pkgs.jq pkgs.python3 pkgs.git pkgs.sops pkgs.gnupg ];
               text = ''
                 usage() {
                   echo 'Usage: nixos-rebuild-remote HOST [boot|switch|test|build|dry-build|dry-activate]'
@@ -256,9 +262,12 @@
                   boot|switch|test|build|dry-build|dry-activate) ;;
                   *) echo "Unsupported rebuild action: $action" >&2; exit 2 ;;
                 esac
-                source=$(nix flake archive --json --no-update-lock-file --to "ssh-ng://cody@$host" . | jq -er .path)
+                work=$(mktemp -d)
+                trap 'rm -rf "$work"' EXIT
+                python3 ${./scripts/hardware-identities.py} prepare "$work/source" >/dev/null
+                source=$(nix flake archive --json --no-update-lock-file --to "ssh-ng://cody@$host" "path:$work/source" | jq -er .path)
                 printf -v command 'sudo nixos-rebuild %q --flake %q' "$action" "$source#$host"
-                exec ssh -t "cody@$host" "$command"
+                ssh -t "cody@$host" "$command"
               '';
             };
             warbler-nixos-rebuild-remote = pkgs.writeShellApplication {

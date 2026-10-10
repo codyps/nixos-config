@@ -6,3 +6,7 @@ result
 __pycache__/
 .security-audit/
 /target
+
+# Decrypted hardware inventory belongs only in prepared source snapshots.
+/hardware-identities.json
+/.hardware-source-files.json

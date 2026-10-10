@@ -3,7 +3,7 @@
 **Build and cache flake outputs** runs on every push to `main` and on pull
 requests. The daily flake updater explicitly calls it with the exact commit it
 created, because commits made with `GITHUB_TOKEN` do not trigger push workflows.
-It remains manually runnable from Actions; the historical workflow filename is
+It is also manually runnable from Actions using
 `configurations-pilot.yml`.
 
 Each run discovers all NixOS, standalone Home Manager, and Darwin configurations,

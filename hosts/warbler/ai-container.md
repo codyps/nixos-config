@@ -213,26 +213,20 @@ hermes gateway status
 ```
 
 The helper downloads the [official Hermes installer](https://hermes-agent.nousresearch.com/docs/getting-started/installation)
-as the unprivileged user. The existing host installation was copied during the
-2026-10-01 migration; this helper is available for fresh installations.
+as the unprivileged user.
 The suggested flags skip browser/desktop components for an initial headless
 setup. Model and messaging credentials are configured interactively. Add other
 harnesses with their own user units under `~/.config/systemd/user`.
 
-## Migration from the host (2026-10-01)
+## Recovery archive
 
-The container's pre-existing Codex/T3 state stays primary. The host's full home
-was copied with Btrfs reflinks to
-`~/migration-from-host-20261001/home`, including its independent Codex databases,
-sessions, credentials, and T3 state. Those databases were not overlaid onto the
-container's live databases. The original `/home/cody-ai` on the host is retained.
+The host account's home archive is `~/migration-from-host-20261001/home`,
+including independent Codex databases, sessions, credentials, and T3 state.
+The original `/home/cody-ai` on the host is also retained. Keep archived databases
+separate from the container's live databases when restoring individual files.
 
-Host projects are also available at their original paths under `~/zpl`, while
-existing container projects remain under `~/p` (`~/workspaces` points there).
-Hermes is installed at `~/.hermes`; its user unit was copied but not enabled,
-matching the old host state. Missing user tools, GitHub/SSH configuration, and
-Codex skills/rules were copied without overwriting existing container files.
-Conflicting settings and caches remain available in the full migration archive.
+Host projects are available under `~/zpl`; container projects are under `~/p`
+(`~/workspaces` points there).
 
 ## Boundaries
 

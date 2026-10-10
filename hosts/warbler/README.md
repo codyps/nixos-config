@@ -2,9 +2,8 @@
 
 The reusable module and setup commands are documented in [Secure unlock](../../docs/secure-unlock.md).
 
-Inspected at `nixos@nixos.bed.einic.org`: x86_64 AMD, 64 GB RAM, UEFI,
-TPM 2.0 (`systemd-pcrlock is-supported` returned `yes`), Secure Boot disabled.
-The installer currently uses Wi-Fi `wlp3s0` (rtw89_8852ae); `eno1` is unplugged.
+Warbler is an x86_64 AMD machine with 64 GB RAM, UEFI, and TPM 2.0.
+Network interfaces are Wi-Fi `wlp3s0` (rtw89_8852ae) and Ethernet `eno1`.
 
 ## Remote rebuild
 
@@ -35,13 +34,14 @@ scale-to-zero configuration, isolation, and `sudo sys garm` administration.
 
 For macOS image preparation, see the [QEMU image builder](../../scripts/actions-vm-image/README.md).
 Warbler enables `sys actions-vm-image` and the macOS autoscaler with one shared VM
-slot. It uses `/var/lib/actions-vm-images/sequoia-clt-auto-v1` (Sequoia 15.8.1,
+slot. It uses `/var/lib/actions-vm-images/sequoia-clt-fda-v3` (Sequoia 15.8.1,
 CLT 16.4) and discovers repositories granted to the existing GARM GitHub App.
 Use `runs-on: warbler-macos-intel` for CLI macOS jobs; full Xcode is not installed.
 Inspect `systemctl status actions-vm-scaler` and
 `journalctl -u actions-vm-scaler` for controller status. GARM continues serving
 its separate Linux scale sets.
-See [validation results](macos-image-validation.md) for the tested boundary and temporary workspace.
+See the [scaler validation procedure](../../scripts/actions-vm-scaler/README.md#validation)
+for job lifecycle and isolation checks.
 
 ## AI harness account
 
@@ -54,7 +54,7 @@ and other harnesses. It provides its own LAN DHCP address and user systemd;
 `cody-ai` can manage its services without host administrator access.
 
 The [legacy host AI account](ai-harnesses.md) and its home are retained for
-recovery. Its Codex service is disabled after migration to the container.
+recovery. Its Codex service is disabled.
 
 ## Hardware and firmware references
 
@@ -324,8 +324,7 @@ is separate and is never used to decrypt SOPS data.
 The public SSH identity is recorded in `hosts/warbler/ssh-host-key.pub`; its age
 recipient is `host_warbler` in `.sops.yaml`. The rule for
 `hosts/warbler/secrets.yaml` includes that recipient and the existing Cody
-administrator recipient. No Robin secrets were shared, and no production
-secret file is created until needed. To add one, run from the checkout:
+administrator recipient. To add a secret, run from the checkout:
 
 ```sh
 nix develop --command sops hosts/warbler/secrets.yaml

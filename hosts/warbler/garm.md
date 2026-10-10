@@ -118,28 +118,6 @@ The guest proxy on `10.77.0.1:9998` exposes only runner endpoints; `/api/v1/firs
 the admin API and UI return 404 there. Public GitHub jobs and private deployment
 secrets should not share a trust policy merely because guests are disposable.
 
-Live validation on 2026-09-27 passed creation from zero, two simultaneous jobs,
-private-repository checkout, and a replacement VM with a different hostname and
-no sentinel file from previous jobs. All VMs were automatically deleted afterward.
-The initial smoke workflow is on `codex/garm-runner-validation`:
-https://github.com/codyps/zpl/actions/runs/36346328033
-
-The production workflows now use `warbler-linux` on both repositories' default
-branches. ZPL PRs #14 and #15 and zpl-comparison PR #3 are merged. Post-merge
-ZPL CI and release preparation passed, as did comparison report generation and
-publication. ZPL's Pages build passed, but deployment returns GitHub's Pages-not-
-enabled 404 and requires separate repository publishing configuration.
-
-A second run cancelled during VM startup also returned the project to zero VMs:
-https://github.com/codyps/zpl/actions/runs/36346550667
-
-The NixOS system was built and activated with `switch`, including the persistent
-boot generation. A reboot has not been performed as part of validation.
-
-Guest probes confirmed GitHub HTTPS works while host SSH/admin API, LAN and
-tailnet connections are blocked. The guest proxy returns 404 for admin routes
-and 401 for unauthenticated metadata requests.
-
 After a job completes, `sudo incus list --project garm` should return to empty.
 Inspect controller and proxy logs with `journalctl -u garm -u nginx`.
 

@@ -1,6 +1,6 @@
 # AI harness account
 
-> The primary environment is now [warbler-ai](ai-container.md). Warbler disables
+> The primary environment is [warbler-ai](ai-container.md). Warbler disables
 > this legacy host service and retains the account/home for recovery. The
 > configuration below documents the old sandbox and its optional test fixture.
 
@@ -41,8 +41,8 @@ account, history, workspaces, and service restrictions.
 
 For newer Codex versions, the host service and SSH sandbox share only
 `/tmp/codex-daemon-1001`, the AI account's mode-0700 control-socket directory.
-Their remaining temporary files stay private. The account's existing UID 1001
-is now explicit so the reserved socket path is stable.
+Their remaining temporary files stay private. The account has explicit UID 1001
+so the reserved socket path is stable.
 
 ## GitHub HTTPS authentication
 

@@ -1,11 +1,9 @@
 # Crow
 
-Inspected over passwordless SSH at `nixos@nixos.bed.einic.org` on 2026-10-08:
-x86_64 AMD, 64 GB RAM, UEFI, TPM 2.0, Secure Boot disabled. Wi-Fi is
-`wlp6s0` (`mt7921e`, permanent address `44:0f:b4:22:d8:38`). Ethernet is
-unplugged. The target WD_BLACK SN850X 4000GB is identified by
+Crow is an x86_64 AMD machine with 64 GB RAM, UEFI, and TPM 2.0.
+Wi-Fi is `wlp6s0` (`mt7921e`, permanent address `44:0f:b4:22:d8:38`).
+The WD_BLACK SN850X 4000GB is identified by
 `/dev/disk/by-id/nvme-eui.e8238fa6bf530001001b448b4036d241`.
-Its existing NTFS partition must only be erased after explicit confirmation.
 
 ## Storage and boot
 
@@ -29,13 +27,10 @@ Signing keys must exist before boot-file installation. Neither the configuration
 nor a rebuild enrolls firmware keys or a TPM disk token. See the
 [shared staged workflow](../../docs/secure-unlock.md#staged-provisioning-with-one-configuration).
 
-
 ## Wi-Fi and SOPS
 
-The existing `billy` WPA3/SAE profile was converted to an iwd profile and
-SOPS-encrypted in `secrets.yaml`. Its recipients are the admin PGP key from
-`.sops.yaml` and the installer SSH identity recorded in `ssh-host-key.pub`.
-Decryption was verified on the installer without printing credentials.
+The `billy` WPA3/SAE iwd profile is SOPS-encrypted in `secrets.yaml`. Its
+recipients are the admin PGP key from `.sops.yaml` and the installer SSH identity recorded in `ssh-host-key.pub`.
 **Preserve `/etc/ssh/ssh_host_ed25519_key` from the installer before rebooting
 or replacing it**, then install it at `/persist/ssh/ssh_host_ed25519_key`
 with root ownership and mode 0600. Its public key must match this directory's
@@ -108,8 +103,8 @@ below. Do not use `scripts/warbler-install.py`: it targets Warbler's disk and
 provisioning identity. Crow supports Wi-Fi after console unlock;
 Ethernet is not required. Firmware menus may differ from Warbler's HP machine.
 
-1. Confirm the exact NVMe and that its NTFS data may be erased. Preserve the
-   installer SSH key pair in a private location outside the checkout; it must
+1. Confirm the exact NVMe and obtain approval to erase its existing data. Preserve
+   the installer SSH key pair in a private location outside the checkout; it must
    survive the installer reboot. Prepare a separate LUKS recovery password in
    the root-owned mode-0600 installer file `/run/crow-luks-password`.
 2. For a fresh format, set `hosts/crow/volume-identity.nix` to `null` in the
@@ -164,79 +159,18 @@ Evaluation and builds do not test physical Wi-Fi reconnection, firmware
 trust, disk formatting, TPM enrollment, or boot. Installation and activation
 are separate steps.
 
-Preparation results (2026-10-08): Crow system and disko script builds passed;
-a recovery initrd with a synthetic evaluation-only volume pin also built.
-`test-crow.nix`, Warbler's existing volume-pin checks, and all 31 secure-unlock
-Python tests passed. Full flake evaluation stops at the existing Warbler VM
-fixture's missing `services.zpl-proxy-api` option; the same failure was
-reproduced from unchanged HEAD. No target disk was formatted and no system
-was installed, activated, or rebooted during these checks.
-
-## Installation result
-
-Crow bootstrap was installed on 2026-10-08 after approval to erase the NVMe.
-PhotoRec was stopped with separate approval after it blocked formatting.
-The root LV is 1,000,001,765,376 bytes (extent-rounded), swap is 8,589,934,592
-bytes, and 2,990,027,046,912 bytes remain free in volume group `crow`.
-The installed system is
-`/nix/store/1c7s7mxd4bgck100a779ll9wbvb25xyd-nixos-system-crow-26.11.20261003.a7868a7`.
-The volume identity is recorded in both this checkout and the installed copy
-at `/persist/nixos-config`. The EFI bootloaders and generation UKI passed
-certificate verification, and the kernel/initrd matched the hashes embedded
-in the signed UKI. The LUKS recovery password passed a test unlock. The
-installed SSH key decrypted the Wi-Fi SOPS file,
-and both initial account passwords were verified against the installed hashes.
+## Recovery material
 
 The private provisioning bundle on the installing machine is
 `/home/cody-ai/.local/share/crow-install` (directory mode 0700, files 0600):
 
-- `account-passwords/root`: initial root console password.
-- `account-passwords/cody`: initial cody console password.
-- `luks-password`: separate disk recovery password.
-- `ssh/`: preserved stage-2 SSH/SOPS identity.
+- `account-passwords/{root,cody}`: initial console passwords.
+- `luks-password`: disk recovery password.
+- `ssh/`: stage-2 SSH/SOPS identity.
 - `sbctl/`: signing keys and owner GUID.
+- `firmware/2026-10-09T21-30-37Z-gLL2ua0F`: firmware database backup, also
+  stored on Crow at `/persist/secure-boot-backup/2026-10-09T21-30-37Z-gLL2ua0F`.
 
-These plaintext files are outside Git and the Nix store. Crow stores only the
-account hashes in `/persist/shadow.d/{root,cody}`. Later `passwd` changes persist
-those hashes but do not update the saved initial plaintext passwords. SSH stays
-key-only. Temporary provisioning passwords on the live installer were removed
-after validation; the local private bundle is retained.
-
-The installer has not been rebooted. First-boot Wi-Fi, container connectivity,
-and persistence remain to be verified after local LUKS entry. Secure Boot key
-enrollment, `crow-unlock` Tailscale registration, and TPM auto-unlock are still
-pending the attended firmware and recovery checkpoints above. Do not install
-the normal `crow` boot generation until those prerequisites are ready.
-
-## First-boot fixes (2026-10-09)
-
-The updated bootstrap was switched live on Crow and installed for its next
-boot. It provides `sys setup-secure-boot`, corrects the backup helper's host
-check, and explicitly configures both sides of the AI container's veth with
-networkd. Previously systemd's default container network replaced the host
-address and the guest waited indefinitely for a managed link, causing repeated
-container startup failures. Crow and its guest now report no failed units;
-`crow-ai` reaches network-online, can fetch over HTTPS, and runs the installed
-Codex daemon with zero container restarts since the update.
-
-The secure-unlock helper now accepts LVM inside the configured LUKS mapping.
-Every backing-device branch must reach that mapping; an LV spanning an
-unencrypted device is rejected. Tests cover direct, nested, mixed-device,
-missing-device and cyclic cases, and Crow's actual LV ancestry was checked.
-All 36 helper tests and Crow's configuration checks passed.
-
-Firmware databases were backed up successfully to
-`/persist/secure-boot-backup/2026-10-09T21-30-37Z-gLL2ua0F` and copied to the
-installing machine at
-`/home/cody-ai/.local/share/crow-install/firmware/2026-10-09T21-30-37Z-gLL2ua0F`.
-PK, KEK, db and dbx checksums match. Bootloader and generation UKI signatures
-were verified against Crow's signing certificate.
-
-Remaining manual steps: enter firmware Setup Mode, boot Crow and run
-`sudo sys setup-secure-boot`, then enable Secure Boot in firmware and cold-boot
-again. Normal-host Tailscale is still logged out; authenticate it with
-`sudo tailscale up` to use the tailnet SSH proxy and advertised routes.
-After Secure Boot is verified, complete the separate `crow-unlock` registration,
-sealed recovery credential installation and remote-unlock test described above.
-Only then retire accepted unpinned bootstrap generations and enroll the disk's
-TPM token. No firmware keys or LUKS tokens were changed by this live update.
+Keep these plaintext files outside Git and the Nix store. Crow stores account
+hashes in `/persist/shadow.d/{root,cody}`. Later `passwd` changes persist those
+hashes but do not update the saved initial passwords. SSH is key-only.

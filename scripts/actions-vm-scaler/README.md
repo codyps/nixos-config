@@ -226,6 +226,9 @@ runtime key file. A standalone `run` additionally requires pre-created isolated
 TAPs and Linux KVM. The service's persisted state is mode 0700; never expose its
 JIT media or state in logs or an HTTP server.
 
+Avoid parallel diagnostic session-creation probes against an active listener:
+creating a session with the same listener identity invalidates its existing session.
+
 ## Validation
 
 ```sh

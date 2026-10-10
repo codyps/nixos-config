@@ -89,8 +89,8 @@ The macOS controller cannot natively build them. Pass prebuilt store paths
 or explicitly select local/controller builds with configured remote builders;
 do not let nixos-anywhere's automatic selection fall back to Robin.
 
-The inspected ISO has NixOS 24.05, kernel 6.6.56 and ZFS 2.2.6. Refresh the
-installer environment before running modern ZFS/disko tooling. Detection of
+Use a current installer environment compatible with the configured ZFS/disko
+tooling. Detection of
 an existing NixOS ISO normally skips nixos-anywhere's kexec step. A reboot
 into an updated ISO or a deliberately selected kexec workflow is required.
 
@@ -106,6 +106,6 @@ The `virtualisation.vmVariantWithDisko` variant alone has the `nixosvmtest`
 account/password. It disables production SOPS/Caddy and initrd SSH, and uses
 Disko's interactive/test password instead of the installation password file.
 The media services and their `/tank` datasets are defined in `media.nix` and
-`disko.nix`. See [MIGRATION.md](MIGRATION.md) for the Finch data migration,
-validation, and rollback state. A fresh installation still requires restoring
+`disko.nix`. See [Media services and recovery](recovery.md) for archive locations and
+restoration precautions. A fresh installation still requires restoring
 application data before the media routes can serve the existing libraries.

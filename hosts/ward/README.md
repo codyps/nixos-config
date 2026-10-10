@@ -6,13 +6,10 @@ Do not run disko or format these existing devices. The EFI filesystem is
 `D04B-D453`. Wired networking is `enp3s0` (igc); both boot stages use its MAC
 as the DHCP client identifier. The machine has a TPM 2.0.
 
-## Recovery findings
+## Storage and recovery
 
-The saved September 2026 journal showed the USB key partition timing out,
-ZFS import exhausting its timeout before unlocking, and `/home` rejecting
-mount(8) because `ward/keep/home` had a native ZFS mountpoint. The configuration
-now prompts for the LUKS passphrase, pins the existing volume identity, and
-orders pool import after `/dev/mapper/ward-zroot` exists.
+The configuration prompts for the LUKS passphrase, pins the volume identity,
+and orders pool import after `/dev/mapper/ward-zroot` exists.
 
 NixOS owns the `/home` mount. Its dataset must have `mountpoint=legacy`:
 
@@ -37,8 +34,7 @@ snapshots newer than `@blank`.
 Use `.#ward` throughout installation and operation. Before first provisioning,
 while Secure Boot is disabled, staged provisioning retains the public volume pin and defers sealed
 recovery credentials and TPM policy creation. Enter the existing LUKS
-passphrase at the console. There is no dependency on the former Samsung USB
-key partition. Stage-2 SSH accepts the configured keys for root and cody;
+passphrase at the console. Stage-2 SSH accepts the configured keys for root and cody;
 cody has passwordless sudo. Password SSH is disabled.
 
 Signing keys live at `/persist/secure-unlock/sbctl`; sbctl and Lanzaboote use
@@ -52,11 +48,9 @@ With firmware in Setup Mode and a backup secured, enroll using
 `sudo sys setup-secure-boot`, then enable Secure Boot in firmware and boot the
 signed Ward generation. Do not clear all firmware databases or discard
 `dbx`. Verify `bootctl status` and `sbctl status` on the installed system.
-Firmware enrollment and reboot are attended steps. During the October 2026
-recovery, PK, KEK, db, and dbx were all absent; only SecureBoot/SetupMode
-variables existed. Those variables were saved under the recovery backup's
-`efivars/` directory. The strict backup command will report an incomplete backup
-when databases are absent; do not interpret that as a reason to clear keys.
+Firmware enrollment and reboot are attended steps. The strict backup command
+reports an incomplete backup when firmware databases are absent; do not interpret that as a reason to clear keys. Saved firmware
+variables are under the recovery backup's `efivars/` directory.
 
 After booting with Secure Boot enabled, the service automatically generates
 and seals the dedicated initrd SSH identity; no manual key generation is needed.
@@ -81,23 +75,5 @@ The LUKS password is independent. `passwd`, `sudo passwd cody`, and
 `sudo passwd root` persist successful changes through PAM across root resets
 and rebuilds. No password or hash belongs in the repository or Nix store.
 
-Hydra, PostgreSQL, and Grafana state now persist across root rollback, alongside
-the existing persistent services. The obsolete Hydra `buildMachinesFiles`
-option was removed; configuring new Hydra gRPC build agents is separate work.
-Automatic flake upgrades are disabled during the staged boot migration.
-Application/container versions and existing proxy routes are otherwise retained.
-
-## Installed recovery checkpoint (2026-10-10)
-
-Historical checkpoint, before the single-configuration workflow above:
-generation 218 was the signed `ward-bootstrap` default, built from main
-`5dde783` plus the ward changes. Both ward variants built successfully;
-`nix flake check --no-build`, ward/crow assertions, and all 40 secure-unlock
-and 7 password tests passed. Signatures on both retained UKIs and both
-systemd-boot binaries were verified against ward's signing certificate.
-Legacy loader entries whose kernel/initrd files were absent were moved to
-`/persist/ward-recovery-20261010/retired-loader-entries/`.
-
-The machine has not been rebooted; Secure Boot and TPM enrollment remain
-pending. The previous generation 217 is retained but still has the original
-USB-key startup configuration. Successful installation is not a boot test.
+Hydra, PostgreSQL, and Grafana state persist across root rollback.
+Automatic flake upgrades are disabled during staged boot provisioning.

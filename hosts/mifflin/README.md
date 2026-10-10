@@ -1,19 +1,10 @@
 # Mifflin VMware integration
 
-## Observed guest
+## Guest integration
 
-Inspected on 2026-09-10: VMware on an Intel i9-9880H, 8 virtual CPUs
-(presented as 8 sockets), about 12 GiB RAM, a 100 GiB virtual SATA disk,
-and 8.4 GiB disk swap. The network uses the emulated e1000 driver.
-`vmwgfx`, `vmw_balloon`, VMCI and vsock were loaded, and both the system
-VMware service and the desktop VMware agent were running. The desktop was
-Plasma Wayland. The running desktop agent was older than the newly installed
-system tools; logging out and back in refreshes it.
-
-Balloon statistics could not be read: `vmware-toolbox-cmd stat balloon`
-reported that the VMware Guest API is not enabled on the host. A loaded
-balloon driver confirms guest support, not that Fusion is reclaiming RAM.
-Memory hot-add onlining was already enabled by the running kernel.
+Mifflin uses VMware Fusion with Plasma Wayland. A loaded balloon driver confirms
+guest support, not that Fusion is reclaiming RAM. Inspect balloon statistics
+with `vmware-toolbox-cmd stat balloon`; the host must enable the VMware Guest API.
 
 ## Guest policy
 
@@ -94,15 +85,6 @@ systemctl status fstrim.timer
 Validate window resizing, clipboard in both directions, and suspend/resume
 from the Fusion console. Those interactions cannot be proved by a Nix build.
 The kernel command-line change takes effect after a reboot.
-
-On 2026-09-11, the clipway system build passed and the compiled clipboard
-plugin was checked for its Wayland backend. The built `clipway.service` was
-enabled and started with `systemctl --user enable --runtime`, and the old
-`app-vmware\x2duser@autostart.service` was masked/stopped for the current
-runtime. Exactly one patched desktop agent was running afterward. This
-session-only activation does not switch the system; activate the NixOS
-configuration to make the service and autostart suppression survive reboot.
-Host/guest clipboard round-trip testing remains an interactive console check.
 
 ## Reclaiming Fusion disk space
 

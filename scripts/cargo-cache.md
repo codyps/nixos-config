@@ -51,7 +51,5 @@ paths, so consumers must use matching flake inputs and package definitions.
 This caches the mbx executable; Rust compilation caches managed by mbx remain
 separate.
 
-The former cargo-target wrapper, garbage collector, and Windows installation
-helpers have been removed. Existing cache data and workspace target links are
-left intact. On Windows, use upstream mbx setup instead of the removed helpers;
-previously installed helpers must be removed from the user PATH.
+On Windows, use upstream mbx setup. Remove any legacy cargo-target helpers
+from the user PATH before using mbx.

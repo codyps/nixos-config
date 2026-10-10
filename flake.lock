@@ -31,11 +31,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1790254865,
-        "narHash": "sha256-N21uHNF8slFxThvCcKKFGQCMfc4lJ514yZADrfpyy2g=",
+        "lastModified": 1791558874,
+        "narHash": "sha256-QTsyTaXHHPAaWwnySbrU0XyJ6NNsxv3KDqAZdK7Xo+Q=",
         "owner": "krisztianfekete",
         "repo": "clipway",
-        "rev": "b449f3dfb82e7e84fac20083d75c29b24b591457",
+        "rev": "a4ad867be8ba1b2e0f47f248e2f4e109c2428d9e",
         "type": "github"
       },
       "original": {
@@ -210,11 +210,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1791484883,
-        "narHash": "sha256-iKxFHJrg7Sltwhq3ssCZYQ4CFEDVvReVVuVuO9dj3sE=",
+        "lastModified": 1791600313,
+        "narHash": "sha256-/2gb2WTztITD/JU1XUCg63vDsIfJGLr0LDsjSCTTJc8=",
         "owner": "nix-community",
         "repo": "home-manager",
-        "rev": "dfadbe5162d5e86bc0808badec8f346f81b4b3f0",
+        "rev": "427c74a88a93cc9f856c8bb99bf6b4a5187a6b33",
         "type": "github"
       },
       "original": {
@@ -580,11 +580,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1791510097,
-        "narHash": "sha256-2gLiboz2hgzpo6KBd/DqFjLt05Lxkb40JgvogNRt/AA=",
+        "lastModified": 1791613434,
+        "narHash": "sha256-NjYBDx/bdw1Nutecsn20yond+CX2so180gmFHHl07fw=",
         "owner": "codyps",
         "repo": "zpl",
-        "rev": "9a1eac2cfbc08f6595d0fe215cfe73e4102c6e3c",
+        "rev": "9a3be061a002a95c76e447e6b34c63e3cb62a1db",
         "type": "github"
       },
       "original": {

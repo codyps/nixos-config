@@ -423,6 +423,34 @@ class MappingAncestryTests(unittest.TestCase):
         self.assertFalse(setup.device_is_within_mapping(self.lv, self.mapping))
 
 
+class ZfsStateTests(unittest.TestCase):
+    def check_pool(self, listing, encrypted=True):
+        def run(*args):
+            if args[0] == "findmnt":
+                return b"zfs\n" if "FSTYPE" in args else b"ward/keep/persist\n"
+            self.assertEqual(args, ("zpool", "list", "-vHP", "ward"))
+            return listing
+        with patch.object(setup, "run", side_effect=run), \
+                patch.object(setup.os, "stat", return_value=SimpleNamespace(st_rdev=123)), \
+                patch.object(setup, "device_is_within_mapping", return_value=encrypted):
+            setup.verify_state_backing({"stateDirectory": "/persist", "mapperName": "luksroot"})
+
+    def test_single_encrypted_vdev(self):
+        self.check_pool(b"ward 800G\n /dev/dm-1 800G\n")
+
+    def test_unencrypted_vdev_rejected(self):
+        with self.assertRaisesRegex(RuntimeError, "exclusively"):
+            self.check_pool(b"ward 800G\n /dev/dm-1 800G\n", False)
+
+    def test_additional_vdev_rejected(self):
+        with self.assertRaisesRegex(RuntimeError, "exactly one"):
+            self.check_pool(b"ward 800G\n /dev/dm-1 800G\n /dev/sda 800G\n")
+
+    def test_missing_vdev_rejected(self):
+        with self.assertRaisesRegex(RuntimeError, "exactly one"):
+            self.check_pool(b"ward 800G\n")
+
+
 class InputPermissionTests(unittest.TestCase):
     def test_symlink_input_is_rejected(self):
         with tempfile.TemporaryDirectory() as directory:

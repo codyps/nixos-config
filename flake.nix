@@ -487,6 +487,16 @@
             ];
           };
 
+          # Keep the existing volume pin during the attended Secure Boot transition.
+          ward-bootstrap = self.nixosConfigurations.ward.extendModules {
+            modules = [
+              ({ lib, ... }: {
+                boot.secureUnlock.remoteUnlock.enable = lib.mkForce false;
+                boot.secureUnlock.tpmUnlock.enable = lib.mkForce false;
+              })
+            ];
+          };
+
           # router
           ward = nixosSystem {
             system = "x86_64-linux";
@@ -494,6 +504,7 @@
             modules = [
               #ethereum-nix.nixosModules.default
               sops-nix.nixosModules.sops
+              lanzaboote.nixosModules.lanzaboote
               ./hosts/ward/configuration.nix
               ./nixos/common.nix
               impermanence.nixosModules.impermanence

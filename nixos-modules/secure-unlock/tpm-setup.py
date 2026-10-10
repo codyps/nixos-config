@@ -50,6 +50,27 @@ def require(condition, message):
         raise RuntimeError(message)
 
 
+def verify_state_backing(config):
+    source = run("findmnt", "--evaluate", "-n", "-o", "SOURCE", "--target", config["stateDirectory"]).decode().strip()
+    mapper = f"/dev/mapper/{config['mapperName']}"
+    # Direct filesystems (including Btrfs subvolumes) retain the original check.
+    if source.startswith("/dev/"):
+        require(device_is_within_mapping(os.stat(source.split("[", 1)[0]).st_rdev, os.stat(mapper).st_rdev),
+                "The state directory must be on the configured encrypted root mapping.")
+        return
+    fstype = run("findmnt", "-n", "-o", "FSTYPE", "--target", config["stateDirectory"]).decode().strip()
+    require(fstype == "zfs", "Unsupported state filesystem; expected the configured encrypted root.")
+    pool = source.split("/", 1)[0]
+    # Accept only a single disk vdev, optionally layered through LVM. Reject
+    # mirrors, caches, logs and additional disks rather than overlooking data
+    # outside the pinned mapping. zpool -P emits absolute leaf device paths.
+    rows = [line.split() for line in run("zpool", "list", "-vHP", pool).decode().splitlines() if line.strip()]
+    require(len(rows) == 2 and rows[0][0] == pool and rows[1][0].startswith("/dev/"),
+            "State ZFS pool must have exactly one disk on the configured encrypted root.")
+    require(device_is_within_mapping(os.stat(rows[1][0]).st_rdev, os.stat(mapper).st_rdev),
+            "State pool is not exclusively on the configured encrypted root.")
+
+
 def preflight(config, *, require_current_generation=True):
     require(os.geteuid() == 0, "Run with sudo on the installed host.")
     require(os.uname().nodename == config["hostName"],
@@ -64,12 +85,7 @@ def preflight(config, *, require_current_generation=True):
     if require_current_generation:
         require(Path("/run/booted-system").resolve() == Path("/run/current-system").resolve(),
                 "Reboot into the current generation before provisioning TPM state.")
-    source = run("findmnt", "--evaluate", "-n", "-o", "SOURCE", "--target", config["stateDirectory"]).decode().strip()
-    # Btrfs st_dev/MAJ:MIN describes an anonymous filesystem device, not its
-    # backing block device. Compare the resolved source after removing subvol.
-    require(device_is_within_mapping(os.stat(source.split("[", 1)[0]).st_rdev,
-                                     os.stat(f"/dev/mapper/{config['mapperName']}").st_rdev),
-            "The state directory must be on the configured encrypted root mapping.")
+    verify_state_backing(config)
     return config
 
 

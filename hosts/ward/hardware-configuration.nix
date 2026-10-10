@@ -20,6 +20,7 @@
       fsType = "zfs";
     };
 
+  # This NixOS-managed mount requires: zfs set mountpoint=legacy ward/keep/home
   fileSystems."/home" =
     {
       device = "ward/keep/home";

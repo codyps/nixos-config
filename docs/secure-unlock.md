@@ -36,7 +36,10 @@ The state directory must persist on the configured encrypted root mapping, and
 must exist before provisioning. It is created at boot by tmpfiles. With an
 ephemeral root, use a persistent directory such as `/persist` and ensure its
 filesystem is mounted for boot. The helper verifies the directory's backing
-mapping before touching credentials or enrolling a disk.
+mapping before touching credentials or enrolling a disk. A ZFS state dataset is
+supported when its pool has exactly one disk vdev whose complete backing-device
+ancestry passes through the pinned LUKS mapping (including LVM inside LUKS).
+Pools with additional vdevs are rejected.
 
 The module enables systemd initrd and Lanzaboote, disables the boot editor,
 and pins the root volume before mounting it. Initrd networking and SSH start

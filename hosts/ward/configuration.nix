@@ -7,11 +7,23 @@ in
   imports =
     [
       ./hardware-configuration.nix
+      ../../nixos-modules/secure-boot-admin.nix
+      ../../nixos-modules/secure-unlock
+      ../../nixos-modules/account-passwords.nix
       ../../nixos-modules/all-modules.nix
     ];
 
-  boot.kernelParams = [ "ip=dhcp" ];
-  boot.loader.systemd-boot.enable = true;
+  boot.secureUnlock = {
+    enable = true;
+    mapperName = "luksroot";
+    stateDirectory = "/persist/secure-unlock";
+    rootVolumeKeyId = import ./volume-identity.nix;
+    remoteUnlock.enable = true;
+    remoteUnlock.authorizedKeys = authorizedKeys;
+    tpmUnlock.enable = true;
+  };
+  # Install ward-bootstrap until Secure Boot has been enabled and verified.
+  system.autoUpgrade.enable = lib.mkForce false;
   boot.loader.efi.canTouchEfiVariables = true;
 
   systemd.settings.Manager.RuntimeWatchdogSec = "30s";
@@ -34,6 +46,9 @@ in
       "/var/lib/tailscale"
       "/var/lib/systemd/coredump"
       "/var/lib/audiobookshelf"
+      "/var/lib/hydra"
+      "/var/lib/postgresql"
+      "/var/lib/grafana"
       "/etc/NetworkManager/system-connections"
       { directory = "/var/lib/colord"; user = "colord"; group = "colord"; mode = "u=rwx,g=rx,o="; }
     ];
@@ -41,14 +56,17 @@ in
 
   boot.initrd = {
     systemd.enable = true;
+    # Do not start the ZFS import timeout while LUKS is still asking for a
+    # passphrase. The pool lives on an LV inside the encrypted mapping.
+    systemd.services.zfs-import-ward = {
+      requires = [ "dev-mapper-ward\\x2dzroot.device" ];
+      after = [ "dev-mapper-ward\\x2dzroot.device" ];
+    };
 
-    network = {
-      enable = true;
-      ssh = {
-        enable = true;
-        authorizedKeys = authorizedKeys;
-        hostKeys = [ "/persist/etc/secret/initrd/ssh_host_ed25519_key" ];
-      };
+    systemd.network.networks."10-wired" = {
+      matchConfig.Name = "enp3s0";
+      networkConfig.DHCP = "ipv4";
+      dhcpV4Config.ClientIdentifier = "mac";
     };
 
     kernelModules = [ "usb_storage" "igc" "tpm_crb" ];
@@ -57,8 +75,6 @@ in
       luksroot = {
         device = "/dev/disk/by-uuid/b8de49f4-4952-4a22-8d8c-f616b77e982e";
         allowDiscards = true;
-        keyFileSize = 4096;
-        keyFile = "/dev/disk/by-id/usb-Samsung_Type-C_0396123100002458-0:0-part5";
       };
     };
   };
@@ -80,8 +96,6 @@ in
     enable = true;
     hydraURL = "https://ward.little-moth.ts.net/hydra";
     notificationSender = "hydra@localhost"; # e-mail of hydra service
-    # a standalone hydra will require you to unset the buildMachinesFiles list to avoid using a nonexistant /etc/nix/machines
-    buildMachinesFiles = [ ];
     # you will probably also want, otherwise *everything* will be built from scratch
     useSubstitutes = true;
   };
@@ -413,9 +427,10 @@ in
 
   systemd.network = {
     enable = true;
-    networks."10-enp3s0.network" = {
+    networks."10-wired" = {
       networkConfig.DHCP = "ipv4";
       matchConfig.Name = "enp3s0";
+      dhcpV4Config.ClientIdentifier = "mac";
       # prioritize the local network directly instead of using tailscale
       routingPolicyRules = [
         {
@@ -501,6 +516,7 @@ in
   # Enable touchpad support (enabled default in most desktopManager).
   # services.xserver.libinput.enable = true;
 
+  security.sudo.wheelNeedsPassword = false;
   users.mutableUsers = false;
   users.users.cody = {
     isNormalUser = true;
@@ -508,16 +524,17 @@ in
     packages = with pkgs; [
       firefox
     ];
-    hashedPasswordFile = "/persist/etc/secret/cody.pass";
     openssh.authorizedKeys.keys = authorizedKeys;
   };
 
   users.users.root = {
-    hashedPasswordFile = "/persist/etc/secret/root.pass";
     openssh.authorizedKeys.keys = authorizedKeys;
   };
 
   environment.systemPackages = with pkgs; [
+    sbctl
+    cryptsetup
+    tpm2-tools
     neovim
     perf
     git
@@ -531,8 +548,9 @@ in
     enable = true;
     settings = {
       StreamLocalBindUnlink = "yes";
-      PermitRootLogin = "no";
-      PasswordAuthentication = true;
+      PermitRootLogin = "prohibit-password";
+      PasswordAuthentication = false;
+      KbdInteractiveAuthentication = false;
     };
     hostKeys = [
       {

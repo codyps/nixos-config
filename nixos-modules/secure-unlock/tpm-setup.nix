@@ -15,7 +15,8 @@ let
   setup = pkgs.writeShellApplication {
     name = "secure-unlock-setup";
     runtimeInputs = with pkgs; [ python3 config.systemd.package cryptsetup openssh util-linux ]
-      ++ lib.optional cfg.remoteUnlock.tailscale.enable pkgs.tailscale;
+      ++ lib.optional cfg.remoteUnlock.tailscale.enable pkgs.tailscale
+      ++ lib.optional (lib.any (fs: fs.fsType == "zfs") (lib.attrValues config.fileSystems)) config.boot.zfs.package;
     text = ''
       exec python3 ${./tpm-setup.py} --config ${setupConfig} "$@"
     '';

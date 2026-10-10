@@ -46,10 +46,20 @@ in
       };
       wifi = {
         enable = lib.mkEnableOption "Wi-Fi for initrd recovery and the running system";
+        backend = mkOption {
+          type = types.enum [ "wpa_supplicant" "iwd" ];
+          default = "wpa_supplicant";
+          description = "Wi-Fi daemon used for recovery. With iwd, configure stage-2 Wi-Fi separately.";
+        };
+        iwdProfileName = mkOption {
+          type = types.strMatching "[a-zA-Z0-9=_-]+\\.(psk|8021x|open)";
+          default = "network.psk";
+          description = "iwd network profile filename, including its security extension.";
+        };
         interface = mkOption {
           type = types.strMatching "[a-zA-Z0-9_-]+";
           default = "wlan0";
-          description = "Wi-Fi interface; install its wpa_supplicant input in stateDirectory/credstore/wifi.";
+          description = "Wi-Fi interface; install its backend's network profile in stateDirectory/credstore/wifi.";
         };
       };
     };

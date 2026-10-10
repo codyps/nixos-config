@@ -15,6 +15,29 @@ PLAIN_STORE = None
 STORE = None
 EFI = Path("/sys/firmware/efi/efivars")
 EFI_GUID = "8be4df61-93ca-11d2-aa0d-00e098032b8c"
+SYS_DEV_BLOCK = Path("/sys/dev/block")
+
+
+def device_is_within_mapping(device_number, mapping_number, ancestors=frozenset()):
+    """Every backing-device branch must pass through the expected LUKS mapping."""
+    if device_number == mapping_number:
+        return True
+    if device_number in ancestors:
+        return False
+    device = SYS_DEV_BLOCK / f"{os.major(device_number)}:{os.minor(device_number)}"
+    try:
+        slaves = list((device / "slaves").iterdir())
+        # A plain partition/disk outside the mapping is not encrypted by it.
+        if not slaves:
+            return False
+        for slave in slaves:
+            major, minor = map(int, (slave / "dev").read_text().strip().split(":"))
+            if not device_is_within_mapping(os.makedev(major, minor), mapping_number,
+                                            ancestors | {device_number}):
+                return False
+        return True
+    except (OSError, ValueError):
+        return False
 
 
 def run(*args):
@@ -44,7 +67,8 @@ def preflight(config, *, require_current_generation=True):
     source = run("findmnt", "--evaluate", "-n", "-o", "SOURCE", "--target", config["stateDirectory"]).decode().strip()
     # Btrfs st_dev/MAJ:MIN describes an anonymous filesystem device, not its
     # backing block device. Compare the resolved source after removing subvol.
-    require(os.stat(source.split("[", 1)[0]).st_rdev == os.stat(f"/dev/mapper/{config['mapperName']}").st_rdev,
+    require(device_is_within_mapping(os.stat(source.split("[", 1)[0]).st_rdev,
+                                     os.stat(f"/dev/mapper/{config['mapperName']}").st_rdev),
             "The state directory must be on the configured encrypted root mapping.")
     return config
 

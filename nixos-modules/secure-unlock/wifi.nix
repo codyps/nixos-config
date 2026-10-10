@@ -4,6 +4,7 @@ let
   interface = cfg.remoteUnlock.wifi.interface;
   deviceUnit = "${utils.escapeSystemdPath "/sys/subsystem/net/devices/${interface}"}.device";
   credentials = "${cfg.stateDirectory}/credstore.encrypted/wifi";
+  iwd = cfg.remoteUnlock.wifi.backend == "iwd";
   serviceConfig = {
     Type = "simple";
     ExecStart = "${pkgs.wpa_supplicant}/bin/wpa_supplicant -i ${interface} -c %d/wifi";
@@ -15,16 +16,47 @@ lib.mkIf (cfg.enable && config.boot.secureUnlock.remoteUnlock.enable && config.b
   # Only TPM-encrypted ciphertext is appended to the initrd. Decryption fails
   # closed: there is no plaintext credential fallback on the ESP.
   boot.initrd.secrets."/etc/credstore.encrypted/wifi" = credentials;
+  boot.initrd.availableKernelModules = lib.optionals iwd [ "af_alg" "algif_hash" "algif_skcipher" "cmac" "ecb" "hmac" "md5" ];
   boot.initrd.systemd = {
-    storePaths = [ "${pkgs.wpa_supplicant}/bin/wpa_supplicant" ];
+    storePaths = if iwd then [ "${pkgs.iwd}/libexec/iwd" ] else [ "${pkgs.wpa_supplicant}/bin/wpa_supplicant" ];
+    dbus.enable = lib.mkIf iwd true;
+    contents = lib.mkIf iwd {
+      "/etc/iwd/main.conf".text = ''
+        [General]
+        EnableNetworkConfiguration=false
+        [DriverQuirks]
+        DefaultInterface=*
+      '';
+      "/etc/dbus-1".source = lib.mkForce (pkgs.makeDBusConf.override {
+        inherit (config.services.dbus) apparmor;
+        dbus = config.services.dbus.dbusPackage;
+        suidHelper = "/bin/false";
+        serviceDirectories = [ config.services.dbus.dbusPackage config.boot.initrd.systemd.package pkgs.iwd ];
+      });
+    };
     services.secure-unlock-wifi = {
       description = "Wi-Fi for remote LUKS unlocking";
       wantedBy = [ "secure-unlock-recovery.target" ];
       wants = [ "tpm2.target" ];
-      after = [ deviceUnit "tpm2.target" "initrd-nixos-copy-secrets.service" ];
+      after = [ deviceUnit "tpm2.target" "initrd-nixos-copy-secrets.service" ] ++ lib.optional iwd "dbus.service";
+      requires = lib.optional iwd "dbus.service";
       bindsTo = [ deviceUnit ];
       unitConfig.DefaultDependencies = false;
-      serviceConfig = serviceConfig // {
+      environment = lib.mkIf iwd {
+        STATE_DIRECTORY = "/run/secure-unlock-iwd";
+        CONFIGURATION_DIRECTORY = "/etc/iwd";
+      };
+      preStart = lib.mkIf iwd ''
+        ${pkgs.coreutils}/bin/install -m 0600 "$CREDENTIALS_DIRECTORY/wifi" /run/secure-unlock-iwd/${cfg.remoteUnlock.wifi.iwdProfileName}
+      '';
+      serviceConfig = (if iwd then {
+        Type = "simple";
+        ExecStart = "${pkgs.iwd}/libexec/iwd --interfaces ${interface}";
+        Restart = "on-failure";
+        RestartSec = "2s";
+        RuntimeDirectory = "secure-unlock-iwd";
+        RuntimeDirectoryMode = "0700";
+      } else serviceConfig) // {
         LoadCredentialEncrypted = [ "wifi:/etc/credstore.encrypted/wifi" ];
       };
     };
@@ -36,7 +68,7 @@ lib.mkIf (cfg.enable && config.boot.secureUnlock.remoteUnlock.enable && config.b
 
   # Reuse the sealed copy after switching root. The authoritative plaintext
   # input stays in the configured credential store on encrypted root.
-  systemd.services.secure-unlock-wifi = {
+  systemd.services.secure-unlock-wifi = lib.mkIf (!iwd) {
     description = "Wi-Fi with TPM-encrypted credentials";
     wantedBy = [ "multi-user.target" ];
     wants = [ "tpm2.target" ];

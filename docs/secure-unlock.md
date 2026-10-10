@@ -41,8 +41,17 @@ mapping before touching credentials or enrolling a disk.
 The module enables systemd initrd and Lanzaboote, disables the boot editor,
 and pins the root volume before mounting it. Initrd networking and SSH start
 only when systemd asks for a passphrase and the configured mapper is still
-closed. Wi-Fi, when enabled, also runs after boot using the sealed credential.
-Configure wired networking for the running system separately.
+closed. The default wpa_supplicant Wi-Fi backend also runs after boot using
+the sealed credential. Configure wired networking for the running system separately.
+
+For iwd recovery, set `remoteUnlock.wifi.backend = "iwd"` and
+`remoteUnlock.wifi.iwdProfileName` to the iwd network filename (for example,
+`billy.psk`). Store a complete iwd profile, rather than wpa_supplicant syntax,
+at `stateDirectory/credstore/wifi`. The initrd decrypts the TPM-sealed profile
+into a private runtime directory and uses networkd for DHCP. Configure stage-2
+iwd separately; [Crow](../hosts/crow/README.md#wi-fi-and-sops) uses SOPS for that
+profile and preserves the interface name across both boot stages. SOPS secrets
+on an encrypted root cannot supply pre-unlock Wi-Fi directly.
 
 ## Installation
 
@@ -60,7 +69,8 @@ Configure wired networking for the running system separately.
    dedicated SSH identity once and seals it to PCR 7. To supply your own identity,
    install a root-owned mode-0600 key at `stateDirectory/credstore/ssh-host-key`
    before the first Secure Boot boot. For Wi-Fi, install a complete
-   wpa_supplicant configuration at `stateDirectory/credstore/wifi` before rebuilding.
+   wpa_supplicant configuration (or iwd profile for the iwd backend) at
+   `stateDirectory/credstore/wifi` before rebuilding.
 4. Verify the fingerprint of `stateDirectory/credstore.encrypted/ssh-host-key.pub`
    through a trusted channel, then reboot and test `ssh -p 2222 root@HOST`.
    It opens the disk passphrase agent. Keep the recovery passphrase.

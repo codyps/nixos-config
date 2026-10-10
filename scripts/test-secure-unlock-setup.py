@@ -377,6 +377,52 @@ class ProvisioningTests(unittest.TestCase):
         self.assertEqual(self.calls, [])
 
 
+class MappingAncestryTests(unittest.TestCase):
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temp.cleanup)
+        self.root = Path(self.temp.name)
+        patcher = patch.object(setup, "SYS_DEV_BLOCK", self.root)
+        patcher.start()
+        self.addCleanup(patcher.stop)
+        self.mapping = os.makedev(254, 0)
+        self.lv = os.makedev(254, 1)
+        self.disk = os.makedev(259, 0)
+
+    def node(self, device, dependencies):
+        directory = self.root / f"{os.major(device)}:{os.minor(device)}" / "slaves"
+        directory.mkdir(parents=True, exist_ok=True)
+        for index, dependency in enumerate(dependencies):
+            slave = directory / str(index)
+            slave.mkdir()
+            (slave / "dev").write_text(f"{os.major(dependency)}:{os.minor(dependency)}\n")
+
+    def test_direct_mapping_and_lvm_inside_luks_are_accepted(self):
+        self.assertTrue(setup.device_is_within_mapping(self.mapping, self.mapping))
+        self.node(self.lv, [self.mapping])
+        self.assertTrue(setup.device_is_within_mapping(self.lv, self.mapping))
+
+    def test_nested_device_mappers_inside_luks_are_accepted(self):
+        thin = os.makedev(254, 2)
+        self.node(thin, [self.lv])
+        self.node(self.lv, [self.mapping])
+        self.assertTrue(setup.device_is_within_mapping(thin, self.mapping))
+
+    def test_mixed_encrypted_and_unencrypted_pvs_are_rejected(self):
+        self.node(self.lv, [self.mapping, self.disk])
+        self.node(self.disk, [])
+        self.assertFalse(setup.device_is_within_mapping(self.lv, self.mapping))
+
+    def test_unrelated_disk_and_missing_device_are_rejected(self):
+        self.node(self.disk, [])
+        self.assertFalse(setup.device_is_within_mapping(self.disk, self.mapping))
+        self.assertFalse(setup.device_is_within_mapping(self.lv, self.mapping))
+
+    def test_cycles_are_rejected(self):
+        self.node(self.lv, [self.lv])
+        self.assertFalse(setup.device_is_within_mapping(self.lv, self.mapping))
+
+
 class InputPermissionTests(unittest.TestCase):
     def test_symlink_input_is_rejected(self):
         with tempfile.TemporaryDirectory() as directory:

@@ -316,6 +316,34 @@
         nixosModules.actions-vm-scaler = import ./nixos-modules/actions-vm-scaler.nix;
         darwinModules.nix-dynamic-machines = import ./nix-darwin/modules/nix-dynamic-machines.nix;
         nixosConfigurations = {
+          crow-bootstrap = self.nixosConfigurations.crow.extendModules {
+            modules = [
+              ({ lib, ... }: {
+                boot.secureUnlock.rootVolumeKeyId = lib.mkForce null;
+                boot.secureUnlock.remoteUnlock.enable = lib.mkForce false;
+                boot.secureUnlock.tpmUnlock.enable = lib.mkForce false;
+              })
+            ];
+          };
+          crow = nixosSystem {
+            system = "x86_64-linux";
+            specialArgs = { inherit self; };
+            modules = [
+              disko.nixosModules.disko
+              impermanence.nixosModules.impermanence
+              lanzaboote.nixosModules.lanzaboote
+              sops-nix.nixosModules.sops
+              ./nixos/common.nix
+              ./hosts/crow/configuration.nix
+              home-manager.nixosModules.home-manager
+              {
+                nixpkgs = nixpkgsConfig;
+                home-manager.useGlobalPkgs = true;
+                home-manager.useUserPackages = true;
+                home-manager.users.cody.imports = [ ./home-manager/home.nix ];
+              }
+            ];
+          };
           warbler-bootstrap = self.nixosConfigurations.warbler.extendModules {
             modules = [
               ({ lib, ... }: {

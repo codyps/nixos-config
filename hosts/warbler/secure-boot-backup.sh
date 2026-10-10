@@ -7,8 +7,8 @@ if [[ $EUID -ne 0 ]]; then
   echo 'Run as root: sudo warbler-secure-boot-backup' >&2
   exit 1
 fi
-if [[ $(hostname -s) != warbler || ! -d /sys/firmware/efi/efivars ]]; then
-  echo 'Run on Warbler booted in UEFI mode.' >&2
+if [[ $(hostname -s) != "$expected_host" || ! -d /sys/firmware/efi/efivars ]]; then
+  echo "Run on $expected_host booted in UEFI mode." >&2
   exit 1
 fi
 if ! mountpoint -q /persist; then

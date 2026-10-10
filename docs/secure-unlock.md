@@ -56,46 +56,75 @@ iwd separately; [Crow](../hosts/crow/README.md#wi-fi-and-sops) uses SOPS for tha
 profile and preserves the interface name across both boot stages. SOPS secrets
 on an encrypted root cannot supply pre-unlock Wi-Fi directly.
 
-## Installation
+## Staged provisioning with one configuration
 
-1. Install with the module enabled but `remoteUnlock.enable = false` and
-   `tpmUnlock.enable = false`. A null `rootVolumeKeyId` is allowed during this
-   attended bootstrap only. After formatting, run `sudo sys root-volume-key-id`
-   and save its public output as a quoted Nix string in `volume-identity.nix`.
-   The configured helper is installed with the module, including during bootstrap.
-2. Back up firmware keys, create signing keys, sign boot files, and enroll Secure
-   Boot using the machine's firmware procedure. The default signing-key directory
-   is `stateDirectory/sbctl`; override `boot.lanzaboote.pkiBundle` if needed.
-   Boot and verify Secure Boot is enabled and Setup Mode is disabled.
-3. Enable remote recovery and, if desired, TPM support as above, then rebuild.
-   Credential provisioning runs before bootloader installation. It generates the
-   dedicated SSH identity once and seals it to PCR 7. To supply your own identity,
-   install a root-owned mode-0600 key at `stateDirectory/credstore/ssh-host-key`
-   before the first Secure Boot boot. For Wi-Fi, install a complete
-   wpa_supplicant configuration (or iwd profile for the iwd backend) at
-   `stateDirectory/credstore/wifi` before rebuilding.
-4. Verify the fingerprint of `stateDirectory/credstore.encrypted/ssh-host-key.pub`
-   through a trusted channel, then reboot and test `ssh -p 2222 root@HOST`.
-   It opens the disk passphrase agent. Keep the recovery passphrase.
-5. For optional disk enrollment, first retire any unpinned bootstrap boot entries
-   and their measured-boot policy components using Lanzaboote's policy workflow.
-   After booting the current pinned, TPM-enabled generation, run
-   `sudo sys setup-luks-tpm-unlock`. It verifies a token-free recovery
-   passphrase slot before adding a pcrlock TPM token. Reboot with console access
-   available to verify automatic unlock and that recovery networking stays idle.
+Ward, Crow and Warbler each use their normal host output throughout installation
+and operation (`.#ward`, `.#crow`, `.#warbler`). There are no `*-bootstrap` outputs
+or unlock feature toggles to change between stages.
 
-Enabling TPM support prepares the measured-boot policy (PCRs 0, 4 and 7);
-it does not enroll the disk. Enrollment remains an explicit command.
-Plaintext credential backups stay on encrypted storage; only TPM-sealed
-ciphertext enters the initrd. Existing SSH identities are preserved, including
-during resealing. `sudo sys setup-unlock-credentials` manually checks/reseals
-the configured credentials; rebuild afterward to include changed ciphertext.
+1. **Install and unlock at the console.** Create signing keys before installing
+   boot files. With Secure Boot disabled, in Setup Mode, or when running from
+   the installer, the bootloader hook stages an empty credential directory and
+   skips TPM policy creation. It still signs boot files with Lanzaboote.
+   For a freshly formatted disk, set `volume-identity.nix` to `null` in the
+   installation checkout first; never reuse the old volume's pin. Record the
+   new public ID from `sudo sys root-volume-key-id`, then rebuild the same host.
+   An unpinned generation cannot start remote recovery or attempt TPM
+   unlock. Keep an existing valid pin when repairing an existing installation.
+2. **Enroll Secure Boot with local console access.** Back up firmware databases
+   and signing keys, follow the host's firmware procedure, and boot with Secure
+   Boot enabled and Setup Mode disabled. Signing keys default to
+   `stateDirectory/sbctl`; the host may override that path. Firmware enrollment
+   and reboot remain attended operations.
+3. **Let the installed host provision SSH.** On a pinned Secure Boot boot,
+   `secure-unlock-credentials.service` generates a dedicated initrd SSH host key
+   once, preserves it on encrypted storage, and seals it to PCR 7. No manual
+   `ssh-keygen` is needed. This identity is separate from normal SSH because its
+   sealed copy is used before root is unlocked. To import an existing identity,
+   place a root-owned mode-0600 key at `stateDirectory/credstore/ssh-host-key`
+   before first provisioning. Wi-Fi and Tailscale are provisioned separately;
+   missing initial optional credentials do not block wired SSH.
+4. **Rebuild the same host's boot files.** For example,
+   `sudo nixos-rebuild boot --flake .#ward`. The hook repeats provisioning
+   idempotently, publishes sealed EFI companion credentials, signs the UKIs and updates the
+   measured-boot policy. Starting the service alone does not update boot files.
+   Verify `stateDirectory/credstore.encrypted/ssh-host-key.pub` through a trusted
+   channel, reboot, and test `ssh -t -p 2222 root@HOST` when a passphrase is
+   requested. It opens the disk passphrase agent.
+5. **Explicitly enroll TPM disk unlock.** Retire unpinned installation entries
+   and their accepted measured-boot components using Lanzaboote's policy
+   workflow. Boot the current pinned generation, then run
+   `sudo sys setup-luks-tpm-unlock`. It verifies a token-free recovery passphrase
+   slot before adding the pcrlock token. Test automatic unlock with console
+   access available and retain the recovery passphrase. Enabling the option
+   prepares PCRs 0, 4 and 7; neither a rebuild nor the boot service enrolls LUKS.
 
-Warbler uses this module with its existing `/persist` paths, volume identity,
-and DHCP settings. Its [installation guide](../hosts/warbler/README.md) includes
-the detailed firmware and bootstrap-policy cleanup procedure. The Warbler
-installer, partition layout, root reset, account setup and firmware backup remain
-host-specific.
+Provisioning records the pinned identity and credentials in
+`stateDirectory/provisioning-ready`. Existing sealed deployments are adopted
+without rotating their identities. After provisioning, disabled Secure Boot,
+a different volume pin, or missing previously provisioned credentials stops
+boot-file installation. Restore backups or deliberately migrate the state;
+do not delete this record to bypass a failure. A missing ciphertext can be
+resealed from its retained plaintext; loss of both copies is an error.
+
+`stateDirectory/initrd-credentials` contains only the selected ciphertext for
+boot installation. The hook copies it to the ESP's `loader/credentials/*.cred`;
+Lanzaboote loads those files into the initrd at boot. This supported
+[systemd credential mechanism](https://systemd.io/CREDENTIALS/) avoids cached
+UKIs overlooking later credential updates when rebuilding the same generation.
+Ciphertext is authenticated by the TPM credential policy; no plaintext enters
+the ESP or Nix store. The PCR policy includes both persistent UKI measurements
+and the firmware measurements generated under `/var/lib/pcrlock.d`.
+Authoritative inputs stay in `stateDirectory/credstore` on
+encrypted storage, sealed copies in `credstore.encrypted`. Optional Wi-Fi starts
+once its root-owned mode-0600 profile exists at `credstore/wifi`; Tailscale starts
+once its separate identity has been enrolled. Rebuild after either change.
+`sudo sys setup-unlock-credentials --ssh-only` can manually reseal SSH; the
+normal boot service and install hook handle available credentials automatically.
+
+Warbler's [installation guide](../hosts/warbler/README.md) covers firmware and
+policy cleanup. Disk layout, root reset, account setup and firmware backup remain
+host-specific. No host is rebooted or enrolled automatically.
 
 ## Separate Tailscale identity in the initrd
 
@@ -110,7 +139,7 @@ recovery port (2222 on Warbler); Tailscale SSH is disabled. Configure tailnet
 grants/ACLs to allow only your recovery clients to reach that node's recovery
 port. The existing wired SSH recovery path remains available.
 
-Provision the identity before installing the new boot generation:
+Provision this optional identity after Secure Boot is ready, then rebuild to include it:
 
 1. Build the new system without activation and copy its closure to the host.
    Run the helper from that new closure so it uses the new configuration:
@@ -142,7 +171,7 @@ Its state is kept under `stateDirectory/tailscale-initrd` on encrypted root;
 the approved snapshot is `stateDirectory/credstore/tailscale-state`.
 The helper validates authentication and disabled expiry, stops that daemon,
 then seals the snapshot using `systemd-creds --with-key=tpm2 --tpm2-pcrs=7`.
-Only `credstore.encrypted/tailscale-state` is appended to the initrd; plaintext
+Only `credstore.encrypted/tailscale-state` is published as an encrypted EFI companion; plaintext
 and auth keys must never be placed in the checkout or Nix store.
 Native Tailscale state encryption is disabled for these isolated daemons:
 the provisioning copy is on encrypted root and the initrd copy is TPM-unsealed

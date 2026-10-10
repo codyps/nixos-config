@@ -4,7 +4,6 @@ let
   lib = flake.inputs.nixpkgs.lib;
   crow = flake.nixosConfigurations.crow;
   c = crow.config;
-  bootstrap = flake.nixosConfigurations.crow-bootstrap.config;
   recovery = (crow.extendModules {
     modules = [
       ({ lib, ... }: {
@@ -19,7 +18,6 @@ let
   guest = c.containers.ai.config;
 in
 assert failures c == [ ];
-assert failures bootstrap == [ ];
 assert failures recovery == [ ];
 assert c.disko.devices.disk.system.content.partitions.crypt.content.content.type == "lvm_pv";
 assert c.disko.devices.lvm_vg.crow.lvs.root.size == "1000000000000B";
@@ -43,16 +41,16 @@ assert c.networking.wireless.iwd.settings.General.EnableNetworkConfiguration == 
 assert c.systemd.network.links."10-crow-wifi".linkConfig.Name == "wlp6s0";
 assert c.sops.secrets.wifi.restartUnits == [ "iwd.service" ];
 assert c.sops.useSystemdActivation;
-assert !bootstrap.boot.secureUnlock.remoteUnlock.enable;
-assert !bootstrap.boot.secureUnlock.tpmUnlock.enable;
-assert bootstrap.programs.adminCommands.commands ? setup-secure-boot;
-assert !(bootstrap.programs.adminCommands.commands ? setup-luks-tpm-unlock);
-assert bootstrap.environment.etc."sbctl/sbctl.conf".text == ''
+assert c.boot.secureUnlock.remoteUnlock.enable;
+assert c.boot.secureUnlock.tpmUnlock.enable;
+assert c.programs.adminCommands.commands ? setup-secure-boot;
+assert c.programs.adminCommands.commands ? setup-luks-tpm-unlock;
+assert c.environment.etc."sbctl/sbctl.conf".text == ''
   keydir: /persist/var/lib/sbctl/keys
   guid: /persist/var/lib/sbctl/GUID
 '';
-assert !(bootstrap.boot.initrd.secrets ? "/etc/credstore.encrypted/wifi");
-assert recovery.boot.initrd.systemd.services.secure-unlock-wifi.serviceConfig.LoadCredentialEncrypted == [ "wifi:/etc/credstore.encrypted/wifi" ];
+assert !(c.boot.initrd.secrets ? "/etc/credstore.encrypted/wifi");
+assert recovery.boot.initrd.systemd.services.secure-unlock-wifi.serviceConfig.LoadCredentialEncrypted == [ "wifi:/.extra/global_credentials/wifi.cred" ];
 assert lib.hasInfix "/libexec/iwd" recovery.boot.initrd.systemd.services.secure-unlock-wifi.serviceConfig.ExecStart;
 assert !(recovery.systemd.services ? secure-unlock-wifi);
 assert recovery.boot.initrd.systemd.network.networks."20-wifi".networkConfig.DHCP == "ipv4";
@@ -63,5 +61,5 @@ assert recovery.boot.initrd.systemd.network.networks."20-wifi".networkConfig.DHC
   routedContainer = true;
   sopsIwd = true;
   sealedIwdRecovery = true;
-  bootstrapAttended = true;
+  stagedProvisioning = true;
 }

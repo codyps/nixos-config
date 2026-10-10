@@ -21,9 +21,9 @@ in
     enable = true;
     stateDirectory = "/persist";
     rootVolumeKeyId = volumeIdentity;
-    tpmUnlock.enable = volumeIdentity != null;
+    tpmUnlock.enable = true;
     remoteUnlock = {
-      enable = volumeIdentity != null;
+      enable = true;
       inherit authorizedKeys;
       tailscale.enable = true;
       wifi = { enable = true; backend = "iwd"; interface = "wlp6s0"; iwdProfileName = "billy.psk"; };

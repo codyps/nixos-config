@@ -22,12 +22,13 @@ homes, Nix store, system state, SSH identity, and container storage survive.
 Never run Warbler's reset script against this machine: its filesystem is
 directly on `cryptroot`, while Crow's filesystem is on the root LV.
 
-`volume-identity.nix` records the installed volume's public identity. The normal
-`crow` output enables remote and TPM support using that pin. The installed
-`crow-bootstrap` output always disables TPM and remote unlock; its first boot
-requires the LUKS password at the console. Secure Boot signing uses Lanzaboote; signing keys and firmware
-enrollment must be provisioned before relying on it. Neither a build nor this
-configuration enrolls firmware keys or a TPM disk token.
+`volume-identity.nix` records the installed volume's public identity. Use `.#crow`
+throughout: staged provisioning defers credentials and TPM policy until the
+pinned host boots with Secure Boot enabled. The first unlock is at the console.
+Signing keys must exist before boot-file installation. Neither the configuration
+nor a rebuild enrolls firmware keys or a TPM disk token. See the
+[shared staged workflow](../../docs/secure-unlock.md#staged-provisioning-with-one-configuration).
+
 
 ## Wi-Fi and SOPS
 
@@ -86,7 +87,7 @@ account, provider credentials, or working files are copied. Manage Codex with
 
 ## Installation checkpoints
 
-The updated bootstrap exposes `sudo sys setup-secure-boot`. After backing up
+The Crow configuration exposes `sudo sys setup-secure-boot`. After backing up
 all four firmware databases with `sudo sys backup-secure-boot` and copying
 that backup off-machine, use firmware settings to enter Setup Mode. Confirm
 `sudo sbctl status` reports Setup Mode enabled, then run
@@ -96,28 +97,25 @@ and check `sudo sbctl status`. The command does not clear firmware keys,
 create replacement signing keys, enable Secure Boot in firmware, or enroll
 the LUKS TPM token.
 
-The initially installed bootstrap predates this command. On that generation,
-the equivalent enrollment command is `sudo sbctl enroll-keys --microsoft`,
-with the same backup and Setup Mode prerequisites. Its `backup-secure-boot`
-helper incorrectly required the hostname Warbler; update the bootstrap before
-using that helper. Continue using `crow-bootstrap` for this update, since the
-normal Crow output requires the later sealed recovery credentials.
-
-`sys setup-luks-tpm-unlock` belongs to the later, pinned Crow configuration;
-its absence in the bootstrap is intentional.
+Older installed generations may lack these helpers; rebuild `.#crow` to update
+them. The same configuration works before Secure Boot enrollment. The command
+`sys setup-luks-tpm-unlock` is present but refuses enrollment until its
+Secure Boot, pin, current-generation and policy prerequisites are satisfied.
 
 Use the [Warbler setup procedure](../warbler/README.md#initial-provisioning-manual-steps-and-attended-firmware-checkpoints)
 for the signing-key and firmware checkpoints, adapting paths and host names
 below. Do not use `scripts/warbler-install.py`: it targets Warbler's disk and
-provisioning identity. Crow's bootstrap supports Wi-Fi after console unlock;
+provisioning identity. Crow supports Wi-Fi after console unlock;
 Ethernet is not required. Firmware menus may differ from Warbler's HP machine.
 
 1. Confirm the exact NVMe and that its NTFS data may be erased. Preserve the
    installer SSH key pair in a private location outside the checkout; it must
    survive the installer reboot. Prepare a separate LUKS recovery password in
    the root-owned mode-0600 installer file `/run/crow-luks-password`.
-2. Build and review the disk script. Running it is the destructive operation:
-   `nix build --no-link --print-out-paths path:.#nixosConfigurations.crow-bootstrap.config.system.build.diskoScript`.
+2. For a fresh format, set `hosts/crow/volume-identity.nix` to `null` in the
+   installation checkout so it cannot reuse the previous disk identity.
+   Build and review the disk script. Running it is the destructive operation:
+   `nix build --no-link --print-out-paths path:.#nixosConfigurations.crow.config.system.build.diskoScript`.
    Only after approval, run that exact script on the installer. Verify `/mnt`,
    `/mnt/nix`, `/mnt/home`, `/mnt/persist`, and `/mnt/boot` mount the intended
    devices. `lvs` must show the root and swap LVs; `vgs` must show free extents.
@@ -131,17 +129,18 @@ Ethernet is not required. Firmware menus may differ from Warbler's HP machine.
    `/mnt/persist/var/lib/sbctl/keys` and GUID file to
    `/mnt/persist/var/lib/sbctl/GUID`, as in Warbler's procedure. Copy this
    checkout into `/mnt/persist/nixos-config`, then install with
-   `nixos-install --no-root-passwd --flake path:.#crow-bootstrap`.
+   `nixos-install --no-root-passwd --flake path:.#crow`.
 5. Boot with local console access, unlock LUKS, and verify Wi-Fi, SOPS,
    persistent files, swap, and container connectivity. Back up existing firmware
    keys with `sudo sys backup-secure-boot`, then complete the documented manual
    Secure Boot enrollment and cold-boot verification.
 6. Obtain `sudo sys root-volume-key-id` and record the quoted public value in
    `hosts/crow/volume-identity.nix`; never reuse Warbler's value or a test pin.
-   This enables Crow's remote/TPM configuration. Build that system without
-   activation, then run its `sw/bin/sys setup-unlock-tailscale` with sudo to
-   provision the separate `crow-unlock` identity before installing boot files.
-   Rebuild for boot; the hook seals the SSH/Wi-Fi/Tailscale credentials.
+   Rebuild `.#crow`; the hook automatically generates the initrd SSH host key
+   and seals available credentials. No manual SSH key generation is needed.
+   Run `sudo sys setup-unlock-tailscale` to provision the separate `crow-unlock`
+   identity, then rebuild for boot to include it. Wi-Fi requires the profile
+   at `/persist/credstore/wifi`; initial absence defers Wi-Fi, not wired recovery.
 7. Cold-boot with console recovery available and verify
    `ssh -t -p 2222 root@crow-unlock` can unlock the disk over Wi-Fi. Retire
    unpinned bootstrap artifacts and their accepted measurements before running

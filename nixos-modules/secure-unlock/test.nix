@@ -31,10 +31,8 @@ let
   cfg = base.config;
   changed = settings: (base.extendModules { modules = [ settings ]; }).config;
   disabled = changed { boot.secureUnlock.enable = lib.mkForce false; };
-  bootstrap = changed {
+  unpinned = changed {
     boot.secureUnlock.rootVolumeKeyId = lib.mkForce null;
-    boot.secureUnlock.remoteUnlock.enable = lib.mkForce false;
-    boot.secureUnlock.tpmUnlock.enable = lib.mkForce false;
   };
   missingKeys = changed { boot.secureUnlock.remoteUnlock.authorizedKeys = lib.mkForce [ ]; };
   initrd = cfg.boot.initrd;
@@ -42,7 +40,7 @@ let
 in
 assert lib.assertMsg (lib.all (a: a.assertion) cfg.assertions)
   (lib.concatStringsSep "\n" (map (a: a.message) (builtins.filter (a: !a.assertion) cfg.assertions)));
-assert lib.all (a: a.assertion) bootstrap.assertions;
+assert lib.all (a: a.assertion) unpinned.assertions;
 assert lib.any (a: !a.assertion) missingKeys.assertions;
 assert initrd.luks.devices.system-root.crypttabExtraOpts == [
   "fixate-volume-key=${pin}"
@@ -52,7 +50,8 @@ assert initrd.luks.devices.system-root.crypttabExtraOpts == [
 assert !(initrd.luks.devices ? cryptroot);
 assert initrd.network.ssh.port == 2200;
 assert initrd.network.ssh.authorizedKeys == [ "ssh-ed25519 PUBLIC-TEST-FIXTURE" ];
-assert initrd.secrets."/etc/credstore.encrypted/ssh-host-key" == "/state/credstore.encrypted/ssh-host-key";
+assert initrd.secrets == { };
+assert initrd.systemd.services.sshd.unitConfig.ConditionPathExists == "/.extra/global_credentials/ssh-host-key.cred";
 assert lib.hasInfix "/dev/mapper/system-root" initrd.systemd.services.secure-unlock-recovery.script;
 assert initrd.systemd.services.sshd.wantedBy == target;
 assert initrd.systemd.services.systemd-networkd.wantedBy == target;
@@ -63,18 +62,23 @@ assert initrd.systemd.services.secure-unlock-tailscale.wantedBy == target;
 assert initrd.systemd.services.systemd-resolved.wantedBy == target;
 assert initrd.systemd.services.secure-unlock-tailscale.conflicts == [ "initrd-switch-root.target" ];
 assert initrd.systemd.services.secure-unlock-tailscale.serviceConfig.LoadCredentialEncrypted == [
-  "tailscale-state:/etc/credstore.encrypted/tailscale-state"
+  "tailscale-state:/.extra/global_credentials/tailscale-state.cred"
 ];
 assert lib.hasInfix "--state=/run/secure-unlock-tailscale/tailscaled.state" initrd.systemd.services.secure-unlock-tailscale.serviceConfig.ExecStart;
-assert initrd.secrets."/etc/credstore.encrypted/tailscale-state" == "/state/credstore.encrypted/tailscale-state";
+assert initrd.systemd.services.secure-unlock-tailscale.unitConfig.ConditionPathExists == "/.extra/global_credentials/tailscale-state.cred";
 assert cfg.boot.secureUnlock.remoteUnlock.tailscale.hostName == "other-host-unlock";
 assert !cfg.services.tailscale.enable;
-assert !(bootstrap.boot.initrd.systemd.services ? secure-unlock-tailscale);
+assert unpinned.boot.initrd.secrets == { };
+assert !unpinned.boot.initrd.network.ssh.enable;
+assert !(unpinned.boot.initrd.systemd.services ? secure-unlock-tailscale);
 assert initrd.systemd.network.networks."20-wifi".matchConfig.Name == "wlp2s0";
 assert cfg.systemd.services.secure-unlock-credentials.unitConfig.RequiresMountsFor == [ "/state" ];
 assert cfg.boot.lanzaboote.measuredBoot.pcrlockPolicy == "/state/pcrlock.json";
-assert !bootstrap.boot.initrd.network.enable;
-assert !bootstrap.boot.lanzaboote.measuredBoot.enable;
+assert unpinned.boot.initrd.luks.devices.system-root.crypttabExtraOpts == [ ];
+assert !unpinned.boot.lanzaboote.measuredBoot.enable;
+assert cfg.systemd.services.systemd-pcrlock-make-policy.unitConfig.ConditionPathExists == "/state/provisioning-ready";
+assert lib.hasInfix "--components=/var/lib/pcrlock.d" (builtins.elemAt cfg.systemd.services.systemd-pcrlock-make-policy.serviceConfig.ExecStart 1);
+assert cfg.systemd.services.systemd-pcrlock-make-policy.unitConfig.ConditionSecurity == "uefi-secureboot";
 assert !(disabled.systemd.services ? secure-unlock-credentials);
 assert !(disabled.boot.initrd.systemd.paths ? secure-unlock-recovery);
 assert !disabled.boot.lanzaboote.enable;
@@ -82,7 +86,7 @@ assert !disabled.boot.lanzaboote.enable;
   alternateHost = true;
   recoveryOnlyNetworking = true;
   separateSealedTailscale = true;
-  bootstrap = true;
+  unpinned = true;
   disabled = true;
   missingKeysRejected = true;
 }

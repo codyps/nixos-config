@@ -47,6 +47,107 @@ class ProvisioningTests(unittest.TestCase):
         stdout.__enter__()
         self.addCleanup(stdout.__exit__, None, None, None)
 
+    def prepare_stage(self, *, ready=True):
+        self.config.update(stateDirectory=str(self.root / "state"), rootVolumeKeyId="a" * 64,
+                           remoteUnlock=True, wifi=True, tailscale=True)
+        with patch.object(setup, "secure_boot_ready", return_value=ready), \
+                patch.object(setup.os, "uname", return_value=SimpleNamespace(nodename="other-host")), \
+                patch.object(setup, "preflight"):
+            setup.prepare_install(self.config, self.work)
+        return Path(self.config["stateDirectory"])
+
+    def test_companion_publication_contains_only_ciphertext_and_preserves_other_credentials(self):
+        self.prepare_stage()
+        esp = self.root / "esp"
+        destination = esp / "loader/credentials"
+        destination.mkdir(parents=True)
+        (destination / "pcrlock.cred").write_bytes(b"unrelated policy")
+        setup.publish_credentials(self.config, esp)
+        self.assertEqual((destination / "ssh-host-key.cred").read_bytes(), b"sealed:fake private key")
+        self.assertFalse((destination / "ssh-host-key.pub").exists())
+        self.assertFalse((destination / "wifi.cred").exists())
+        (self.plain_store / "wifi").write_bytes(b"new wifi")
+        self.prepare_stage()
+        setup.publish_credentials(self.config, esp)
+        self.assertEqual((destination / "wifi.cred").read_bytes(), b"sealed:new wifi")
+        self.assertEqual((destination / "pcrlock.cred").read_bytes(), b"unrelated policy")
+
+    def test_changed_pin_rejected_without_modifying_credentials(self):
+        self.prepare_stage()
+        original = (self.store / "ssh-host-key").read_bytes()
+        self.config["rootVolumeKeyId"] = "b" * 64
+        with patch.object(setup, "secure_boot_ready", return_value=True), \
+                patch.object(setup.os, "uname", return_value=SimpleNamespace(nodename="other-host")), \
+                patch.object(setup, "preflight"):
+            with self.assertRaisesRegex(RuntimeError, "Root volume identity changed"):
+                setup.prepare_install(self.config, self.work)
+        self.assertEqual((self.store / "ssh-host-key").read_bytes(), original)
+
+    def test_initial_stage_has_no_credentials_or_key_generation(self):
+        state = self.prepare_stage(ready=False)
+        self.assertEqual(list((state / "initrd-credentials").iterdir()), [])
+        self.assertFalse((state / "provisioning-ready").exists())
+        self.assertEqual(self.calls, [])
+
+    def test_first_secure_boot_generates_ssh_without_optional_credentials(self):
+        state = self.prepare_stage()
+        self.assertEqual([p.name for p in (state / "initrd-credentials").iterdir()], ["ssh-host-key"])
+        first = (self.store / "ssh-host-key.pub").read_bytes()
+        self.prepare_stage()
+        self.assertEqual(first, (self.store / "ssh-host-key.pub").read_bytes())
+        self.assertEqual(len([c for c in self.calls if c[:2] == ("ssh-keygen", "-q")]), 1)
+
+    def test_provisioned_host_rejects_disabled_secure_boot(self):
+        self.prepare_stage()
+        with self.assertRaisesRegex(RuntimeError, "Provisioned unlock state"):
+            self.prepare_stage(ready=False)
+
+    def test_existing_deployment_cannot_silently_downgrade(self):
+        setup.credentials(self.args, self.work)
+        with self.assertRaisesRegex(RuntimeError, "Provisioned unlock state"):
+            self.prepare_stage(ready=False)
+
+    def test_optional_credentials_added_later_and_remembered(self):
+        state = self.prepare_stage()
+        (self.plain_store / "wifi").write_bytes(b"wifi profile")
+        (self.plain_store / "tailscale-state").write_bytes(b"tailnet snapshot")
+        self.prepare_stage()
+        self.assertEqual(sorted(p.name for p in (state / "initrd-credentials").iterdir()),
+                         ["ssh-host-key", "tailscale-state", "wifi"])
+        for directory in (self.plain_store, self.store):
+            (directory / "wifi").unlink()
+        with self.assertRaisesRegex(RuntimeError, "Previously provisioned wifi is missing"):
+            self.prepare_stage()
+
+    def test_missing_ssh_key_cannot_rotate_after_provisioning(self):
+        self.prepare_stage()
+        for directory in (self.plain_store, self.store):
+            (directory / "ssh-host-key").unlink()
+        (self.store / "ssh-host-key.pub").unlink()
+        with self.assertRaisesRegex(RuntimeError, "Previously provisioned ssh-host-key is missing"):
+            self.prepare_stage()
+
+    def test_failed_preflight_never_publishes_readiness(self):
+        self.config.update(stateDirectory=str(self.root / "state"), rootVolumeKeyId="a" * 64)
+        with patch.object(setup, "secure_boot_ready", return_value=True), \
+                patch.object(setup.os, "uname", return_value=SimpleNamespace(nodename="other-host")), \
+                patch.object(setup, "preflight", side_effect=RuntimeError("wrong backing device")):
+            with self.assertRaisesRegex(RuntimeError, "wrong backing device"):
+                setup.prepare_install(self.config, self.work)
+        self.assertFalse((Path(self.config["stateDirectory"]) / "provisioning-ready").exists())
+
+    def test_unpinned_or_installer_stage_never_seals(self):
+        self.config.update(stateDirectory=str(self.root / "state"), rootVolumeKeyId=None)
+        with patch.object(setup, "secure_boot_ready", return_value=True), patch.object(setup, "preflight") as preflight:
+            setup.prepare_install(self.config, self.work)
+            preflight.assert_not_called()
+        self.config["rootVolumeKeyId"] = "a" * 64
+        with patch.object(setup.os, "uname", return_value=SimpleNamespace(nodename="installer")), \
+                patch.object(setup, "preflight") as preflight:
+            setup.prepare_install(self.config, self.work)
+            preflight.assert_not_called()
+        self.assertEqual(self.calls, [])
+
     def fake_run(self, *args):
         self.calls.append(args)
         if self.fail and self.fail(args):

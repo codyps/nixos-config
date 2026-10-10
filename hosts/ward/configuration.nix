@@ -22,7 +22,7 @@ in
     remoteUnlock.authorizedKeys = authorizedKeys;
     tpmUnlock.enable = true;
   };
-  # Install ward-bootstrap until Secure Boot has been enabled and verified.
+  # The shared hook stages console-only boot until Secure Boot is verified.
   system.autoUpgrade.enable = lib.mkForce false;
   boot.loader.efi.canTouchEfiVariables = true;
 

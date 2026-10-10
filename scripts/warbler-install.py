@@ -18,7 +18,7 @@ REPO = Path(__file__).resolve().parents[1]
 TARGET = "nixos@nixos.bed.einic.org"
 DISK = "/dev/nvme0n1"
 DEFAULT_SECRETS = Path.home() / ".local/share/warbler-install"
-CONFIG = "path:.#nixosConfigurations.warbler-bootstrap.config"
+CONFIG = "path:.#nixosConfigurations.warbler.config"
 NIX = "nix --extra-experimental-features 'nix-command flakes'"
 
 
@@ -271,7 +271,10 @@ def install(directory, *, build_only=False):
     try:
         ssh(f"mkdir -m 700 {q}/source {q}/secrets")
         ssh(f"tar -xzf - --no-same-owner -C {q}/source", source_archive())
-        print("Building bootstrap system and disko on the live host (no secrets supplied)...", flush=True)
+        # Formatting creates a new volume identity. Clear only the disposable
+        # install source's old pin; save the new public identity after formatting.
+        ssh(f"printf 'null\\n' > {q}/source/hosts/warbler/volume-identity.nix")
+        print("Building attended system and disko on the live host (no secrets supplied)...", flush=True)
         root = f"cd {q}/source; "
         configured = ssh(root + f"{NIX} eval --raw {CONFIG}.disko.devices.disk.system.device").decode()
         if configured != DISK:
@@ -287,7 +290,7 @@ def install(directory, *, build_only=False):
             outputs.append(output)
         inspect_target()
         if build_only:
-            print("Bootstrap and disko built successfully; no secrets transferred or disks changed.")
+            print("System and disko built successfully; no secrets transferred or disks changed.")
             return
         confirmation = f"ERASE {DISK} ON {TARGET}"
         if input(f"Backups and local console ready? Type exactly:\n{confirmation}\n> ") != confirmation:
@@ -323,7 +326,7 @@ sync
 """
         print("Installing to the confirmed NVMe; no automatic reboot...", flush=True)
         ssh(script)
-        print("Bootstrap installed. Follow README step 5 (first NVMe boot), then continue the Secure Boot setup sequence.")
+        print("Attended system installed. Follow README step 5 (first NVMe boot), then continue the Secure Boot setup sequence.")
     finally:
         # Exact per-run mktemp directory validated above, never a broad path.
         ssh(f"rm -rf -- {q}")

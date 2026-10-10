@@ -34,8 +34,9 @@ snapshots newer than `@blank`.
 
 ## First boot and Secure Boot transition
 
-Install `ward-bootstrap` while Secure Boot is disabled. It retains the public
-volume pin but disables TPM auto-unlock and initrd SSH. Enter the existing LUKS
+Use `.#ward` throughout installation and operation. Before first provisioning,
+while Secure Boot is disabled, staged provisioning retains the public volume pin and defers sealed
+recovery credentials and TPM policy creation. Enter the existing LUKS
 passphrase at the console. There is no dependency on the former Samsung USB
 key partition. Stage-2 SSH accepts the configured keys for root and cody;
 cody has passwordless sudo. Password SSH is disabled.
@@ -49,7 +50,7 @@ sudo sys backup-secure-boot
 
 With firmware in Setup Mode and a backup secured, enroll using
 `sudo sys setup-secure-boot`, then enable Secure Boot in firmware and boot the
-signed bootstrap generation. Do not clear all firmware databases or discard
+signed Ward generation. Do not clear all firmware databases or discard
 `dbx`. Verify `bootctl status` and `sbctl status` on the installed system.
 Firmware enrollment and reboot are attended steps. During the October 2026
 recovery, PK, KEK, db, and dbx were all absent; only SecureBoot/SetupMode
@@ -57,14 +58,15 @@ variables existed. Those variables were saved under the recovery backup's
 `efivars/` directory. The strict backup command will report an incomplete backup
 when databases are absent; do not interpret that as a reason to clear keys.
 
-After booting with Secure Boot enabled, rebuild the normal `ward` output.
-Its bootloader hook seals the dedicated recovery SSH host key to the verified
-PCR 7 policy; only ciphertext enters the initrd. Recovery SSH starts on port
+After booting with Secure Boot enabled, the service automatically generates
+and seals the dedicated initrd SSH identity; no manual key generation is needed.
+Rebuild the same `ward` output to include it in boot files. The hook seals the
+key to the verified PCR 7 policy; only ciphertext enters the initrd. Recovery SSH starts on port
 2222 when a passphrase is requested. Compare its fingerprint with
 `/persist/secure-unlock/credstore.encrypted/ssh-host-key.pub` before connecting.
 Ward uses wired recovery; a separate initrd Tailscale identity is not enrolled.
 
-After booting the normal pinned generation and retiring bootstrap/old boot
+After booting the current pinned generation and retiring unpinned/old boot
 entries from the measured-boot policy, run `sudo sys setup-luks-tpm-unlock`
 to enroll automatic unlocking. This keeps passphrase recovery. See
 [the shared procedure](../../docs/secure-unlock.md) for the PCR policy and
@@ -87,7 +89,8 @@ Application/container versions and existing proxy routes are otherwise retained.
 
 ## Installed recovery checkpoint (2026-10-10)
 
-Generation 218 is the signed `ward-bootstrap` default, built from main
+Historical checkpoint, before the single-configuration workflow above:
+generation 218 was the signed `ward-bootstrap` default, built from main
 `5dde783` plus the ward changes. Both ward variants built successfully;
 `nix flake check --no-build`, ward/crow assertions, and all 40 secure-unlock
 and 7 password tests passed. Signatures on both retained UKIs and both

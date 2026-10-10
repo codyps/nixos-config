@@ -4,7 +4,8 @@ let
   setupConfig = pkgs.writeText "secure-unlock.json" (builtins.toJSON {
     disk = config.boot.initrd.luks.devices.${cfg.mapperName}.device;
     hostName = config.networking.hostName;
-    inherit (cfg) mapperName stateDirectory;
+    inherit (cfg) mapperName stateDirectory rootVolumeKeyId;
+    remoteUnlock = cfg.remoteUnlock.enable;
     wifi = cfg.remoteUnlock.wifi.enable;
     tailscale = cfg.remoteUnlock.enable && cfg.remoteUnlock.tailscale.enable;
     tailscaleHostName = cfg.remoteUnlock.tailscale.hostName;
@@ -21,26 +22,13 @@ let
       exec python3 ${./tpm-setup.py} --config ${setupConfig} "$@"
     '';
   };
-  provision = "${setup}/bin/secure-unlock-setup credentials"
-    + lib.optionalString (!config.boot.secureUnlock.remoteUnlock.wifi.enable) " --ssh-only";
+  provision = "${setup}/bin/secure-unlock-setup prepare-install";
 in
 {
-  # A normal activation script runs too late: switch installs boot files first.
-  # Wrap the existing external-loader hook without replacing Lanzaboote logic.
-  options.boot.loader.external.installHook = lib.mkOption {
-    apply = original:
-      if cfg.enable && cfg.remoteUnlock.enable then
-        pkgs.writeShellScript "secure-unlock-provision-and-install-bootloader" ''
-          set -eu
-          ${provision}
-          exec ${original} "$@"
-        ''
-      else original;
-  };
-
   config = lib.mkIf cfg.enable {
     environment.etc."secure-unlock.json".source = setupConfig;
     environment.systemPackages = [ setup ];
+    boot.secureUnlock.provisioningPackage = setup;
     programs.adminCommands.commands = {
       setup-unlock-credentials = [ "${setup}/bin/secure-unlock-setup" "credentials" ];
     } // lib.optionalAttrs cfg.tpmUnlock.enable {

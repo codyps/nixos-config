@@ -89,6 +89,93 @@ def preflight(config, *, require_current_generation=True):
     return config
 
 
+def credential_available(name):
+    return any((directory / name).exists() or (directory / name).is_symlink()
+               for directory in (PLAIN_STORE, STORE))
+
+
+def secure_boot_ready():
+    for name, expected in [("SecureBoot", 1), ("SetupMode", 0)]:
+        try:
+            data = (EFI / f"{name}-{EFI_GUID}").read_bytes()
+        except FileNotFoundError:
+            return False
+        require(len(data) == 5, "Malformed Secure Boot firmware variable.")
+        if data[4] != expected:
+            return False
+    return True
+
+
+def prepare_install(config, work):
+    """Stage only available ciphertext; never silently downgrade an enrolled host."""
+    state = Path(config["stateDirectory"])
+    state.mkdir(mode=0o700, parents=True, exist_ok=True)
+    marker = state / "provisioning-ready"
+    staged = state / "initrd-credentials"
+    require(not staged.is_symlink(), "Initrd credential directory must not be a symlink.")
+    staged.mkdir(mode=0o700, exist_ok=True)
+    staged.chmod(0o700)
+    previous = json.loads(private_input(marker).read_text()) if marker.exists() else None
+    # Adopt existing deployments without a marker, preserving their identities.
+    existing = [name for name in ("ssh-host-key", "wifi", "tailscale-state")
+                if (STORE / name).exists() or (STORE / name).is_symlink()]
+    provisioned = previous is not None or bool(existing) or (STORE / "ssh-host-key.pub").exists()
+    ready = (config.get("rootVolumeKeyId") is not None
+             and os.uname().nodename == config["hostName"] and secure_boot_ready())
+    if not ready:
+        require(not provisioned, "Provisioned unlock state exists: boot the installed, pinned host with Secure Boot enabled before rebuilding.")
+        require(not any(staged.iterdir()), "Unexpected staged credentials on an unprovisioned host.")
+        print("Unlock provisioning deferred: console passphrase only until the pinned host boots with Secure Boot enabled.")
+        return
+    preflight(config, require_current_generation=False)
+    if previous:
+        require(previous["rootVolumeKeyId"] == config["rootVolumeKeyId"],
+                "Root volume identity changed; explicit recovery/migration is required.")
+    requested = []
+    if config.get("remoteUnlock"):
+        requested.append("ssh-host-key")
+        for name, enabled in [("wifi", config["wifi"]), ("tailscale-state", config.get("tailscale"))]:
+            known = name in existing or (previous and name in previous["credentials"])
+            available = (PLAIN_STORE / name).exists() or (PLAIN_STORE / name).is_symlink()
+            if enabled and (known or available):
+                requested.append(name)
+            elif enabled:
+                print(f"Optional {name} recovery awaits credentials; wired SSH remains available.")
+        for name in requested:
+            if name in existing or (previous and name in previous["credentials"]):
+                require((PLAIN_STORE / name).exists() or (STORE / name).exists(),
+                        f"Previously provisioned {name} is missing; restore its credential backup.")
+        credentials(argparse.Namespace(ssh_key_file=None, wifi_file=None,
+                    ssh_only="wifi" not in requested, tailscale="tailscale-state" in requested), work)
+    # Record readiness before copying: an interrupted publication must fail closed
+    # on a later insecure boot, rather than reverting to initial provisioning.
+    record = work / "provisioning-ready"
+    record.write_text(json.dumps({"rootVolumeKeyId": config["rootVolumeKeyId"],
+                                 "credentials": sorted(set(requested + (previous["credentials"] if previous else existing)))}))
+    publish(record, marker)
+    for name in requested:
+        publish(private_input(STORE / name), staged / name)
+    for entry in staged.iterdir():
+        if entry.name not in requested:
+            require(entry.is_file() and not entry.is_symlink(), "Unexpected staged credential entry.")
+            entry.unlink()
+    print("Unlock credentials staged. Boot-file installation can now update the measured-boot policy.")
+
+
+def publish_credentials(config, esp):
+    """Use encrypted EFI companion files so unchanged UKIs need no regeneration."""
+    staged = Path(config["stateDirectory"]) / "initrd-credentials"
+    destination = esp / "loader/credentials"
+    destination.mkdir(parents=True, exist_ok=True)
+    for name in ("ssh-host-key", "wifi", "tailscale-state"):
+        source = staged / name
+        target = destination / f"{name}.cred"
+        if source.exists():
+            publish(private_input(source), target)
+        else:
+            target.unlink(missing_ok=True)
+
+
 def private_input(path):
     path = Path(path)
     require(not path.is_symlink(), f"Input must not be a symlink: {path}")
@@ -247,7 +334,7 @@ def enroll_tailscale(config, work):
     PLAIN_STORE.chmod(0o700)
     publish(private_input(state), source)
     args = argparse.Namespace(ssh_key_file=None, wifi_file=None,
-                              ssh_only=not config["wifi"], tailscale=True)
+                              ssh_only=not config["wifi"] or not credential_available("wifi"), tailscale=True)
     credentials(args, work)
     print(f"Separate initrd Tailscale node {config['tailscaleHostName']} sealed. Rebuild boot files before testing.")
 
@@ -301,6 +388,9 @@ def main():
     creds.add_argument("--wifi-file", type=Path)
     creds.add_argument("--ssh-key-file", type=Path, help="Import an existing key into the configured credential store; otherwise reuse or generate once")
     creds.add_argument("--ssh-only", action="store_true", help="Provision Ethernet SSH without Wi-Fi credentials")
+    commands.add_parser("prepare-install", help="Provision available credentials when Secure Boot is ready, otherwise stage console-only boot")
+    publish_cmd = commands.add_parser("publish-credentials", help="Install staged encrypted EFI companion credentials")
+    publish_cmd.add_argument("--esp", type=Path, required=True)
     commands.add_parser("enroll-disk", help="Verify recovery passphrase and add a TPM LUKS token")
     commands.add_parser("enroll-tailscale", help="Register and seal a separate non-expiring initrd Tailscale node")
     args = parser.parse_args()
@@ -308,20 +398,29 @@ def main():
     require(not (args.command == "credentials" and args.ssh_only and args.wifi_file),
             "--ssh-only cannot be combined with --wifi-file.")
     config = json.loads(args.config.read_text())
-    if args.command == "credentials":
-        args.tailscale = config.get("tailscale", False)
     if args.command == "credentials" and not config["wifi"]:
         require(not args.wifi_file, "Enable Wi-Fi in the host configuration before supplying credentials.")
         args.ssh_only = True
     global PLAIN_STORE, STORE
     PLAIN_STORE = Path(config["stateDirectory"]) / "credstore"
     STORE = Path(config["stateDirectory"]) / "credstore.encrypted"
-    preflight(config, require_current_generation=args.command == "enroll-disk")
+    if args.command == "credentials":
+        args.tailscale = config.get("tailscale", False) and credential_available("tailscale-state")
+        args.ssh_only = args.ssh_only or (not args.wifi_file and not credential_available("wifi"))
+    require(os.geteuid() == 0, "Run with sudo on the installed host.")
+    if args.command not in ("prepare-install", "publish-credentials"):
+        require(config.get("rootVolumeKeyId") is not None, "Pin the root volume identity and reboot before provisioning unlock state.")
+        preflight(config, require_current_generation=args.command == "enroll-disk")
     with open("/run/secure-unlock-setup.lock", "w") as lock:
         fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
         with tempfile.TemporaryDirectory(prefix="secure-unlock-", dir="/run") as directory:
             work = Path(directory)
-            if args.command == "credentials":
+            if args.command == "prepare-install":
+                prepare_install(config, work)
+            elif args.command == "publish-credentials":
+                prepare_install(config, work)
+                publish_credentials(config, args.esp)
+            elif args.command == "credentials":
                 credentials(args, work)
             elif args.command == "enroll-tailscale":
                 enroll_tailscale(config, work)

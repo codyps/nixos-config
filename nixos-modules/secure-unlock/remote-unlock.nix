@@ -1,5 +1,5 @@
 { config, lib, ... }:
-lib.mkIf (config.boot.secureUnlock.enable && config.boot.secureUnlock.remoteUnlock.enable) {
+lib.mkIf (config.boot.secureUnlock.enable && config.boot.secureUnlock.remoteUnlock.enable && config.boot.secureUnlock.rootVolumeKeyId != null) {
   boot.initrd.systemd = {
     # cryptsetup stays active while asking for a passphrase, so OnFailure
     # cannot trigger recovery. TPM auto-unlock does not create an ask.* file.
@@ -23,7 +23,7 @@ lib.mkIf (config.boot.secureUnlock.enable && config.boot.secureUnlock.remoteUnlo
       # A console answer may have unlocked root since the path fired. Keep
       # this service active even when skipping, to avoid retriggering it.
       script = ''
-        if [ ! -e /dev/mapper/${config.boot.secureUnlock.mapperName} ]; then
+        if [ -s /.extra/global_credentials/ssh-host-key.cred ] && [ ! -e /dev/mapper/${config.boot.secureUnlock.mapperName} ]; then
           systemctl --no-block start secure-unlock-recovery.target
         fi
       '';

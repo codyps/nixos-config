@@ -8,7 +8,6 @@ let
   failures = config: builtins.filter (a: !a.assertion) config.assertions;
   normal = configured { boot.secureUnlock.tpmUnlock.enable = lib.mkForce false; };
   tpm = configured { boot.secureUnlock.tpmUnlock.enable = lib.mkForce true; };
-  bootstrap = flake.nixosConfigurations.warbler-bootstrap.config;
   missing = configured {
     boot.secureUnlock.rootVolumeKeyId = lib.mkForce null;
     boot.secureUnlock.tpmUnlock.enable = lib.mkForce false;
@@ -25,19 +24,19 @@ assert failures normal == [ ];
 assert missing.boot.secureUnlock.rootVolumeKeyId == null;
 assert base.options.boot.secureUnlock.rootVolumeKeyId.default == null;
 assert failures tpm == [ ];
-assert failures bootstrap == [ ];
 assert lib.hasInfix pin (crypttab normal);
 assert lib.hasInfix pin (crypttab tpm);
-assert !lib.hasInfix "fixate-volume-key=" (crypttab bootstrap);
-assert !bootstrap.boot.secureUnlock.remoteUnlock.enable && !bootstrap.boot.secureUnlock.tpmUnlock.enable;
-assert builtins.length (failures missing) == 1;
-assert builtins.length (failures missingTpm) == 1;
+assert !lib.hasInfix "fixate-volume-key=" (crypttab missing);
+assert !lib.hasInfix "tpm2-device=" (crypttab missingTpm);
+assert !missing.boot.lanzaboote.measuredBoot.enable;
+assert failures missing == [ ];
+assert failures missingTpm == [ ];
 assert !invalid.success;
 {
   manualUnlockPinned = true;
   defaultPinUnset = true;
   tpmUnlockPinned = true;
-  bootstrapAttended = true;
-  missingPinsRejected = true;
+  unpinnedAttended = true;
+  missingPinsDeferTpm = true;
   invalidPinRejected = true;
 }

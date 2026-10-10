@@ -70,7 +70,21 @@ pkgs.testers.runNixOSTest {
       environment.etc."test-ssh-key" = { source = sshKey; mode = "0600"; };
     };
     warbler = { config, ... }: {
-      disabledModules = [ ./hardware-configuration.nix ];
+      # Keep this recovery test independent of production applications and their
+      # SOPS identities. Storage, accounts and boot use the actual host modules.
+      disabledModules = [
+        ./hardware-configuration.nix
+        ./zpl-proxy-api.nix
+        ./garm.nix
+        ./ai-harnesses.nix
+        ./ai-container.nix
+        ./hindsight.nix
+        ./actions-vm-scaler.nix
+      ];
+      # Newer NixOS test nodes omit switch-to-configuration by default; this
+      # test explicitly installs and reinstalls the same system generation.
+      system.switch.enable = true;
+      programs.actions-vm-image.enable = lib.mkForce false;
       imports = [
         disko.nixosModules.disko
         impermanence.nixosModules.impermanence
@@ -109,10 +123,6 @@ pkgs.testers.runNixOSTest {
       services.tailscale.enable = lib.mkForce false;
       nix.gc.automatic = lib.mkForce false;
       nix.optimise.automatic = lib.mkForce false;
-      # Override the production setting, while allowing the remote
-      # specialisation's mkForce to enable recovery on subsequent boots.
-      boot.secureUnlock.remoteUnlock.enable = lib.mkOverride 60 false;
-      boot.secureUnlock.tpmUnlock.enable = lib.mkOverride 60 false;
       boot.secureUnlock.remoteUnlock.wifi.enable = true;
       boot.secureUnlock.rootVolumeKeyId = lib.mkForce "77e740d9d987a52981ee75ae6ab327c2b70a8b49c6e36258abc426db85c5f831";
       boot.lanzaboote.settings.secure-boot-enroll = "force";
@@ -128,27 +138,23 @@ pkgs.testers.runNixOSTest {
       boot.initrd.systemd.services.secure-unlock-wifi.enable = lib.mkForce false;
       systemd.services.secure-unlock-wifi.enable = lib.mkForce false;
 
-      specialisation.remote.configuration = {
-        boot.secureUnlock.remoteUnlock.enable = lib.mkForce true;
-        boot.secureUnlock.tpmUnlock.enable = lib.mkForce true;
-        # /run survives switch-root, recording even briefly started services.
-        boot.initrd.systemd.services.systemd-networkd.serviceConfig.ExecStartPre =
-          "+${pkgs.coreutils}/bin/touch /run/warbler-initrd-networkd-started";
-        boot.initrd.systemd.services.sshd.serviceConfig.ExecStartPre =
-          "+${pkgs.coreutils}/bin/touch /run/warbler-initrd-sshd-started";
-        # Exercise real TPM credential loading and service lifecycle without
-        # registering a test node with an external tailnet.
-        boot.initrd.systemd.services.secure-unlock-tailscale.serviceConfig.Type = lib.mkForce "oneshot";
-        boot.initrd.systemd.services.secure-unlock-tailscale.serviceConfig.RemainAfterExit = true;
-        boot.initrd.systemd.services.secure-unlock-tailscale.serviceConfig.ExecStart = lib.mkForce tailscaleProbe;
-        boot.initrd.systemd.storePaths = [
-          tailscaleProbe
-          "${pkgs.bash}/bin/bash"
-          "${pkgs.coreutils}/bin/cat"
-          "${pkgs.coreutils}/bin/stat"
-          "${pkgs.coreutils}/bin/touch"
-        ];
-      };
+      # /run survives switch-root, recording even briefly started services.
+      boot.initrd.systemd.services.systemd-networkd.serviceConfig.ExecStartPre =
+        "+${pkgs.coreutils}/bin/touch /run/warbler-initrd-networkd-started";
+      boot.initrd.systemd.services.sshd.serviceConfig.ExecStartPre =
+        "+${pkgs.coreutils}/bin/touch /run/warbler-initrd-sshd-started";
+      # Exercise real TPM credential loading and service lifecycle without
+      # registering a test node with an external tailnet.
+      boot.initrd.systemd.services.secure-unlock-tailscale.serviceConfig.Type = lib.mkForce "oneshot";
+      boot.initrd.systemd.services.secure-unlock-tailscale.serviceConfig.RemainAfterExit = true;
+      boot.initrd.systemd.services.secure-unlock-tailscale.serviceConfig.ExecStart = lib.mkForce tailscaleProbe;
+      boot.initrd.systemd.storePaths = [
+        tailscaleProbe
+        "${pkgs.bash}/bin/bash"
+        "${pkgs.coreutils}/bin/cat"
+        "${pkgs.coreutils}/bin/stat"
+        "${pkgs.coreutils}/bin/touch"
+      ];
 
       virtualisation = {
         memorySize = 3072;
@@ -196,18 +202,12 @@ pkgs.testers.runNixOSTest {
         installer.succeed("install -d -m 700 /mnt/persist/ssh; install -m 600 ${sshKey} /mnt/persist/ssh/ssh_host_ed25519_key")
         installer.succeed("mount --bind /nix/store /mnt/nix/store")
         installer.succeed("cp -r ${keys}/. /mnt/persist/var/lib/sbctl/; chmod -R u+w /mnt/persist/var/lib/sbctl")
-        # The not-yet-selected remote specialisation needs placeholder blobs
-        # for initial signing. They cannot decrypt and contain no real secrets.
-        installer.succeed("echo unprovisioned > /mnt/persist/credstore.encrypted/wifi; echo unprovisioned > /mnt/persist/credstore.encrypted/ssh-host-key")
-        installer.succeed("echo unprovisioned > /mnt/persist/credstore.encrypted/tailscale-state")
         installer.succeed("touch /mnt/etc/NIXOS; mkdir -p /mnt/nix/var/nix/profiles")
         installer.succeed("nixos-enter --root /mnt --system ${nodes.warbler.system.build.toplevel} -- nix-store --load-db < ${nodes.warbler.system.build.testClosure}/registration")
         installer.succeed("nixos-enter --root /mnt --system ${nodes.warbler.system.build.toplevel} -- nix-env -p /nix/var/nix/profiles/system --set ${nodes.warbler.system.build.toplevel}")
         installer.succeed("install -d -m 700 /run/account-passwords; umask 077; printf %s Abcdef-ghijkl-mnopq7-RS > /run/account-passwords/root; printf %s Tuvwxy-zabcde-fghij8-KL > /run/account-passwords/cody")
         installer.succeed("${nodes.warbler.system.build.toplevel}/sw/bin/warbler-account-passwords initialize --root /mnt --password-dir /run/account-passwords")
         installer.succeed("NIXOS_INSTALL_BOOTLOADER=1 nixos-enter --root /mnt -- ${nodes.warbler.system.build.toplevel}/bin/switch-to-configuration boot")
-        installer.succeed("rm /mnt/persist/credstore.encrypted/wifi /mnt/persist/credstore.encrypted/ssh-host-key")
-        installer.succeed("rm /mnt/persist/credstore.encrypted/tailscale-state")
         installer.succeed("mkdir -p /mnt/boot/loader/keys/auto; cp ${authVariables}/*.auth /mnt/boot/loader/keys/auto/; sync")
         installer.shutdown()
 
@@ -221,7 +221,11 @@ pkgs.testers.runNixOSTest {
 
     with subtest("UEFI Secure Boot and manual recovery unlock"):
         console_unlock()
+        warbler.succeed("test ! -e /run/warbler-initrd-networkd-started && test ! -e /run/warbler-initrd-sshd-started")
         warbler.succeed("bootctl status | grep 'Secure Boot: enabled'")
+        # No manual provisioning command has run: the boot service creates the
+        # stable initrd identity automatically on this first Secure Boot boot.
+        warbler.succeed("test -s /persist/credstore/ssh-host-key && test -s /persist/credstore.encrypted/ssh-host-key && test -s /persist/provisioning-ready")
         warbler.succeed("test $(cat ${nodes.warbler.sops.secrets.vm-probe.path}) = warbler-sops-test")
         ssh_identity = warbler.succeed("ssh-keygen -y -f /persist/ssh/ssh_host_ed25519_key")
         for mount, subvol in [("/", "root"), ("/nix", "nix"), ("/home", "home"), ("/persist", "persist")]:
@@ -251,12 +255,13 @@ pkgs.testers.runNixOSTest {
         client.succeed("printf %s " + shlex.quote("[192.168.1.3]:2222 " + identity) + " > /etc/test-known-hosts")
 
     with subtest("boot signed remote-unlock generation"):
-        # Pass the actual store root, not a path inside the parent generation:
-        # nix-env otherwise canonicalises it back to the parent's store root.
-        remote = "${nodes.warbler.specialisation.remote.configuration.system.build.toplevel}"
+        # Reinstall exactly the same generation with newly sealed credentials.
+        remote = "${nodes.warbler.system.build.toplevel}"
         warbler.succeed(f"nix-env -p /nix/var/nix/profiles/system --set {remote}")
         warbler.succeed(f"test $(readlink -f /nix/var/nix/profiles/system) = {remote}")
         warbler.succeed(f"{remote}/bin/switch-to-configuration boot")
+        warbler.succeed("cmp /boot/loader/credentials/ssh-host-key.cred /persist/credstore.encrypted/ssh-host-key")
+        warbler.succeed("cmp /boot/loader/credentials/tailscale-state.cred /persist/credstore.encrypted/tailscale-state")
         warbler.shutdown()
         warbler.start()
         client.wait_until_succeeds("nc -z 192.168.1.3 2222")

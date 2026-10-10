@@ -194,9 +194,12 @@ class InstallTests(unittest.TestCase):
                 self.assertFalse(any("warbler_volume_key_id=" in cmd for cmd in calls))
             else:
                 installer.install("/external")
+                self.assertFalse(any("warbler-bootstrap" in cmd for cmd in calls))
+                clear_pin = next(i for i, cmd in enumerate(calls) if "printf 'null" in cmd)
                 build = next(i for i, cmd in enumerate(calls) if " build --accept-flake-config" in cmd)
                 transfer = next(i for i, cmd in enumerate(calls) if "tar -xf -" in cmd)
                 installation = next(i for i, cmd in enumerate(calls) if "nixos-install --" in cmd)
+                self.assertLess(clear_pin, build)
                 self.assertLess(build, transfer)
                 self.assertLess(transfer, installation)
                 self.assertIn("--system /nix/store/", calls[installation])

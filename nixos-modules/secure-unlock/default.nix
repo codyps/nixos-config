@@ -2,9 +2,10 @@
 let
   cfg = config.boot.secureUnlock;
   inherit (lib) mkOption types;
+  remote = cfg.remoteUnlock.enable && cfg.rootVolumeKeyId != null;
 in
 {
-  imports = [ ../../modules/admin-commands.nix ./remote-unlock.nix ./wifi.nix ./tailscale.nix ./tpm-setup.nix ];
+  imports = [ ../../modules/admin-commands.nix ./remote-unlock.nix ./wifi.nix ./tailscale.nix ./tpm-setup.nix ./bootloader.nix ];
 
   options.boot.secureUnlock = {
     enable = lib.mkEnableOption "pinned LUKS root with Secure Boot, remote recovery and optional TPM unlocking";
@@ -21,7 +22,7 @@ in
     rootVolumeKeyId = mkOption {
       type = types.nullOr (types.strMatching "[0-9a-f]{64}");
       default = null;
-      description = "Public identity from root-volume-key-id; required before enabling remote or TPM unlock.";
+      description = "Public identity from root-volume-key-id; required before provisioning remote or TPM unlock. Null permits attended installation only.";
     };
     tpmUnlock.enable = lib.mkEnableOption "TPM measured-boot unlocking after explicit enrollment";
     remoteUnlock = {
@@ -63,6 +64,12 @@ in
         };
       };
     };
+    provisioningPackage = mkOption {
+      type = types.package;
+      readOnly = true;
+      internal = true;
+      description = "Staged credential provisioning helper.";
+    };
     volumeIdentityPackage = mkOption {
       type = types.package;
       readOnly = true;
@@ -72,10 +79,6 @@ in
 
   config = lib.mkIf cfg.enable {
     assertions = [
-      {
-        assertion = cfg.rootVolumeKeyId != null || (!cfg.tpmUnlock.enable && !cfg.remoteUnlock.enable);
-        message = "secureUnlock requires a pinned rootVolumeKeyId before remote or TPM unlock is enabled.";
-      }
       {
         assertion = !cfg.remoteUnlock.enable || cfg.remoteUnlock.authorizedKeys != [ ];
         message = "secureUnlock remote recovery requires at least one SSH authorized key.";
@@ -94,7 +97,7 @@ in
       configurationLimit = lib.mkDefault 4;
       pkiBundle = lib.mkDefault "${cfg.stateDirectory}/sbctl";
       measuredBoot = {
-        enable = cfg.tpmUnlock.enable;
+        enable = cfg.tpmUnlock.enable && cfg.rootVolumeKeyId != null;
         pcrs = [ 0 4 7 ];
         pcrlockDirectory = lib.mkDefault "${cfg.stateDirectory}/pcrlock.d";
         pcrlockPolicy = lib.mkDefault "${cfg.stateDirectory}/pcrlock.json";
@@ -106,25 +109,23 @@ in
       systemd.tpm2.enable = true;
       luks.devices.${cfg.mapperName}.crypttabExtraOpts =
         lib.optional (cfg.rootVolumeKeyId != null) "fixate-volume-key=${cfg.rootVolumeKeyId}"
-        ++ lib.optionals cfg.tpmUnlock.enable [ "tpm2-device=auto" "token-timeout=10s" ];
+        ++ lib.optionals (cfg.tpmUnlock.enable && cfg.rootVolumeKeyId != null) [ "tpm2-device=auto" "token-timeout=10s" ];
       network = {
-        enable = cfg.remoteUnlock.enable;
+        enable = remote;
         ssh = {
-          enable = cfg.remoteUnlock.enable;
+          enable = remote;
           inherit (cfg.remoteUnlock) port authorizedKeys;
           hostKeys = [ ];
           ignoreEmptyHostKeys = true;
           extraConfig = "HostKey /run/credentials/sshd.service/ssh-host-key";
         };
       };
-      systemd.users.root.shell = lib.mkIf cfg.remoteUnlock.enable "/bin/systemd-tty-ask-password-agent";
-      secrets = lib.mkIf cfg.remoteUnlock.enable {
-        "/etc/credstore.encrypted/ssh-host-key" = "${cfg.stateDirectory}/credstore.encrypted/ssh-host-key";
-      };
-      systemd.services.sshd = lib.mkIf cfg.remoteUnlock.enable {
+      systemd.users.root.shell = lib.mkIf remote "/bin/systemd-tty-ask-password-agent";
+      systemd.services.sshd = lib.mkIf remote {
+        unitConfig.ConditionPathExists = "/.extra/global_credentials/ssh-host-key.cred";
         wants = [ "tpm2.target" ];
         after = [ "tpm2.target" ];
-        serviceConfig.LoadCredentialEncrypted = [ "ssh-host-key:/etc/credstore.encrypted/ssh-host-key" ];
+        serviceConfig.LoadCredentialEncrypted = [ "ssh-host-key:/.extra/global_credentials/ssh-host-key.cred" ];
       };
     };
   };

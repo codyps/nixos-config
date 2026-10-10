@@ -316,15 +316,6 @@
         nixosModules.actions-vm-scaler = import ./nixos-modules/actions-vm-scaler.nix;
         darwinModules.nix-dynamic-machines = import ./nix-darwin/modules/nix-dynamic-machines.nix;
         nixosConfigurations = {
-          crow-bootstrap = self.nixosConfigurations.crow.extendModules {
-            modules = [
-              ({ lib, ... }: {
-                boot.secureUnlock.rootVolumeKeyId = lib.mkForce null;
-                boot.secureUnlock.remoteUnlock.enable = lib.mkForce false;
-                boot.secureUnlock.tpmUnlock.enable = lib.mkForce false;
-              })
-            ];
-          };
           crow = nixosSystem {
             system = "x86_64-linux";
             specialArgs = { inherit self; };
@@ -342,17 +333,6 @@
                 home-manager.useUserPackages = true;
                 home-manager.users.cody.imports = [ ./home-manager/home.nix ];
               }
-            ];
-          };
-          warbler-bootstrap = self.nixosConfigurations.warbler.extendModules {
-            modules = [
-              ({ lib, ... }: {
-                # A fresh format creates a different volume identity. Bootstrap
-                # must remain attended until that identity is pinned.
-                boot.secureUnlock.rootVolumeKeyId = lib.mkForce null;
-                boot.secureUnlock.remoteUnlock.enable = lib.mkForce false;
-                boot.secureUnlock.tpmUnlock.enable = lib.mkForce false;
-              })
             ];
           };
           warbler = nixosSystem {
@@ -484,16 +464,6 @@
               {
                 nixpkgs = nixpkgsConfig;
               }
-            ];
-          };
-
-          # Keep the existing volume pin during the attended Secure Boot transition.
-          ward-bootstrap = self.nixosConfigurations.ward.extendModules {
-            modules = [
-              ({ lib, ... }: {
-                boot.secureUnlock.remoteUnlock.enable = lib.mkForce false;
-                boot.secureUnlock.tpmUnlock.enable = lib.mkForce false;
-              })
             ];
           };
 

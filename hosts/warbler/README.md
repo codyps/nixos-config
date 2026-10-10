@@ -91,8 +91,10 @@ volume key and the string `cryptsetup:cryptroot:<LUKS UUID>`; it is not a key
 or the digest stored in the LUKS header. Changing the volume key, UUID, or
 mapper name requires a new pin. Changing the recovery password does not.
 
-`warbler-bootstrap` explicitly sets this identity to null and disables remote
-and TPM disk unlock. Use it only for attended installation of a new volume.
+Use `.#warbler` at every stage. For a freshly formatted disk, set
+`volume-identity.nix` to `null` in the installation checkout first. Staged
+provisioning omits recovery credentials and TPM unlock until the new pin is
+recorded and the installed host boots with Secure Boot enabled.
 The remote installer records the freshly formatted volume's identity in
 `hosts/warbler/volume-identity.nix` in the installed checkout. For a manual
 installation, obtain the identity on the trusted installed system and update
@@ -103,7 +105,7 @@ learn the expected identity from a disk during boot. An unpinned configuration
 cannot enable remote or TPM unlock. Pinning authenticates volume identity,
 not every filesystem block or its freshness.
 
-On the trusted installed system (including `warbler-bootstrap`), run:
+On the trusted installed system (including its initial attended stage), run:
 
 ```sh
 sudo sys root-volume-key-id
@@ -192,7 +194,8 @@ network connection. The local console passphrase prompt remains available.
 
 Early Wi-Fi and SSH **always require TPM-encrypted credentials**, even when
 `boot.secureUnlock.tpmUnlock.enable = false`. Only these ciphertext files
-are appended to the initrd at installation/rebuild time:
+are published as EFI companions at installation/rebuild time and loaded into
+the initrd at boot:
 
 | Source on encrypted storage | Credential name | Consumer |
 | --- | --- | --- |
@@ -221,11 +224,11 @@ solely on that TPM can provide remote recovery after the TPM is lost.
 
 `scripts/warbler-install.py` automates the installer-side work over the existing
 `nixos@nixos.bed.einic.org` SSH connection. It uses the live host to build the
-x86_64 bootstrap system. There is no need for an interactive shell on the other,
+x86_64 initial system. There is no need for an interactive shell on the other,
 store-only builder. Follow **step 1 below** first (backups, BIOS credentials,
 local console and Ethernet ready); then use this workflow instead of manual
 steps 2–4. The live installer may stay connected over Wi-Fi while installation
-runs, but the first installed bootstrap boot requires Ethernet.
+runs, but the first installed boot requires Ethernet.
 
 From this checkout on the Mac:
 
@@ -239,7 +242,7 @@ Back up the generated bundle to separately encrypted offline storage, then run:
 python3 scripts/warbler-install.py install
 ```
 
-`install` includes the preflight checks and bootstrap build. Separate `check`
+`install` includes the preflight checks and initial build. Separate `check`
 and `build` runs are optional rehearsals, not required installation steps.
 
 - `prepare` captures `apple-password-gen` output without displaying it and
@@ -265,7 +268,8 @@ and `build` runs are optional rehearsals, not required installation steps.
   sudo. It displays model/capacity, not hardware serial numbers.
 - `install` first generates missing account passwords in the local bundle,
   retaining any existing ones. It sends a source-only snapshot (tracked plus nonignored untracked
-  files), builds `warbler-bootstrap` and disko **without any secrets**, and
+  files), clears the old pin in its disposable source snapshot, then builds
+  `warbler` and disko **without any secrets**, and
   rechecks the expected empty NVMe. It then requires the exact typed erase
   confirmation. Only afterward are secrets sent over SSH to a separate,
   root-only live-RAM directory, outside the flake source. Disko reads the
@@ -298,8 +302,8 @@ and `build` runs are optional rehearsals, not required installation steps.
 On successful installation, continue at **step 5** below: first NVMe boot,
 BIOS Setup Mode/key enrollment, Secure Boot verification, and only then TPM
 credential sealing. Do not regenerate keys in the manual instructions. The
-copied checkout retains normal `warbler` settings; `warbler-bootstrap` supplies
-temporary forced-off remote/TPM unlock settings without editing the checkout.
+copied checkout retains `warbler` settings and the newly recorded volume pin.
+Provisioning is staged by runtime readiness, without a second host output.
 After Secure Boot verification, one rebuild to `.#warbler` seals credentials,
 installs remote unlock, and prepares measured boot for optional TPM enrollment.
 The bootloader hook creates the credentials before including them in the initrd.
@@ -370,11 +374,12 @@ the TPM helper. Commands below are instructions, not evidence of installation.
 
 2. **Live USB: prepare the checkout:** obtain this flake checkout on the live host. Enter a root shell (`sudo -i`) and
    `cd` to that checkout. All installer commands below run there as root.
-   Use `.#warbler-bootstrap` for installation; leave the normal configuration
-   unchanged. This output disables remote and TPM disk unlock and omits encrypted
-   initrd credentials and Wi-Fi services until credentials can be sealed against
-   the final Secure Boot state. Disk unlocking is local-console only during
-   bootstrap; administration after boot is via wired SSH.
+   Use `.#warbler` throughout. Before formatting a new volume, write `null`
+   to `hosts/warbler/volume-identity.nix` in this installation checkout. Do not
+   clear the valid pin when repairing an existing volume. Initial unlocking
+   uses the console; administration after boot is via wired SSH. The shared
+   hook defers credential sealing until the pinned installed host boots with
+   Secure Boot enabled.
 
 3. **Live USB — inspect, then format the NVMe:** inspect without displaying
    serial numbers:
@@ -383,7 +388,7 @@ the TPM helper. Commands below are instructions, not evidence of installation.
    test -d /sys/firmware/efi
    lsblk -o NAME,PATH,SIZE,MODEL,TYPE,FSTYPE,MOUNTPOINTS
    nix build --accept-flake-config --no-link --print-out-paths \
-     .#nixosConfigurations.warbler-bootstrap.config.system.build.diskoScript
+     .#nixosConfigurations.warbler.config.system.build.diskoScript
    ```
 
    Confirm `/dev/nvme0n1` is the intended 512 GB NVMe, not the 4 TB SATA SSD
@@ -442,7 +447,7 @@ the TPM helper. Commands below are instructions, not evidence of installation.
      sbctl --config /run/warbler-sbctl-install.conf create-keys
    mkdir -p /mnt/persist/nixos-config
    cp -a . /mnt/persist/nixos-config/
-   nixos-install --no-root-passwd --flake .#warbler-bootstrap
+   nixos-install --no-root-passwd --flake .#warbler
    ```
 
    Stop on any failure. Lanzaboote needs these keys before installation signs
@@ -524,6 +529,8 @@ the TPM helper. Commands below are instructions, not evidence of installation.
    verify remote recovery and prepare for optional enrollment, without another
    configuration change, rebuild, and preparatory reboot later.
 
+   The boot service also provisions SSH automatically on the first pinned
+   Secure Boot boot; no manual `ssh-keygen` is needed.
    Ethernet needs no credential preparation: the hook creates and retains the
    dedicated initrd SSH identity automatically. For optional Wi-Fi, set
    `boot.secureUnlock.remoteUnlock.wifi.enable = true` and install the complete
@@ -542,10 +549,12 @@ the TPM helper. Commands below are instructions, not evidence of installation.
    ```
 
    The bootloader hook generates or reuses the SSH identity, seals the SSH and
-   optional Wi-Fi credentials, verifies decryption, and includes the ciphertext
-   in the initrd before signing. No separate service-start command is needed.
-   Missing Wi-Fi input, bad permissions, or failed sealing stops installation
-   of the boot files. Rebuild after later credential changes too; starting the
+   optional Wi-Fi credentials, verifies decryption, and publishes encrypted EFI companions
+   for the signed initrd to load at boot. No separate service-start command is needed.
+   Initial absence of optional Wi-Fi/Tailscale inputs defers those paths.
+   Bad permissions, failed sealing, or loss of previously provisioned credentials
+   stops boot-file installation. Rebuild after later credential changes too;
+   starting the
    provisioning service alone does not update an already-built initrd.
    Back up `/persist/credstore` to separately encrypted offline storage.
 
@@ -562,7 +571,8 @@ the TPM helper. Commands below are instructions, not evidence of installation.
 Warbler enables `boot.secureUnlock.remoteUnlock.tailscale.enable` for a separate
 `warbler-unlock` node in the initrd. Follow the
 [Tailscale provisioning procedure](../../docs/secure-unlock.md#separate-tailscale-identity-in-the-initrd)
-before installing this configuration's boot files. Run the new system closure's
+after Secure Boot is ready; rebuild afterward to include that identity.
+Run the new system closure's
 `sys setup-unlock-tailscale`, authenticate the separate node and disable
 its key expiry, then install the boot generation. Its state is sealed to TPM
 PCR 7; the normal host's `warbler` identity and state remain separate.
@@ -634,7 +644,7 @@ and password login after reboot using synthetic credentials.
 The Python tests mock TPM, password hashing, and disk commands; they validate failure handling,
 repeat runs, identity preservation, and recovery checks, not physical enrollment.
 The Nix pin checks cover manual/TPM configuration, malformed/missing pins,
-and the attended bootstrap exception. On Linux, as root with `python3`,
+and the unpinned attended provisioning stage. On Linux, as root with `python3`,
 `cryptsetup`, and `systemd-cryptsetup` in PATH, run
 `bash scripts/test-warbler-volume-key.sh` to exercise real volume activation
 on disposable images under `/run`: correct identity succeeds, substituted

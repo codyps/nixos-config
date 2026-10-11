@@ -1,33 +1,29 @@
-name: Inventory cache hashes for privacy cleanup
+name: Remove identified production cache sources
 on:
   workflow_dispatch:
 permissions:
   contents: read
 jobs:
-  inventory:
+  cleanup:
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
-      - name: List cache hashes without exposing stored contents
+      - name: Remove the two verified public plaintext source snapshots
         env:
-          CACHE: ${{ vars.CACHIX_CACHE }}
           TOKEN: ${{ secrets.CACHIX_AUTH_TOKEN }}
         shell: python
         run: |
-          import json, os, re, urllib.request
-          cache = os.environ['CACHE']
-          assert re.fullmatch(r'[a-z0-9-]+', cache)
-          request = urllib.request.Request('https://app.cachix.org/api/v1/cache/' + cache + '/contents',
-              headers={'Authorization': 'Bearer ' + os.environ['TOKEN']})
-          with urllib.request.urlopen(request, timeout=60) as response:
-              values = json.load(response)
-          hashes = sorted({x.rsplit('/', 1)[-1].split('-', 1)[0] for x in values})
-          assert all(re.fullmatch(r'[0-9a-z]{32}', x) for x in hashes)
-          with open('cache-hashes.json', 'w') as output:
-              json.dump(hashes, output)
-          print('Listed', len(hashes), 'store hashes')
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
-        with:
-          name: cache-hashes
-          path: cache-hashes.json
-          retention-days: 3
+          import json, os, urllib.request, urllib.error
+          # These exact snapshots were verified to contain the production inventory.
+          hashes = ['1mavidmkv2yb3ba0qh0glha6fy262ziq', 'q1bxzk43kxnhri8x3my6s19pi08ak1z3']
+          statuses = {}
+          for h in hashes:
+              request = urllib.request.Request('https://app.cachix.org/api/v1/cache/codyps/' + h + '.narinfo',
+                  method='DELETE', headers={'Authorization': 'Bearer ' + os.environ['TOKEN']})
+              try:
+                  with urllib.request.urlopen(request, timeout=60) as response:
+                      statuses[h] = response.status
+              except urllib.error.HTTPError as error:
+                  statuses[h] = error.code
+          print(json.dumps(statuses))
+          assert all(x in (200, 204, 404) for x in statuses.values()), 'Removal requires a credential with permission to delete cache entries'

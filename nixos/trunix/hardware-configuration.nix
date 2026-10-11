@@ -13,18 +13,18 @@
 
   fileSystems."/" =
     {
-      device = "/dev/disk/by-uuid/${(import ../../lib/hardware-identities.nix) "trunix" "rootUuid"}";
+      device = "/dev/disk/by-uuid/${(import ../../lib/hardware-identities.nix) "trunix" [ "storage" "fileSystems" "/" "uuid" ]}";
       fsType = "ext4";
     };
 
   fileSystems."/boot" =
     {
-      device = "/dev/disk/by-uuid/${(import ../../lib/hardware-identities.nix) "trunix" "bootUuid"}";
+      device = "/dev/disk/by-uuid/${(import ../../lib/hardware-identities.nix) "trunix" [ "storage" "fileSystems" "/boot" "uuid" ]}";
       fsType = "vfat";
     };
 
   swapDevices =
-    [{ device = "/dev/disk/by-uuid/${(import ../../lib/hardware-identities.nix) "trunix" "swapUuid"}"; }];
+    [{ device = "/dev/disk/by-uuid/${(import ../../lib/hardware-identities.nix) "trunix" [ "storage" "swap" "uuid" ]}"; }];
 
   hardware.cpu.intel.updateMicrocode = lib.mkDefault config.hardware.enableRedistributableFirmware;
 }

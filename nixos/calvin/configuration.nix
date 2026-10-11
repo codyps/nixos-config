@@ -50,7 +50,7 @@ in
 
   boot.initrd.luks.devices = {
     calvin-crypt = {
-      device = "/dev/disk/by-uuid/${(import ../../lib/hardware-identities.nix) "calvin" "rootLuksUuid"}";
+      device = "/dev/disk/by-uuid/${(import ../../lib/hardware-identities.nix) "calvin" [ "storage" "luks" "calvin-crypt" "uuid" ]}";
       allowDiscards = true;
       preLVM = true;
       bypassWorkqueues = true;
@@ -112,7 +112,7 @@ in
       atuin
     ];
 
-  networking.hostId = "${(import ../../lib/hardware-identities.nix) "calvin" "zfsHostId"}";
+  networking.hostId = "${(import ../../lib/hardware-identities.nix) "calvin" [ "storage" "zfs" "hostId" ]}";
 
   programs.sway = {
     enable = true;

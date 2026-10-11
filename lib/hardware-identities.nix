@@ -1,9 +1,9 @@
-# Provisioning adds this file only to a disposable path: flake, never to Git.
-host: key:
+# Only prepared, local sources contain the decrypted per-host settings.
+host: path:
 let
   file = ../hardware-identities.json;
   inventory =
     if builtins.pathExists file then builtins.fromJSON (builtins.readFile file)
-    else throw "Hardware inventory missing: use sys hardware-source run -- nix ... (see docs/hardware-identities.md)";
+    else throw "Hardware settings missing: use the managed nix command, or bootstrap with sys hardware-source (docs/hardware-identities.md)";
 in
-inventory.${host}.${key}
+builtins.foldl' (value: key: builtins.getAttr key value) inventory.${host} path

@@ -59,8 +59,8 @@ daemon, its administrator must also authorize the cache if the user is untrusted
 The Docker builder's `nix.conf` carries matching settings; rebuild/recreate the
 builder using its setup instructions to apply them to an existing container.
 
-NixOS builds require the inventory-only `HARDWARE_IDENTITIES_AGE_KEY` Actions
-secret. CI decrypts hardware inventory into a temporary source snapshot outside
-Git. Pull requests without the key omit NixOS targets and report the omission;
-main and scheduled runs fail if it is missing. See
-[hardware provisioning](../docs/hardware-identities.md) for local builds and key scope.
+Hardware-dependent configurations are built with deterministic synthetic identifiers.
+CI has no production hardware decryption step. Publishing verifies the prepared
+source contains exactly the synthetic inventory. These systems must not be
+installed; production builds reuse shared package dependencies and rebuild the
+identity-dependent outputs locally. See [hardware settings](../docs/hardware-identities.md).

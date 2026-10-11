@@ -1,6 +1,9 @@
 #!/usr/bin/env python3
 """Prepare a disposable path flake with SOPS hardware inventory outside Git."""
 import argparse
+import base64
+import hashlib
+import re
 import json
 import os
 from pathlib import Path
@@ -13,40 +16,86 @@ INVENTORY = "hardware-identities.json"
 MANIFEST = ".hardware-source-files.json"
 
 
-def validate_inventory(inventory, schema):
-    if not isinstance(inventory, dict) or inventory.keys() != schema.keys():
-        raise ValueError("Hardware inventory hosts do not match the schema")
-    for host, fields in schema.items():
-        if not isinstance(inventory[host], dict) or inventory[host].keys() != fields.keys():
-            raise ValueError(f"Hardware inventory fields do not match schema for {host}")
-        for key, kind in fields.items():
-            value = inventory[host][key]
-            if kind == "integer":
-                valid = type(value) is int and 0 <= value <= 0xffffffff
-            else:
-                valid = isinstance(value, str) and bool(value) and not any(c in value for c in '\n\r\0')
-                # Only the explicit fresh-install volume pin may be absent.
-                valid |= key == "rootVolumeKeyId" and value is None
-            if not valid:
-                raise ValueError(f"Invalid hardware inventory value for {host}.{key}")
+FIXTURE_MARKER = ".hardware-fixture"
+
+
+def validate_inventory(inventory, schema, path=()):
+    if isinstance(schema, dict):
+        if not isinstance(inventory, dict) or inventory.keys() != schema.keys():
+            raise ValueError("Hardware fields do not match schema at " + ".".join(path))
+        for key, kind in schema.items():
+            validate_inventory(inventory[key], kind, path + (key,))
+    else:
+        patterns = {
+            "uuid": r"[0-9a-fA-F-]+",
+            "host-id": r"[0-9a-fA-F]{8}",
+            "volume-key-id": r"[0-9a-fA-F]{64}",
+            "mac-address": r"(?:[0-9a-fA-F]{2}:){5}[0-9a-fA-F]{2}",
+            "duid": r"(?:[0-9a-fA-F]{2}:)*[0-9a-fA-F]{2}",
+            "device-id": r"[a-zA-Z0-9_.:+-]+",
+            "usb-hash": r"[A-Za-z0-9+/]{43}=",
+            "string": r"[^\n\r\0]+",
+        }
+        valid = (type(inventory) is int and 0 <= inventory <= 0xffffffff) if schema == "integer" else (
+            inventory is None and schema == "volume-key-id" or
+            isinstance(inventory, str) and re.fullmatch(patterns[schema], inventory) is not None)
+        if not valid:
+            raise ValueError("Invalid hardware value at " + ".".join(path))
     return inventory
 
 
-def read_inventory(repo, inventory_file=None):
+def fixture_inventory(schema, path=()):
+    """Deterministic synthetic values; never derive fixtures from production data."""
+    if isinstance(schema, dict):
+        return {k: fixture_inventory(v, path + (k,)) for k, v in schema.items()}
+    digest = hashlib.sha256("fixture/".encode() + "/".join(path).encode()).hexdigest()
+    return {
+        "integer": int(digest[:8], 16),
+        "uuid": f"{digest[:8]}-{digest[8:12]}-4000-8000-{digest[12:24]}",
+        "host-id": digest[:8], "volume-key-id": digest,
+        "mac-address": "02:" + ":".join(digest[i:i+2] for i in range(0, 10, 2)),
+        "duid": "00:04:" + ":".join(digest[i:i+2] for i in range(0, 32, 2)),
+        "device-id": "synthetic-ci-disk-" + digest[:8],
+        "usb-hash": base64.b64encode(bytes.fromhex(digest)).decode(),
+        "string": "synthetic-ci-" + digest[:8],
+    }[schema]
+
+
+def read_inventory(repo, inventory_file=None, fixtures=False):
     if (repo / MANIFEST).exists() and (repo / ".git").exists():
         raise ValueError("Prepared source manifest must not be placed in a Git checkout")
     schema = json.loads((repo / "lib/hardware-identities-schema.json").read_text())
-    if inventory_file:
+    if fixtures:
+        if inventory_file:
+            raise ValueError("Fixtures cannot use production inventory")
+        inventory = fixture_inventory(schema)
+    elif inventory_file:
         inventory = json.loads(Path(inventory_file).read_text())
     elif (repo / MANIFEST).is_file():
         inventory = json.loads((repo / INVENTORY).read_text())
     else:
-        result = subprocess.run(["sops", "--decrypt", str(repo / "secrets/hardware-identities.json")],
-                                stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        if result.returncode:
-            raise RuntimeError("Cannot decrypt hardware inventory; configure a SOPS recipient key (output withheld)")
-        inventory = json.loads(result.stdout)
+        inventory = {}
+        for host in schema:
+            result = subprocess.run(["sops", "--decrypt", str(repo / "secrets/hardware" / (host + ".json"))],
+                                    stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            if result.returncode:
+                raise RuntimeError(f"Cannot decrypt hardware settings for {host}; configure a SOPS recipient key (output withheld)")
+            try:
+                inventory[host] = json.loads(result.stdout)
+            except ValueError:
+                raise RuntimeError(f"Invalid decrypted JSON for {host} (output withheld)") from None
     return validate_inventory(inventory, schema)
+
+
+def verify_fixtures(repo):
+    """Require exact synthetic data, not merely an easily copied marker."""
+    repo = Path(repo)
+    if not (repo / FIXTURE_MARKER).is_file():
+        raise ValueError("Public publishing requires a fixture source")
+    actual = json.loads((repo / INVENTORY).read_text())
+    expected = fixture_inventory(json.loads((repo / "lib/hardware-identities-schema.json").read_text()))
+    if actual != expected:
+        raise ValueError("Public publishing refused: inventory differs from synthetic fixtures")
 
 
 def source_files(repo):
@@ -65,7 +114,7 @@ def source_files(repo):
         path = Path(name)
         if path.is_absolute() or '..' in path.parts or path.parts[0] in ('.git', 'keys'):
             raise ValueError("Unsafe source path")
-        if name in (INVENTORY, MANIFEST):
+        if name in (INVENTORY, MANIFEST, FIXTURE_MARKER):
             raise ValueError("Decrypted inventory must never be tracked or listed in the source manifest")
         source = repo / path
         if source.is_symlink() and (not source.resolve().is_relative_to(repo) or str(source.resolve().relative_to(repo)) not in names):
@@ -80,14 +129,14 @@ def source_files(repo):
     return result
 
 
-def prepare(repo, destination, inventory_file=None):
+def prepare(repo, destination, inventory_file=None, fixtures=False):
     repo = Path(repo).resolve()
     destination = Path(destination).absolute()
     if destination.exists() or destination.is_symlink():
         raise ValueError("Destination must not exist")
     if destination.resolve().is_relative_to(repo):
         raise ValueError("Prepared source must be outside the repository")
-    inventory = read_inventory(repo, inventory_file)
+    inventory = read_inventory(repo, inventory_file, fixtures)
     files = source_files(repo)
     destination.mkdir(mode=0o700)
     try:
@@ -95,6 +144,8 @@ def prepare(repo, destination, inventory_file=None):
             target = destination / name
             target.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(repo / name, target, follow_symlinks=False)
+        if fixtures or (repo / FIXTURE_MARKER).exists():
+            (destination / FIXTURE_MARKER).write_text("Synthetic CI configuration; do not install.\n")
         for name, data in ((INVENTORY, inventory), (MANIFEST, files)):
             target = destination / name
             target.write_text(json.dumps(data, indent=2) + '\n')
@@ -109,7 +160,9 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--repo', type=Path, default=Path.cwd())
     parser.add_argument('--inventory', type=Path, help='Use an existing local plaintext inventory instead of SOPS')
+    parser.add_argument('--fixtures', action='store_true', help='Use synthetic CI identities; never install these builds')
     commands = parser.add_subparsers(dest='action', required=True)
+    commands.add_parser('verify-fixtures')
     stage = commands.add_parser('prepare')
     stage.add_argument('destination', type=Path)
     run = commands.add_parser('run')
@@ -117,8 +170,11 @@ def main():
     args = parser.parse_args()
     os.umask(0o077)
     try:
+        if args.action == 'verify-fixtures':
+            verify_fixtures(args.repo)
+            return 0
         if args.action == 'prepare':
-            print(prepare(args.repo, args.destination, args.inventory))
+            print(prepare(args.repo, args.destination, args.inventory, args.fixtures))
             return 0
         command = args.command
         if command[:1] == ['--']:
@@ -126,7 +182,7 @@ def main():
         if not command:
             raise ValueError('run requires a command after --')
         with tempfile.TemporaryDirectory(prefix='nixos-hardware-') as temporary:
-            source = prepare(args.repo, Path(temporary) / 'source', args.inventory)
+            source = prepare(args.repo, Path(temporary) / 'source', args.inventory, args.fixtures)
             return subprocess.run(command, cwd=source).returncode
     except (ValueError, OSError, RuntimeError, subprocess.CalledProcessError) as error:
         print(f'Hardware provisioning stopped: {error}', file=sys.stderr)

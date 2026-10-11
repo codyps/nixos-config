@@ -91,7 +91,7 @@
                 args = builtins.functionArgs (import package);
               in
               # Older pins need an explicit self-reference for withPlugins;
-              # newer nixpkgs uses finalAttrs.finalPackage internally.
+                # newer nixpkgs uses finalAttrs.finalPackage internally.
               prev.callPackage package (prev.lib.optionalAttrs (args ? caddy) {
                 inherit caddy;
               });
@@ -179,7 +179,10 @@
             hardware-identities = pkgs.runCommand "test-hardware-identities" { nativeBuildInputs = [ pkgs.python3 pkgs.git ]; } ''
               cp ${./scripts/hardware-identities.py} hardware-identities.py
               cp ${./scripts/test-hardware-identities.py} test-hardware-identities.py
+              cp ${./scripts/hardware-nix.py} hardware-nix.py
+              cp ${./scripts/test-hardware-nix.py} test-hardware-nix.py
               python3 test-hardware-identities.py
+              python3 test-hardware-nix.py
               touch "$out"
             '';
             admin-commands = pkgs.runCommand "test-admin-commands" { nativeBuildInputs = [ pkgs.python3 ]; } ''

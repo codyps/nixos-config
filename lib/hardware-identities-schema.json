@@ -1,93 +1,297 @@
 {
   "forbes": {
-    "rootLuksUuid": "string",
-    "zfsHostId": "string",
-    "bootUuid": "string"
+    "storage": {
+      "luks": {
+        "rcrypt": {
+          "uuid": "uuid"
+        }
+      },
+      "zfs": {
+        "hostId": "host-id"
+      },
+      "fileSystems": {
+        "/boot": {
+          "uuid": "uuid"
+        }
+      }
+    }
   },
   "warbler": {
-    "rootVolumeKeyId": "string",
-    "aiMac": "string",
-    "wiredDuid": "string",
-    "wiredIaid": "integer",
-    "usbReceiverHash": "string"
+    "storage": {
+      "luks": {
+        "cryptroot": {
+          "volumeKeyId": "volume-key-id"
+        }
+      }
+    },
+    "network": {
+      "containers": {
+        "warbler-ai": {
+          "interfaces": {
+            "mv-eno1": {
+              "macAddress": "mac-address"
+            }
+          }
+        }
+      },
+      "interfaces": {
+        "eno1": {
+          "dhcp": {
+            "duid": "duid",
+            "iaid": "integer"
+          }
+        }
+      }
+    },
+    "usb": {
+      "devices": {
+        "logitechReceiver": {
+          "descriptorHash": "usb-hash"
+        }
+      }
+    }
   },
   "arnold": {
-    "luks_z10_1_uuid": "string",
-    "luks_z8_1_uuid": "string",
-    "luks_z8_2_uuid": "string",
-    "luks_z10_2_uuid": "string",
-    "luks_z10_3_uuid": "string",
-    "luks_z8_3_uuid": "string",
-    "luks_z10_4_uuid": "string",
-    "luks_z10_5_uuid": "string",
-    "luks_z8_4_uuid": "string",
-    "luks_z10_6_uuid": "string",
-    "luks_z8_5_uuid": "string",
-    "luks_z12_0_uuid": "string",
-    "luks_z12_1_uuid": "string",
-    "luks_z12_2_uuid": "string",
-    "luks_z12_3_uuid": "string",
-    "luks_z12_4_uuid": "string",
-    "luks_z12_5_uuid": "string",
-    "luks_z12_6_uuid": "string",
-    "luks_z12_7_uuid": "string",
-    "luks_z12_8_uuid": "string",
-    "luks_z14_0_uuid": "string",
-    "luks_z14_1_uuid": "string",
-    "luks_z14_2_uuid": "string",
-    "luks_z14_3_uuid": "string",
-    "luks_i01_uuid": "string",
-    "luks_f01_uuid": "string",
-    "luks_ru1_uuid": "string",
-    "luks_pair1_uuid": "string",
-    "zfsHostId": "string",
-    "bootUuid": "string",
-    "bootSecondaryUuid": "string"
+    "storage": {
+      "luks": {
+        "z10.1": {
+          "uuid": "uuid"
+        },
+        "z8.1": {
+          "uuid": "uuid"
+        },
+        "z8.2": {
+          "uuid": "uuid"
+        },
+        "z10.2": {
+          "uuid": "uuid"
+        },
+        "z10.3": {
+          "uuid": "uuid"
+        },
+        "z8.3": {
+          "uuid": "uuid"
+        },
+        "z10.4": {
+          "uuid": "uuid"
+        },
+        "z10.5": {
+          "uuid": "uuid"
+        },
+        "z8.4": {
+          "uuid": "uuid"
+        },
+        "z10.6": {
+          "uuid": "uuid"
+        },
+        "z8.5": {
+          "uuid": "uuid"
+        },
+        "z12.0": {
+          "uuid": "uuid"
+        },
+        "z12.1": {
+          "uuid": "uuid"
+        },
+        "z12.2": {
+          "uuid": "uuid"
+        },
+        "z12.3": {
+          "uuid": "uuid"
+        },
+        "z12.4": {
+          "uuid": "uuid"
+        },
+        "z12.5": {
+          "uuid": "uuid"
+        },
+        "z12.6": {
+          "uuid": "uuid"
+        },
+        "z12.7": {
+          "uuid": "uuid"
+        },
+        "z12.8": {
+          "uuid": "uuid"
+        },
+        "z14.0": {
+          "uuid": "uuid"
+        },
+        "z14.1": {
+          "uuid": "uuid"
+        },
+        "z14.2": {
+          "uuid": "uuid"
+        },
+        "z14.3": {
+          "uuid": "uuid"
+        },
+        "i01": {
+          "uuid": "uuid"
+        },
+        "f01": {
+          "uuid": "uuid"
+        },
+        "ru1": {
+          "uuid": "uuid"
+        },
+        "pair1": {
+          "uuid": "uuid"
+        }
+      },
+      "zfs": {
+        "hostId": "host-id"
+      },
+      "fileSystems": {
+        "/boot.d/0": {
+          "uuid": "uuid"
+        },
+        "/boot.d/1": {
+          "uuid": "uuid"
+        }
+      }
+    }
   },
   "crow": {
-    "rootVolumeKeyId": "string",
-    "installDiskId": "string",
-    "wifiMac": "string"
+    "storage": {
+      "luks": {
+        "cryptroot": {
+          "volumeKeyId": "volume-key-id"
+        }
+      },
+      "installationDisk": {
+        "byId": "device-id"
+      }
+    },
+    "network": {
+      "interfaces": {
+        "wlp6s0": {
+          "permanentMacAddress": "mac-address"
+        }
+      }
+    }
   },
   "mifflin": {
-    "rootUuid": "string",
-    "bootUuid": "string",
-    "swapUuid": "string"
+    "storage": {
+      "fileSystems": {
+        "/": {
+          "uuid": "uuid"
+        },
+        "/boot": {
+          "uuid": "uuid"
+        }
+      },
+      "swap": {
+        "uuid": "uuid"
+      }
+    }
   },
   "constance": {
-    "rootUuid": "string"
+    "storage": {
+      "fileSystems": {
+        "/": {
+          "uuid": "uuid"
+        }
+      }
+    }
   },
   "finch": {
-    "zfsHostId": "string",
-    "bootUuid": "string"
+    "storage": {
+      "zfs": {
+        "hostId": "host-id"
+      },
+      "fileSystems": {
+        "/boot": {
+          "uuid": "uuid"
+        }
+      }
+    }
   },
   "ward": {
-    "rootVolumeKeyId": "string",
-    "rootLuksUuid": "string",
-    "zfsHostId": "string",
-    "bootUuid": "string"
+    "storage": {
+      "luks": {
+        "luksroot": {
+          "volumeKeyId": "volume-key-id",
+          "uuid": "uuid"
+        }
+      },
+      "zfs": {
+        "hostId": "host-id"
+      },
+      "fileSystems": {
+        "/boot": {
+          "uuid": "uuid"
+        }
+      }
+    }
   },
   "maclay": {
-    "rootUuid": "string",
-    "bootUuid": "string",
-    "swapUuid": "string"
+    "storage": {
+      "fileSystems": {
+        "/": {
+          "uuid": "uuid"
+        },
+        "/boot": {
+          "uuid": "uuid"
+        }
+      },
+      "swap": {
+        "uuid": "uuid"
+      }
+    }
   },
   "robin": {
-    "zfsHostId": "string",
-    "installDiskId": "string"
+    "storage": {
+      "zfs": {
+        "hostId": "host-id"
+      },
+      "installationDisk": {
+        "byId": "device-id"
+      }
+    }
   },
   "adams": {
-    "rootUuid": "string",
-    "bootUuid": "string"
+    "storage": {
+      "fileSystems": {
+        "/": {
+          "uuid": "uuid"
+        },
+        "/boot": {
+          "uuid": "uuid"
+        }
+      }
+    }
   },
   "calvin": {
-    "rootLuksUuid": "string",
-    "zfsHostId": "string",
-    "bootUuid": "string"
+    "storage": {
+      "luks": {
+        "calvin-crypt": {
+          "uuid": "uuid"
+        }
+      },
+      "zfs": {
+        "hostId": "host-id"
+      },
+      "fileSystems": {
+        "/boot": {
+          "uuid": "uuid"
+        }
+      }
+    }
   },
   "trunix": {
-    "rootUuid": "string",
-    "bootUuid": "string",
-    "swapUuid": "string"
+    "storage": {
+      "fileSystems": {
+        "/": {
+          "uuid": "uuid"
+        },
+        "/boot": {
+          "uuid": "uuid"
+        }
+      },
+      "swap": {
+        "uuid": "uuid"
+      }
+    }
   }
 }

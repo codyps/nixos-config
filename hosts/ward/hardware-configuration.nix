@@ -29,7 +29,7 @@
 
   fileSystems."/boot" =
     {
-      device = "/dev/disk/by-uuid/${(import ../../lib/hardware-identities.nix) "ward" "bootUuid"}";
+      device = "/dev/disk/by-uuid/${(import ../../lib/hardware-identities.nix) "ward" [ "storage" "fileSystems" "/boot" "uuid" ]}";
       fsType = "vfat";
       options = [ "fmask=0022" "dmask=0022" ];
     };

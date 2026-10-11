@@ -19,12 +19,20 @@ spec.loader.exec_module(installer)
 
 class InstallTests(unittest.TestCase):
     def setUp(self):
-        inventory = patch.object(installer.hardware, "read_inventory", return_value={"warbler": {"rootVolumeKeyId": "a" * 64}})
+        inventory = patch.object(installer.hardware, "read_inventory", return_value={"warbler": {"storage": {"luks": {"cryptroot": {"volumeKeyId": "a" * 64}}}}})
         inventory.start()
         self.addCleanup(inventory.stop)
         output = contextlib.redirect_stdout(io.StringIO())
         output.__enter__()
         self.addCleanup(output.__exit__, None, None, None)
+
+    def test_refuse_fixture_installation(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            (root / installer.hardware.FIXTURE_MARKER).write_text('fixture')
+            with patch.object(installer, 'REPO', root):
+                with self.assertRaisesRegex(ValueError, 'synthetic'):
+                    installer.source_archive()
 
     def test_secret_directory_cannot_be_inside_checkout(self):
         with self.assertRaisesRegex(RuntimeError, "outside the checkout"):
@@ -198,7 +206,7 @@ class InstallTests(unittest.TestCase):
             else:
                 installer.install("/external")
                 self.assertFalse(any("warbler-bootstrap" in cmd for cmd in calls))
-                clear_pin = next(i for i, cmd in enumerate(calls) if "['rootVolumeKeyId'] = None" in cmd)
+                clear_pin = next(i for i, cmd in enumerate(calls) if "['volumeKeyId'] = None" in cmd)
                 build = next(i for i, cmd in enumerate(calls) if " build --accept-flake-config" in cmd)
                 transfer = next(i for i, cmd in enumerate(calls) if "tar -xf -" in cmd)
                 installation = next(i for i, cmd in enumerate(calls) if "nixos-install --" in cmd)
@@ -233,17 +241,17 @@ class InstallTests(unittest.TestCase):
             script = installer.volume_identity_script(root / "system", root / "checkout")
             for value, status in [("b" * 64, 0), ("invalid", 0), ("c" * 64, 1)]:
                 with self.subTest(value=value, status=status):
-                    output.write_text(json.dumps({"warbler": {"rootVolumeKeyId": "existing-pin"}, "other": "preserved"}))
+                    output.write_text(json.dumps({"warbler": {"storage": {"luks": {"cryptroot": {"volumeKeyId": "existing-pin"}}}}, "other": "preserved"}))
                     helper.write_text(f"#!/bin/sh\nprintf '%s\\n' '{value}'\nexit {status}\n")
                     helper.chmod(0o700)
                     result = subprocess.run(["bash", "-eu", "-c", script], capture_output=True)
                     self.assertEqual(result.stdout, b"")
                     if value == "b" * 64:
                         self.assertEqual(result.returncode, 0)
-                        self.assertEqual(json.loads(output.read_text()), {"warbler": {"rootVolumeKeyId": value}, "other": "preserved"})
+                        self.assertEqual(json.loads(output.read_text()), {"warbler": {"storage": {"luks": {"cryptroot": {"volumeKeyId": value}}}}, "other": "preserved"})
                     else:
                         self.assertNotEqual(result.returncode, 0)
-                        self.assertEqual(json.loads(output.read_text())["warbler"]["rootVolumeKeyId"], "existing-pin")
+                        self.assertEqual(json.loads(output.read_text())["warbler"]["storage"]["luks"]["cryptroot"]["volumeKeyId"], "existing-pin")
 
 
 if __name__ == "__main__":

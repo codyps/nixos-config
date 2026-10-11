@@ -10,3 +10,4 @@ __pycache__/
 # Decrypted hardware inventory belongs only in prepared source snapshots.
 /hardware-identities.json
 /.hardware-source-files.json
+/.hardware-fixture

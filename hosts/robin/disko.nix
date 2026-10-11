@@ -9,7 +9,7 @@
     disk = {
       root = {
         type = "disk";
-        device = "/dev/disk/by-id/${(import ../../lib/hardware-identities.nix) "robin" "installDiskId"}";
+        device = "/dev/disk/by-id/${(import ../../lib/hardware-identities.nix) "robin" [ "storage" "installationDisk" "byId" ]}";
         content = {
           type = "gpt";
           partitions = {

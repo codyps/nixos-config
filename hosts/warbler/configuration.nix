@@ -6,8 +6,8 @@ let
   # identifiers are public; DUIDRawData excludes the two-byte DUID type.
   wiredDhcpIdentity = {
     DUIDType = "vendor";
-    DUIDRawData = "${(import ../../lib/hardware-identities.nix) "warbler" "wiredDuid"}";
-    IAID = (import ../../lib/hardware-identities.nix) "warbler" "wiredIaid";
+    DUIDRawData = "${(import ../../lib/hardware-identities.nix) "warbler" [ "network" "interfaces" "eno1" "dhcp" "duid" ]}";
+    IAID = (import ../../lib/hardware-identities.nix) "warbler" [ "network" "interfaces" "eno1" "dhcp" "iaid" ];
   };
   wiredDhcpConfig = {
     dhcpV4Config = wiredDhcpIdentity // { ClientIdentifier = "duid"; };

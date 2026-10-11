@@ -231,7 +231,7 @@ in
     wantedBy = [ "sockets.target" ];
   };
 
-  networking.hostId = "${(import ../../lib/hardware-identities.nix) "finch" "zfsHostId"}";
+  networking.hostId = "${(import ../../lib/hardware-identities.nix) "finch" [ "storage" "zfs" "hostId" ]}";
   networking.hostName = "finch";
   networking.useDHCP = false;
 

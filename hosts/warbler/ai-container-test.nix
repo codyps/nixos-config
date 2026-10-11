@@ -44,7 +44,7 @@ pkgs.testers.runNixOSTest {
           interface = "eth1";
           bind-interfaces = true;
           dhcp-range = "192.168.1.100,192.168.1.150,255.255.255.0,1h";
-          dhcp-host = "${(import ../../lib/hardware-identities.nix) "warbler" "aiMac"},192.168.1.100";
+          dhcp-host = "${(import ../../lib/hardware-identities.nix) "warbler" [ "network" "containers" "warbler-ai" "interfaces" "mv-eno1" "macAddress" ]},192.168.1.100";
         };
       };
       networking.firewall.allowedUDPPorts = [ 67 ];

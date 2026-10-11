@@ -127,7 +127,7 @@ in
     };
   };
 
-  networking.hostId = "${(import ../../lib/hardware-identities.nix) "robin" "zfsHostId"}";
+  networking.hostId = "${(import ../../lib/hardware-identities.nix) "robin" [ "storage" "zfs" "hostId" ]}";
   networking.hostName = "robin";
   networking.useDHCP = false;
 

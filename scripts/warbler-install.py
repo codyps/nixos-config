@@ -189,6 +189,8 @@ def prepare(directory):
 
 
 def source_archive():
+    if (REPO / hardware.FIXTURE_MARKER).exists():
+        raise ValueError("Refusing to install synthetic hardware fixtures")
     names = run(["git", "ls-files", "-z", "--cached", "--others", "--exclude-standard"],
                 cwd=REPO).split(b"\0")
     buffer = io.BytesIO()
@@ -267,7 +269,7 @@ import json, os, sys, tempfile
 from pathlib import Path
 path = Path(sys.argv[1])
 data = json.loads(path.read_text())
-data["warbler"]["rootVolumeKeyId"] = sys.argv[2]
+data["warbler"]["storage"]["luks"]["cryptroot"]["volumeKeyId"] = sys.argv[2]
 fd, temporary = tempfile.mkstemp(dir=path.parent)
 with os.fdopen(fd, "w") as stream:
     json.dump(data, stream)
@@ -299,7 +301,7 @@ def install(directory, *, build_only=False):
         ssh(f"python3 - {q}/source/hardware-identities.json <<'PYTHON'\n"
             "import json, sys\nfrom pathlib import Path\n"
             "path = Path(sys.argv[1])\ndata = json.loads(path.read_text())\n"
-            "data['warbler']['rootVolumeKeyId'] = None\n"
+            "data['warbler']['storage']['luks']['cryptroot']['volumeKeyId'] = None\n"
             "path.write_text(json.dumps(data) + '\\n')\nPYTHON")
         print("Building attended system and disko on the live host (no secrets supplied)...", flush=True)
         root = f"cd {q}/source; "

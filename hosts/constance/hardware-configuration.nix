@@ -16,7 +16,7 @@
 
   fileSystems."/" =
     {
-      device = "/dev/disk/by-uuid/${(import ../../lib/hardware-identities.nix) "constance" "rootUuid"}";
+      device = "/dev/disk/by-uuid/${(import ../../lib/hardware-identities.nix) "constance" [ "storage" "fileSystems" "/" "uuid" ]}";
       fsType = "ext4";
     };
 

@@ -16,18 +16,18 @@
 
   fileSystems."/" =
     {
-      device = "/dev/disk/by-uuid/${(import ../../lib/hardware-identities.nix) "maclay" "rootUuid"}";
+      device = "/dev/disk/by-uuid/${(import ../../lib/hardware-identities.nix) "maclay" [ "storage" "fileSystems" "/" "uuid" ]}";
       fsType = "ext4";
     };
 
   fileSystems."/boot" =
     {
-      device = "/dev/disk/by-uuid/${(import ../../lib/hardware-identities.nix) "maclay" "bootUuid"}";
+      device = "/dev/disk/by-uuid/${(import ../../lib/hardware-identities.nix) "maclay" [ "storage" "fileSystems" "/boot" "uuid" ]}";
       fsType = "vfat";
     };
 
   swapDevices =
-    [{ device = "/dev/disk/by-uuid/${(import ../../lib/hardware-identities.nix) "maclay" "swapUuid"}"; }];
+    [{ device = "/dev/disk/by-uuid/${(import ../../lib/hardware-identities.nix) "maclay" [ "storage" "swap" "uuid" ]}"; }];
 
   # Enables DHCP on each ethernet and wireless interface. In case of scripted networking
   # (the default) this is the recommended approach. When using systemd-networkd it's

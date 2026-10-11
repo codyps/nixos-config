@@ -22,11 +22,11 @@ class HardwareTests(unittest.TestCase):
         self.repo.mkdir()
         subprocess.run(['git', 'init', '-q', str(self.repo)], check=True)
         (self.repo / 'lib').mkdir()
-        self.schema = {'example': {'wifiMac': 'string', 'iaid': 'integer', 'rootVolumeKeyId': 'string'}}
+        self.schema = {'example': {'wifiMac': 'string', 'iaid': 'integer', 'volumeKeyId': 'volume-key-id'}}
         (self.repo / 'lib/hardware-identities-schema.json').write_text(json.dumps(self.schema))
         (self.repo / '.gitignore').write_text('hardware-identities.json\nkeys/\n')
         (self.repo / 'flake.nix').write_text('{}')
-        self.inventory = {'example': {'wifiMac': '02:00:00:00:00:01', 'iaid': 42, 'rootVolumeKeyId': 'a' * 64}}
+        self.inventory = {'example': {'wifiMac': '02:00:00:00:00:01', 'iaid': 42, 'volumeKeyId': 'a' * 64}}
         self.local = self.root / 'inventory.json'
         self.local.write_text(json.dumps(self.inventory))
         self.dest = self.root / 'source'
@@ -95,7 +95,7 @@ class HardwareTests(unittest.TestCase):
                 hardware.validate_inventory(data, self.schema)
 
     def test_fresh_install_null_pin_allowed(self):
-        self.inventory['example']['rootVolumeKeyId'] = None
+        self.inventory['example']['volumeKeyId'] = None
         self.assertEqual(hardware.validate_inventory(self.inventory, self.schema), self.inventory)
 
     def test_snapshot_can_be_prepared_again_without_key(self):
@@ -105,10 +105,10 @@ class HardwareTests(unittest.TestCase):
         self.assertEqual(json.loads((self.root / 'second' / hardware.INVENTORY).read_text()), self.inventory)
 
     def test_sops_decryption_used_for_git_source(self):
-        result = subprocess.CompletedProcess([], 0, json.dumps(self.inventory).encode(), b'')
+        result = subprocess.CompletedProcess([], 0, json.dumps(self.inventory["example"]).encode(), b'')
         with patch.object(hardware.subprocess, 'run', return_value=result) as run:
             self.assertEqual(hardware.read_inventory(self.repo), self.inventory)
-        self.assertEqual(run.call_args.args[0], ['sops', '--decrypt', str(self.repo / 'secrets/hardware-identities.json')])
+        self.assertEqual(run.call_args.args[0], ['sops', '--decrypt', str(self.repo / 'secrets/hardware/example.json')])
 
     def test_manifest_in_git_checkout_rejected(self):
         (self.repo / hardware.MANIFEST).write_text('[]')
@@ -122,6 +122,35 @@ class HardwareTests(unittest.TestCase):
                 hardware.prepare(self.repo, self.dest)
         self.assertNotIn('sensitive', str(error.exception))
         self.assertFalse(self.dest.exists())
+
+    def test_nested_fields_and_synthetic_generation(self):
+        schema = {'host': {'storage': {'luks': {'cryptroot': {'volumeKeyId': 'volume-key-id'}}},
+                           'network': {'interfaces': {'eno1': {'macAddress': 'mac-address'}}}}}
+        fixture = hardware.fixture_inventory(schema)
+        self.assertEqual(fixture, hardware.fixture_inventory(schema))
+        self.assertEqual(hardware.validate_inventory(fixture, schema), fixture)
+        fixture['host']['network']['interfaces']['eno1']['macAddress'] = 'not-a-mac'
+        with self.assertRaises(ValueError):
+            hardware.validate_inventory(fixture, schema)
+
+    def test_fixture_mode_never_decrypts_and_publish_guard_rejects_production(self):
+        with patch.object(hardware, 'read_inventory', wraps=hardware.read_inventory), patch.object(
+                hardware.subprocess, 'run', wraps=subprocess.run) as run:
+            hardware.prepare(self.repo, self.dest, fixtures=True)
+        self.assertFalse(any(c.args[0][0] == 'sops' for c in run.call_args_list))
+        hardware.verify_fixtures(self.dest)
+        (self.dest / hardware.INVENTORY).write_text(json.dumps(self.inventory))
+        with self.assertRaisesRegex(ValueError, 'differs'):
+            hardware.verify_fixtures(self.dest)
+
+    def test_fixture_marker_preserved_when_repreparing(self):
+        hardware.prepare(self.repo, self.dest, fixtures=True)
+        second = hardware.prepare(self.dest, self.root / 'second')
+        hardware.verify_fixtures(second)
+
+    def test_fixtures_reject_external_inventory(self):
+        with self.assertRaises(ValueError):
+            hardware.prepare(self.repo, self.dest, self.local, fixtures=True)
 
     def test_run_propagates_failure_and_cleans_snapshot(self):
         command = ['python3', str(Path(hardware.__file__)), '--repo', str(self.repo), '--inventory', str(self.local),

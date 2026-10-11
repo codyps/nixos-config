@@ -47,6 +47,13 @@ class NixWrapperTests(unittest.TestCase):
             self.assertEqual(decrypt.call_count, 2)
             self.assertEqual(first.stat().st_mode & 0o777, 0o600)
 
+    def test_decryption_cache_cannot_be_written_inside_checkout(self):
+        with patch.dict(os.environ, {'XDG_CACHE_HOME': str(self.repo / 'cache')}), patch.object(wrapper.hardware, 'read_inventory') as decrypt:
+            with self.assertRaisesRegex(ValueError, 'outside the repository'):
+                wrapper.cached_inventory(self.repo)
+            decrypt.assert_not_called()
+            self.assertFalse((self.repo / 'cache').exists())
+
     def test_unrelated_commands_and_flakes_do_not_decrypt(self):
         with patch.object(wrapper, 'cached_inventory', side_effect=AssertionError('must not decrypt')), patch.object(wrapper.subprocess, 'call', return_value=0) as run:
             for args in [['--version'], ['fmt'], ['flake', 'update'], ['build', 'nixpkgs#hello'], ['eval', '--expr', '1+1']]:

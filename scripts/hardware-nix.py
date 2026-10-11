@@ -66,6 +66,8 @@ def cached_inventory(repo):
     for path in [repo / 'lib/hardware-identities-schema.json', *sorted((repo / 'secrets/hardware').glob('*.json'))]:
         digest.update(path.name.encode() + b'\0' + path.read_bytes())
     base = Path(os.environ.get('XDG_CACHE_HOME', str(Path.home() / '.cache'))) / 'nixos-hardware'
+    if base.resolve().is_relative_to(repo.resolve()):
+        raise ValueError('The decrypted hardware cache must be outside the repository')
     base.mkdir(mode=0o700, parents=True, exist_ok=True)
     if base.is_symlink() or base.stat().st_uid != os.getuid() or base.stat().st_mode & 0o077:
         raise ValueError('Hardware cache must be owned by this user with mode 0700')

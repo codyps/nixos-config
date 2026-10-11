@@ -40,6 +40,13 @@ Finch's `tank` has `readonly=on`, inherited by every child. Runtime service mask
 do not survive reboot: do not boot Finch into its old service configuration
 while Robin runs the copied Syncthing identity.
 
+Finch's configuration disables Syncthing, Audiobookshelf, Caddy (including its
+socket), and OCI containers, masks the migrated service/timer units, and
+withdraws its exit-node advertisement while retaining SSH and Tailscale
+management access. Apply these persistent settings with
+`nix run .#nixos-rebuild-remote -- finch switch`. Activation of this retirement
+configuration has not yet been verified.
+
 Before returning Finch to service, stop Robin's writers and reconcile new
 application state. Then set `zfs set readonly=off tank` on Finch and restore
 the intended service masks and DNS. Never enable both Syncthing instances.

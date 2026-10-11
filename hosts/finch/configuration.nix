@@ -106,130 +106,24 @@ in
   */
 
 
-  systemd.services.caddy = {
-    serviceConfig = {
-      EnvironmentFile = "/persist/etc/default/caddy";
-      RuntimeDirectory = "caddy";
-    };
+  # Migrated to Robin. Keep these disabled across rebuilds and reboots:
+  # both hosts must never run the copied Syncthing identity simultaneously.
+  services.syncthing.enable = lib.mkForce false;
+  services.audiobookshelf.enable = lib.mkForce false;
+  services.caddy.enable = lib.mkForce false;
+  virtualisation.oci-containers.containers = lib.mkForce { };
 
-    requires = [ "tank-libation.mount" ];
-    after = [ "tank-libation.mount" ];
-  };
-
-  services.caddy = {
-    enable = true;
-    package = pkgs.caddyFull;
-
-    globalConfig = ''
-      cache
-
-      acme_dns cloudflare {env.CLOUDFLARE_API_TOKEN}
-
-      servers {
-        trusted_proxies cloudflare {
-          interval 12h
-          timeout 15s
-        }
-      }
-    '';
-
-    virtualHosts."*.einic.org" = {
-      extraConfig = ''
-        bind fd/4 {
-          protocols h1 h2
-        }
-        bind fdgram/6 {
-          protocols h3
-        }
-
-        @audiobooks host audiobooks.einic.org
-        handle @audiobooks {
-          root /tank/libation/data/
-          file_server browse
-        }
-
-        @audiobookshelf host audiobookshelf.einic.org
-        handle @audiobookshelf {
-          reverse_proxy http://127.0.0.1:8917
-        }
-
-        handle {
-          abort
-        }
-      '';
-
-    };
-
-    virtualHosts."finch.little-moth.ts.net" = {
-      extraConfig = ''
-        bind fd/5 {
-          protocols h1 h2
-        }
-        bind fdgram/7 {
-          protocols h3
-        }
-
-        file_server /roms/* {
-          root /tank/syncthing/Roms
-          browse {
-             reveal_symlinks
-          }
-        }
-
-        handle_path /syncthing/* {
-          reverse_proxy http://127.0.0.1:8384 {
-              # https://docs.syncthing.net/users/reverseproxy.html
-              #header_up Host {upstream_hostport}
-              # https://docs.syncthing.net/users/faq.html#why-do-i-get-host-check-error-in-the-gui-api
-              header_up +Host "localhost"
-          }
-        }
-
-        handle {
-          abort
-        }
-      '';
-    };
-  };
-
-  # NOTE: when caddy is given an IP address to bind, it doesn't specify the
-  # `FREEBIND` socket option, so we're required to have that IP address
-  # assigned to a local interface before caddy starts. There isn't a good way
-  # to do that, and requiring it would break caddy if tailscale failed for some
-  # reason (undesirable).
-
-  # NOTE: when a systemd.socket binds `<specific-ip>:443` as a listenStream
-  # before caddy tries to bind the wildcard `:443`, caddy fails to obtain a
-  # bind and exits. This broke our "use systemd.socket and a systemd.service
-  # to forward stuff to a unix socket caddy reads from".
-
-  # NOTE: when using systemd.sockets, we don't bind to the interface because
-  # using multiple systemd.socket units doesn't specify the ordering for the
-  # file descriptors, and caddy's way of interfacing with this is us explicitly
-  # listing fd numbers in the caddyfile. If caddy supported examining the
-  # descriptions, we could use multiple systemd.sockets, allowing more flexible
-  # configuration.
-  systemd.sockets."caddy" = {
-    listenStreams = [
-      # fd/4
-      "[::]:443"
-      # fd/5
-      "100.112.195.103:443"
-    ];
-    listenDatagrams = [
-      # fdgram/6
-      "[::]:443"
-      # fdgram/7
-      "100.112.195.103:443"
-    ];
-    socketConfig = {
-      BindIPv6Only = "both";
-      FreeBind = true;
-      ReusePort = true;
-    };
-    requiredBy = [ "caddy.service" ];
-    wantedBy = [ "sockets.target" ];
-  };
+  # Explicit masks also cover units left behind by the old configuration.
+  systemd.services = lib.genAttrs [
+    "syncthing"
+    "audiobookshelf"
+    "caddy"
+    "podman-libation"
+    "podman-storyteller"
+  ]
+    (_: { enable = false; });
+  systemd.sockets.caddy.enable = false;
+  systemd.timers.podman-libation.enable = false;
 
   networking.hostId = "${(import ../../lib/hardware-identities.nix) "finch" [ "storage" "zfs" "hostId" ]}";
   networking.hostName = "finch";
@@ -317,114 +211,16 @@ in
     ];
   };
 
-  services.syncthing = {
-    enable = true;
-    dataDir = "/tank/syncthing";
-    overrideDevices = false;
-    settings = {
-      devices = {
-        "u3" = { id = "SYFXMYB-T4PKQ3E-IQHWO7R-LDHJ7LL-P7BTPBR-NRDS6CG-3NB7W72-ZCATPAW"; };
-      };
-    };
-  };
-
   networking.firewall.enable = true;
-  networking.firewall.allowedTCPPorts = [ 22 443 80 22000 ];
-  networking.firewall.allowedUDPPorts = [ 443 22000 41641 ];
+  networking.firewall.allowedTCPPorts = [ 22 ];
+  networking.firewall.allowedUDPPorts = [ 41641 ];
   networking.firewall.trustedInterfaces = [ "tailscale0" ];
 
-  # enable tailscale exit
-  boot.kernel.sysctl."net.ipv4.ip_forward" = 1;
-  boot.kernel.sysctl."net.ipv6.conf.all.forwarding" = 1;
-
-  services.tailscale.permitCertUid = "caddy";
-
-  #virtualisation.oci-containers.containers = {
-  #libation = {
-  #  image = "docker.io/rmcrackan/libation:latest";
-  #  autoStart = false;
-  #  volumes = [
-  #    "/tank/libation/data:/data"
-  #    "/tank/libation/config:/config"
-  #    "/tank/libation/tmp:/tmp"
-  #    #"/var/lib/libation/data:/data"
-  #    #"/var/lib/libation/config:/config"
-  #  ];
-  #  labels = {
-  #    "io.containers.autoupdate" = "registry";
-  #  };
-  #};
-
-  #storyteller = {
-  #  image = "registry.gitlab.com/smoores/storyteller:latest";
-  #  volumes = [
-  #    "/tank/storyteller/data:/data"
-  #    "/tank/storyteller/secret:/run/secret"
-  #  ];
-  #  environment = {
-  #    STORYTELLER_SECRET_KEY_FILE = "/run/secret/key";
-  #  };
-  #  ports = [
-  #    "127.0.0.1:8918:8001"
-  #  ];
-  #  labels = {
-  #    "io.containers.autoupdate" = "registry";
-  #  };
-  #};
-  #};
-
-  #systemd.services.podman-libation =
-  #  let
-  #    mounts = [
-  #      "tank-libation.mount"
-  #      "tank-books-kindle.mount"
-  #      "tank-books-personal.mount"
-  #    ];
-  #  in
-  #  {
-  #    serviceConfig = {
-  #      Type = lib.mkForce "oneshot";
-  #      Restart = lib.mkForce "on-failure";
-  #    };
-  #    after = mounts;
-  #    requires = mounts;
-  #  };
-
-  #systemd.timers.podman-libation = {
-  #  wantedBy = [ "timers.target" ];
-  #  timerConfig = {
-  #    Persistent = true;
-  #    OnCalendar = "hourly";
-  #    AccuracySec = "30m";
-  #    RandomizedDelaySec = "20m";
-  #  };
-  #};
-
-  # oci-containers can't handle running as a user. See:
-  # https://github.com/NixOS/nixpkgs/issues/259770
-  #systemd.services.podman-libation.serviceConfig = {
-  #  User = "libation";
-  #  Home = "/tank/libation";
-  #DynamicUser = true;
-  #StateDirectory = "libation";
-  #};
-  #users.users.libation = {
-  #  isSystemUser = true;
-  #  group = "libation";
-  #};
-  #users.groups.libation = {};
-
-  #virtualisation.podman = {
-  #  enable = true;
-  #  autoPrune.enable = true;
-  #  defaultNetwork.settings.dns_enabled = true;
-  #};
-
-  #services.audiobookshelf = {
-  #  package = pkgs.audiobookshelf-headless;
-  #  enable = true;
-  #  port = 8917;
-  #};
+  # Retain tailnet management access, but Robin now provides the exit node.
+  services.tailscale.useRoutingFeatures = "none";
+  services.tailscale.extraSetFlags = [ "--advertise-exit-node=false" ];
+  boot.kernel.sysctl."net.ipv4.ip_forward" = 0;
+  boot.kernel.sysctl."net.ipv6.conf.all.forwarding" = 0;
 
   zramSwap.enable = true;
 

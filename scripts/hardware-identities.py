@@ -191,9 +191,10 @@ def provision_deployment(repo, destination, inventory_file=None, fixtures=False)
             provision(repo, destination / 'hardware-input', None if fixtures else local, fixtures)
             # Resolve the Git working tree through Nix so ignored/untracked files
             # stay excluded. A store snapshot is lockable even with tracked edits,
-            # unlike a dirty Git input on newer Nix versions.
+            # unlike a dirty Git input on newer Nix versions. Archive materializes
+            # the snapshot; metadata alone may return an unrealized store path.
             reference = ("git+file://" + quote(str(repo), safe="/")) if (repo / '.git').exists() else 'path:' + str(repo)
-            snapshot = subprocess.run(['nix', 'flake', 'metadata', '--refresh', '--json',
+            snapshot = subprocess.run(['nix', 'flake', 'archive', '--refresh', '--json',
                                        '--no-write-lock-file', reference],
                                       stdout=subprocess.PIPE, stderr=subprocess.PIPE)
             if snapshot.returncode:

@@ -190,7 +190,7 @@ class HardwareTests(unittest.TestCase):
         if command[0] == 'nix-store':
             (self.dest / 'source-root').symlink_to(command[2])
             return subprocess.CompletedProcess(command, 0)
-        if 'metadata' in command:
+        if 'archive' in command:
             return subprocess.CompletedProcess(command, 0, stdout=json.dumps({'path': '/nix/store/' + 'a' * 32 + '-source'}).encode())
         (self.dest / 'flake.lock').write_text('{"locked":true}')
         return subprocess.CompletedProcess(command, 0)
@@ -216,7 +216,7 @@ class HardwareTests(unittest.TestCase):
         self.inventory['example']['iaid'] = 99
         self.local.write_text(json.dumps(self.inventory))
         def fail_lock(command, **kwargs):
-            return self.fake_lock(command, **kwargs) if 'metadata' in command else subprocess.CompletedProcess(command, 1)
+            return self.fake_lock(command, **kwargs) if 'archive' in command else subprocess.CompletedProcess(command, 1)
         with patch.object(hardware.subprocess, 'run', side_effect=fail_lock):
             with self.assertRaisesRegex(RuntimeError, 'restored'):
                 hardware.provision_deployment(self.repo, self.dest, self.local)
@@ -236,6 +236,17 @@ class HardwareTests(unittest.TestCase):
 
     @unittest.skipUnless(shutil.which('nix'), 'Nix integration requires a local Nix installation')
     def test_deployment_real_nix_refresh_and_archive_without_override(self):
+        # All inputs in this test are synthetic; retain subprocess diagnostics so
+        # runner-specific Nix failures are actionable without exposing real data.
+        original_run = subprocess.run
+        def checked_run(*args, **kwargs):
+            result = original_run(*args, **kwargs)
+            if result.returncode:
+                self.fail((result.stderr or b'').decode())
+            return result
+        diagnostic_patch = patch.object(hardware.subprocess, 'run', side_effect=checked_run)
+        diagnostic_patch.start()
+        self.addCleanup(diagnostic_patch.stop)
         fixtures = hardware.provision(self.repo, self.root / 'fixture-input', fixtures=True)
         flake = self.repo / 'flake.nix'
         flake.write_text('''{

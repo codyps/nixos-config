@@ -1,4 +1,4 @@
-{ config, ... }:
+{ config, pkgs, self, ... }:
 {
   sops.secrets.zpl-printers = {
     sopsFile = ./zpl-printers.enc.json;
@@ -8,6 +8,7 @@
 
   services.zpl-proxy-api = {
     enable = true;
+    package = pkgs.callPackage ../../nixpkgs/zpl-proxy-api.nix { zpl = self.inputs.zpl; };
     printersFile = config.sops.secrets.zpl-printers.path;
     listenAddress = "0.0.0.0";
     port = 3000;

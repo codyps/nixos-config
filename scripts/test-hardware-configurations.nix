@@ -16,6 +16,6 @@ assert warbler.boot.secureUnlock.rootVolumeKeyId == settings.warbler.storage.luk
 assert (crow.system.preSwitchChecks ? rejectHardwareFixtures) == fixture;
 assert (ward.system.preSwitchChecks ? rejectHardwareFixtures) == fixture;
 assert (warbler.system.preSwitchChecks ? rejectHardwareFixtures) == fixture;
-assert lib.hasInfix "Refusing to activate synthetic hardware fixtures" darwin.system.activationScripts.preActivation.text == fixture;
+assert lib.hasInfix "reject-hardware-fixtures" darwin.system.activationScripts.preActivation.text == fixture;
 assert builtins.all (home: (home.config.home.activation ? rejectHardwareFixtures) == fixture) homes;
 { volumePinsMatch = true; fixtureActivationGuard = true; }

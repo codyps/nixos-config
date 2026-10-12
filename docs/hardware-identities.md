@@ -21,6 +21,62 @@ secrets and never enter these build inputs.
 
 ## Ordinary Nix commands
 
+### First use on an existing machine
+
+Pulling the repository does not install the wrapper. Until you activate a new
+system or Home Manager generation, use the explicit helper below. You need Nix
+with flakes enabled and a SOPS identity authorized by `.sops.yaml`: either the
+administrator's GPG private key in your user keyring, or an authorized age key
+available to SOPS (for example through `SOPS_AGE_KEY_FILE`). The helper currently
+decrypts all host files, so that identity must have access to all of them. No
+GitHub or Cachix token is needed to build.
+
+From the checkout, enter the development shell (it provides Python, Git and
+SOPS), then build without activation:
+
+```sh
+git pull --rebase
+nix develop
+python3 scripts/hardware-identities.py run -- nix build .#nixosConfigurations.ward.config.system.build.toplevel --no-link
+```
+
+For a local macOS build, replace the build target with
+`.#darwinConfigurations.u3.system`, or the configuration for your Mac. Platform
+builds still require a native or configured remote builder.
+
+To install the wrapper on the controller, activate its configuration once using
+the helper. Choose the command for that controller and replace `HOST` with its
+configuration name:
+
+```sh
+# NixOS controller
+python3 scripts/hardware-identities.py run -- sudo nixos-rebuild switch --flake .#HOST
+# macOS controller with darwin-rebuild already installed
+python3 scripts/hardware-identities.py run -- sudo darwin-rebuild switch --flake .#HOST
+# Standalone Home Manager controller
+python3 scripts/hardware-identities.py run -- home-manager switch --flake .#HOST
+```
+
+Run the helper as your normal user so it can access that user's SOPS identity;
+only the rebuild command needs `sudo`. Open a fresh login shell after activation
+and leave the development shell so its upstream `nix` does not shadow the managed
+wrapper. Merely building the configuration does not install it.
+
+For a remote NixOS host that already accepts `cody@HOST` SSH and sudo, the packaged
+helper handles source preparation and transfer even before the wrapper is installed:
+
+```sh
+nix run .#nixos-rebuild-remote -- ward build
+# Install as the next boot generation, without rebooting:
+nix run .#nixos-rebuild-remote -- ward boot
+```
+
+Use `switch` instead of `boot` only when you intend to activate services now.
+This helper is for an installed host; a live installer accessed as `nixos@nixos`
+uses the host's installation guide instead.
+
+### After activation
+
 The shared hardware module installs a `nix` wrapper ahead of the configured Nix
 executable. After activating that module on a controller, ordinary commands work:
 

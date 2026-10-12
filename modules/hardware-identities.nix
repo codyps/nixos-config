@@ -20,9 +20,14 @@ let
     '';
   };
   fixture = builtins.pathExists ../.hardware-fixture;
-  rejectFixture = ''
+  rejectFixtureCommand = pkgs.writeShellScript "reject-hardware-fixtures" ''
     echo "Refusing to activate synthetic hardware fixtures. Rebuild with local SOPS settings." >&2
     exit 1
+  '';
+  # Keep the failure in a separate executable so ShellCheck can still analyze
+  # the rest of Darwin's combined activation script.
+  rejectFixture = ''
+    ${rejectFixtureCommand} || exit 1
   '';
 in
 {

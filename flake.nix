@@ -304,6 +304,8 @@
           };
           devShells.default = pkgs.mkShell {
             nativeBuildInputs = with pkgs; [
+              python3
+              git
               age
               gnupg
               ssh-to-pgp

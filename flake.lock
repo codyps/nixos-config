@@ -203,6 +203,19 @@
         "type": "github"
       }
     },
+    "hardware-identities": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1,
+        "narHash": "sha256-CV+FRYx2Y8tRGUwJrX4oicO1sJLGD7dVImVRiikYdNM=",
+        "path": "./config/hardware-fixtures",
+        "type": "path"
+      },
+      "original": {
+        "path": "./config/hardware-fixtures",
+        "type": "path"
+      }
+    },
     "home-manager": {
       "inputs": {
         "nixpkgs": [
@@ -480,6 +493,7 @@
         "clipway": "clipway",
         "disko": "disko",
         "flake-utils": "flake-utils",
+        "hardware-identities": "hardware-identities",
         "home-manager": "home-manager",
         "home-manager-26-05": "home-manager-26-05",
         "impermanence": "impermanence",

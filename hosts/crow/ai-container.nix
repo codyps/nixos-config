@@ -1,4 +1,4 @@
-{ config, lib, pkgs, ... }:
+{ config, lib, pkgs, hardwareIdentities, ... }:
 {
   # These controls are host-wide, not namespaced. Allow per-process profiling
   # (including kernel time) and debugger attachment to same-UID dumpable tasks.
@@ -31,6 +31,7 @@
     localAddress = "10.80.0.2";
     hostAddress = "10.80.0.1";
     config = {
+      _module.args.hardwareIdentities = hardwareIdentities;
       imports = [ ../warbler/ai-container-guest.nix ];
       networking.hostName = lib.mkForce "crow-ai";
       systemd.network.networks."10-lan".enable = false;

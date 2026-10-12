@@ -1,9 +1,11 @@
 { pkgs }:
+let hardwareIdentities = (import ../../lib/hardware-identities.nix ../../config/hardware-fixtures).get; in
 pkgs.testers.runNixOSTest {
   name = "warbler-ai-container";
   nodes = {
     host = { lib, ... }: {
       imports = [ ./ai-container.nix ];
+      _module.args.hardwareIdentities = hardwareIdentities;
       # Model the trusted Tailscale interface separately from the other LAN.
       services.tailscale.interfaceName = "testvpn";
       networking.dhcpcd.denyInterfaces = [ "testvpn" ];
@@ -44,7 +46,7 @@ pkgs.testers.runNixOSTest {
           interface = "eth1";
           bind-interfaces = true;
           dhcp-range = "192.168.1.100,192.168.1.150,255.255.255.0,1h";
-          dhcp-host = "${(import ../../lib/hardware-identities.nix) "warbler" [ "network" "containers" "warbler-ai" "interfaces" "mv-eno1" "macAddress" ]},192.168.1.100";
+          dhcp-host = "${hardwareIdentities "warbler" [ "network" "containers" "warbler-ai" "interfaces" "mv-eno1" "macAddress" ]},192.168.1.100";
         };
       };
       networking.firewall.allowedUDPPorts = [ 67 ];

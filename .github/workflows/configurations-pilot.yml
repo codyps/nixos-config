@@ -41,14 +41,13 @@ jobs:
           ref: ${{ inputs.ref || github.sha }}
           persist-credentials: false
       - uses: cachix/install-nix-action@b85815f71a6de0ddee80b8a80a98d43f4bcc66c7 # v31
-      - name: Prepare synthetic hardware fixtures outside Git
+      - name: Verify the resolved hardware input is synthetic
         run: |
-          python3 scripts/hardware-identities.py --fixtures prepare "$RUNNER_TEMP/hardware-source"
-          echo "HARDWARE_SOURCE=$RUNNER_TEMP/hardware-source" >> "$GITHUB_ENV"
+          input=$(nix eval --raw .#lib.hardwareIdentities.inputPath)
+          python3 scripts/hardware-identities.py --verify-fixtures "$input"
       - name: Test hardware provisioning
         run: |
           python3 scripts/test-hardware-identities.py
-          python3 scripts/test-hardware-nix.py
           python3 scripts/test-warbler-install.py
       - name: Test pilot reporting
         run: python3 scripts/test-configuration-pilot.py
@@ -61,20 +60,16 @@ jobs:
       - name: Test dynamic builder modules
         run: nix eval --impure --json --option eval-cache false --file scripts/test-nix-dynamic-machines-modules.nix
       - name: Check persistent cache settings for every configuration
-        working-directory: ${{ env.HARDWARE_SOURCE }}
         run: |
           nix eval --accept-flake-config --no-update-lock-file --impure --json \
             --expr 'let flake = builtins.getFlake ("path:" + toString ./.); in import (flake.outPath + "/scripts/check-nix-caches.nix") flake'
       - name: Check volume pins and fixture activation guards
-        working-directory: ${{ env.HARDWARE_SOURCE }}
-        run: nix eval --impure --json --file scripts/test-hardware-configurations.nix
+        run: nix eval --json .#lib.hardwareIdentityChecks
       - name: Discover configuration and package targets
         id: matrix
         run: |
-          cd "$HARDWARE_SOURCE"
           nix eval --accept-flake-config --no-update-lock-file --impure --json \
             --expr 'let flake = builtins.getFlake ("path:" + toString ./.); in import (flake.outPath + "/scripts/configuration-matrix.nix") flake' > "$GITHUB_WORKSPACE/matrix.json"
-          cd "$GITHUB_WORKSPACE"
           jq -e '.include | length > 0' matrix.json
           echo "configurations=$(jq -c . matrix.json)" >> "$GITHUB_OUTPUT"
           {
@@ -113,10 +108,10 @@ jobs:
           test -n "$CACHIX_AUTH_TOKEN" || { echo 'Set the CACHIX_AUTH_TOKEN repository secret.'; exit 1; }
 
       - uses: cachix/install-nix-action@b85815f71a6de0ddee80b8a80a98d43f4bcc66c7 # v31
-      - name: Prepare synthetic hardware fixtures outside Git
+      - name: Verify the resolved hardware input is synthetic
         run: |
-          python3 scripts/hardware-identities.py --fixtures prepare "$RUNNER_TEMP/hardware-source"
-          echo "HARDWARE_SOURCE=$RUNNER_TEMP/hardware-source" >> "$GITHUB_ENV"
+          input=$(nix eval --raw .#lib.hardwareIdentities.inputPath)
+          python3 scripts/hardware-identities.py --verify-fixtures "$input"
       - uses: cachix/cachix-action@38b082610b782e7e93e209c35fd730d399dee866 # v17
         if: vars.CACHIX_CACHE != ''
         with:
@@ -124,7 +119,7 @@ jobs:
           skipPush: true
 
       - name: Build target and measure resources
-        run: python3 scripts/configuration-pilot.py "path:$HARDWARE_SOURCE#${CONFIGURATION_TARGET#.#}"
+        run: python3 scripts/configuration-pilot.py "$CONFIGURATION_TARGET"
 
       - name: Publish target runtime closure
         if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main' && (inputs.publish || (github.event_name == 'push' && inputs.ref == ''))
@@ -133,7 +128,8 @@ jobs:
           CACHIX_AUTH_TOKEN: ${{ secrets.CACHIX_AUTH_TOKEN }}
         run: |
           set -o pipefail
-          python3 scripts/hardware-identities.py --repo "$HARDWARE_SOURCE" verify-fixtures
+          input=$(nix eval --raw .#lib.hardwareIdentities.inputPath)
+          python3 scripts/hardware-identities.py --verify-fixtures "$input"
           cachix push "$CACHIX_CACHE" ./result 2>&1 | tee pilot/publish.log
 
       - name: Retain pilot measurements

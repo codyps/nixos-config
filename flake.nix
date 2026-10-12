@@ -1,5 +1,6 @@
 {
   inputs = {
+    hardware-identities = { url = "path:./config/hardware-fixtures"; flake = false; };
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
     zpl.url = "github:codyps/zpl";
     zpl.inputs.nixpkgs.follows = "nixpkgs";
@@ -56,10 +57,17 @@
     ];
   };
 
-  outputs = { self, zpl, atuin, nixpkgs, nixpkgs-darwin, flake-utils, nix-darwin, nix-darwin-26-05, home-manager, home-manager-26-05, nixos-wsl, nixos-vscode-server, impermanence, sops-nix, disko, lanzaboote, clipway }:
+  outputs = { self, hardware-identities, zpl, atuin, nixpkgs, nixpkgs-darwin, flake-utils, nix-darwin, nix-darwin-26-05, home-manager, home-manager-26-05, nixos-wsl, nixos-vscode-server, impermanence, sops-nix, disko, lanzaboote, clipway }:
     let
+      hardwareSettings = import ./lib/hardware-identities.nix hardware-identities;
       withCommonModules = constructor: args: constructor (args // {
-        modules = [ ./modules/nix-cache.nix ./modules/terminfo.nix ./modules/admin-commands.nix ./modules/hardware-identities.nix ] ++ args.modules;
+        modules = [
+          { _module.args = { hardwareIdentities = hardwareSettings.get; hardwareFixture = hardwareSettings.fixture; }; }
+          ./modules/nix-cache.nix
+          ./modules/terminfo.nix
+          ./modules/admin-commands.nix
+          ./modules/hardware-identities.nix
+        ] ++ args.modules;
       });
       mkOverlays = nixpkgsSource: [
         (final: prev:
@@ -179,10 +187,7 @@
             hardware-identities = pkgs.runCommand "test-hardware-identities" { nativeBuildInputs = [ pkgs.python3 pkgs.git ]; } ''
               cp ${./scripts/hardware-identities.py} hardware-identities.py
               cp ${./scripts/test-hardware-identities.py} test-hardware-identities.py
-              cp ${./scripts/hardware-nix.py} hardware-nix.py
-              cp ${./scripts/test-hardware-nix.py} test-hardware-nix.py
               python3 test-hardware-identities.py
-              python3 test-hardware-nix.py
               touch "$out"
             '';
             admin-commands = pkgs.runCommand "test-admin-commands" { nativeBuildInputs = [ pkgs.python3 ]; } ''
@@ -267,9 +272,13 @@
                 esac
                 work=$(mktemp -d)
                 trap 'rm -rf "$work"' EXIT
-                python3 ${./scripts/hardware-identities.py} prepare "$work/source" >/dev/null
-                source=$(nix flake archive --json --no-update-lock-file --to "ssh-ng://cody@$host" "path:$work/source" | jq -er .path)
-                printf -v command 'sudo nixos-rebuild %q --flake %q' "$action" "$source#$host"
+                python3 ${./scripts/hardware-identities.py} "$work/hardware-input" >/dev/null
+                archive=$(nix flake archive --json --no-write-lock-file --to "ssh-ng://cody@$host" \
+                  --override-input hardware-identities "path:$work/hardware-input" .)
+                source=$(jq -er .path <<< "$archive")
+                identities=$(jq -er '.inputs["hardware-identities"].path' <<< "$archive")
+                printf -v command 'sudo nixos-rebuild %q --flake %q --override-input hardware-identities %q --no-write-lock-file' \
+                  "$action" "$source#$host" "path:$identities"
                 ssh -t "cody@$host" "$command"
               '';
             };
@@ -316,7 +325,10 @@
           };
           formatter = pkgs.nixpkgs-fmt;
         }
-      ) //
+      ) // {
+      lib.hardwareIdentities = hardwareSettings;
+      lib.hardwareIdentityChecks = import ./scripts/check-hardware-configurations.nix { flake = self; };
+    } //
     (
       let
         nixosSystem = withCommonModules nixpkgs.lib.nixosSystem;

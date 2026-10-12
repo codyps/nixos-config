@@ -1,4 +1,4 @@
-{ config, lib, pkgs, ... }:
+{ config, lib, pkgs, hardwareIdentities, ... }:
 let
   ssh-auth = (import ../../nixos/ssh-auth.nix);
   authorizedKeys = ssh-auth.authorizedKeys;
@@ -17,7 +17,7 @@ in
     enable = true;
     mapperName = "luksroot";
     stateDirectory = "/persist/secure-unlock";
-    rootVolumeKeyId = import ./volume-identity.nix;
+    rootVolumeKeyId = import ./volume-identity.nix { inherit hardwareIdentities; };
     remoteUnlock.enable = true;
     remoteUnlock.authorizedKeys = authorizedKeys;
     tpmUnlock.enable = true;
@@ -73,7 +73,7 @@ in
 
     luks.devices = {
       luksroot = {
-        device = "/dev/disk/by-uuid/${(import ../../lib/hardware-identities.nix) "ward" [ "storage" "luks" "luksroot" "uuid" ]}";
+        device = "/dev/disk/by-uuid/${hardwareIdentities "ward" [ "storage" "luks" "luksroot" "uuid" ]}";
         allowDiscards = true;
       };
     };
@@ -423,7 +423,7 @@ in
   networking.firewall.allowedTCPPorts = [ 80 443 ];
 
   networking.hostName = "ward";
-  networking.hostId = "${(import ../../lib/hardware-identities.nix) "ward" [ "storage" "zfs" "hostId" ]}";
+  networking.hostId = "${hardwareIdentities "ward" [ "storage" "zfs" "hostId" ]}";
 
   systemd.network = {
     enable = true;

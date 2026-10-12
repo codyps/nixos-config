@@ -1,6 +1,6 @@
 # ex: set sts=2 ts=2 sw=2 et:
 
-{ config, lib, pkgs, home-manager, ... }:
+{ config, lib, pkgs, home-manager, hardwareIdentities, ... }:
 
 {
   imports =
@@ -18,13 +18,13 @@
   boot.loader.systemd-boot.enable = true;
   boot.loader.efi.canTouchEfiVariables = true;
   boot.initrd.luks.devices.rcrypt = {
-    device = "/dev/disk/by-uuid/${(import ../../lib/hardware-identities.nix) "forbes" [ "storage" "luks" "rcrypt" "uuid" ]}";
+    device = "/dev/disk/by-uuid/${hardwareIdentities "forbes" [ "storage" "luks" "rcrypt" "uuid" ]}";
     allowDiscards = true;
     bypassWorkqueues = true;
   };
 
   networking.hostName = "forbes"; # Define your hostname.
-  networking.hostId = "${(import ../../lib/hardware-identities.nix) "forbes" [ "storage" "zfs" "hostId" ]}";
+  networking.hostId = "${hardwareIdentities "forbes" [ "storage" "zfs" "hostId" ]}";
   # Pick only one of the below networking options.
   # networking.wireless.enable = true;  # Enables wireless support via wpa_supplicant.
   networking.networkmanager.enable = true; # Easiest to use and most distros use this by default.

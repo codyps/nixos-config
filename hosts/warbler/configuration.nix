@@ -1,4 +1,4 @@
-{ config, lib, pkgs, ... }:
+{ config, lib, pkgs, hardwareIdentities, ... }:
 let
   inherit (import ../../nixos/ssh-auth.nix) authorizedKeys;
   # Preserve eno1's existing lease across initrd and normal boot. The initrd
@@ -6,8 +6,8 @@ let
   # identifiers are public; DUIDRawData excludes the two-byte DUID type.
   wiredDhcpIdentity = {
     DUIDType = "vendor";
-    DUIDRawData = "${(import ../../lib/hardware-identities.nix) "warbler" [ "network" "interfaces" "eno1" "dhcp" "duid" ]}";
-    IAID = (import ../../lib/hardware-identities.nix) "warbler" [ "network" "interfaces" "eno1" "dhcp" "iaid" ];
+    DUIDRawData = "${hardwareIdentities "warbler" [ "network" "interfaces" "eno1" "dhcp" "duid" ]}";
+    IAID = hardwareIdentities "warbler" [ "network" "interfaces" "eno1" "dhcp" "iaid" ];
   };
   wiredDhcpConfig = {
     dhcpV4Config = wiredDhcpIdentity // { ClientIdentifier = "duid"; };
@@ -23,7 +23,7 @@ in
     systemd.services.codex-ai.enable = false;
     programs.actions-vm-image.enable = true;
     programs.adminCommands.commands.backup-secure-boot = [ "${pkgs.callPackage ./secure-boot-backup.nix { }}/bin/warbler-secure-boot-backup" ];
-    boot.secureUnlock.rootVolumeKeyId = import ./volume-identity.nix;
+    boot.secureUnlock.rootVolumeKeyId = import ./volume-identity.nix { inherit hardwareIdentities; };
     networking.hostName = "warbler";
     time.timeZone = "America/New_York";
     system.stateVersion = "26.05";

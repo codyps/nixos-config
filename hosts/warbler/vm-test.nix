@@ -43,7 +43,10 @@ pkgs.testers.runNixOSTest {
   # Docker builder does not advertise either; no shell access is necessary.
   requiredFeatures = { kvm = false; nixos-test = false; };
   globalTimeout = 3600;
-  node.specialArgs = { inherit self; };
+  node.specialArgs = {
+    inherit self;
+    hardwareIdentities = (import ../../lib/hardware-identities.nix ../../config/hardware-fixtures).get;
+  };
   defaults = {
     # Load the emulated hardware drivers before waiting for initrd mounts.
     boot.initrd.kernelModules = [ "virtio_pci" "virtio_blk" "virtio_net" "virtiofs" ];

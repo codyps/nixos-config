@@ -2,7 +2,7 @@
 # your system.  Help is available in the configuration.nix(5) man page
 # and in the NixOS manual (accessible by running ‘nixos-help’).
 
-{ config, pkgs, lib, modulesPath, self, ... }:
+{ config, pkgs, lib, modulesPath, self, hardwareIdentities, ... }:
 
 let
   ssh-auth = (import ../../nixos/ssh-auth.nix);
@@ -127,7 +127,7 @@ in
     };
   };
 
-  networking.hostId = "${(import ../../lib/hardware-identities.nix) "robin" [ "storage" "zfs" "hostId" ]}";
+  networking.hostId = "${hardwareIdentities "robin" [ "storage" "zfs" "hostId" ]}";
   networking.hostName = "robin";
   networking.useDHCP = false;
 

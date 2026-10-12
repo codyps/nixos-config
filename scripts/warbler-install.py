@@ -199,7 +199,7 @@ def source_archive():
             if not raw:
                 continue
             relative = Path(os.fsdecode(raw))
-            if relative.is_absolute() or ".." in relative.parts or relative.parts[0] in (".git", "keys") or str(relative) in (hardware.INVENTORY, hardware.MANIFEST):
+            if relative.is_absolute() or ".." in relative.parts or relative.parts[0] in (".git", "keys") or (str(relative) in (hardware.INVENTORY, hardware.MANIFEST) or relative.parts[0] == "hardware-input"):
                 raise RuntimeError("Unsafe or private path in source inventory")
             source = REPO / relative
             if source.is_symlink() and (not source.resolve().is_relative_to(REPO.resolve()) or not source.is_file() or os.fsencode(str(source.resolve().relative_to(REPO.resolve()))) not in names):
@@ -209,8 +209,8 @@ def source_archive():
             if not source.is_file():
                 raise RuntimeError("Only regular source files may be transferred")
             archive.add(source, arcname=str(relative), recursive=False)
-        for name, value in ((hardware.INVENTORY, hardware.read_inventory(REPO)),
-                            (hardware.MANIFEST, archive.getnames())):
+        for name, value in (("hardware-input/" + hardware.INVENTORY, hardware.read_inventory(REPO)),
+                            ("hardware-input/metadata.json", {"version": 1, "fixture": False})):
             data = (json.dumps(value, indent=2) + "\n").encode()
             entry = tarfile.TarInfo(name)
             entry.size = len(data)
@@ -257,7 +257,7 @@ def secret_archive(directory):
 def volume_identity_script(system, checkout):
     """Pin only the freshly installed volume, using its existing recovery input."""
     helper = shlex.quote(str(Path(system) / "sw/bin/root-volume-key-id"))
-    output = shlex.quote(str(Path(checkout) / hardware.INVENTORY))
+    output = shlex.quote(str(Path(checkout) / "hardware-input" / hardware.INVENTORY))
     return f"""
 warbler_volume_key_id=$({helper} --key-file /tmp/warbler-luks-password)
 if [[ ! "$warbler_volume_key_id" =~ ^[0-9a-f]{{64}}$ ]]; then
@@ -298,22 +298,22 @@ def install(directory, *, build_only=False):
         ssh(f"tar -xzf - --no-same-owner -C {q}/source", source_archive())
         # Formatting creates a new volume identity. Clear only the disposable
         # install source's old pin; save the new public identity after formatting.
-        ssh(f"python3 - {q}/source/hardware-identities.json <<'PYTHON'\n"
+        ssh(f"python3 - {q}/source/hardware-input/hardware-identities.json <<'PYTHON'\n"
             "import json, sys\nfrom pathlib import Path\n"
             "path = Path(sys.argv[1])\ndata = json.loads(path.read_text())\n"
             "data['warbler']['storage']['luks']['cryptroot']['volumeKeyId'] = None\n"
             "path.write_text(json.dumps(data) + '\\n')\nPYTHON")
         print("Building attended system and disko on the live host (no secrets supplied)...", flush=True)
         root = f"cd {q}/source; "
-        configured = ssh(root + f"{NIX} eval --raw {CONFIG}.disko.devices.disk.system.device").decode()
+        configured = ssh(root + f"{NIX} eval --override-input hardware-identities path:{work}/source/hardware-input --no-write-lock-file --raw {CONFIG}.disko.devices.disk.system.device").decode()
         if configured != DISK:
             raise RuntimeError("Evaluated disko target differs from inspected disk")
-        disks = json.loads(ssh(root + f"{NIX} eval --json {CONFIG}.disko.devices.disk --apply builtins.attrNames"))
+        disks = json.loads(ssh(root + f"{NIX} eval --override-input hardware-identities path:{work}/source/hardware-input --no-write-lock-file --json {CONFIG}.disko.devices.disk --apply builtins.attrNames"))
         if disks != ["system"]:
             raise RuntimeError("Unexpected additional disko disks")
         outputs = []
         for attribute in ("system.build.toplevel", "system.build.diskoScript"):
-            output = ssh(root + f"{NIX} build --accept-flake-config --no-link --print-out-paths {CONFIG}.{attribute}").decode().strip()
+            output = ssh(root + f"{NIX} build --override-input hardware-identities path:{work}/source/hardware-input --no-write-lock-file --accept-flake-config --no-link --print-out-paths {CONFIG}.{attribute}").decode().strip()
             if not re.fullmatch(r"/nix/store/[a-z0-9]{32}-[^/\s]+", output):
                 raise RuntimeError("Unexpected build output")
             outputs.append(output)

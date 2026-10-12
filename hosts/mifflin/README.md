@@ -1,8 +1,9 @@
 # Mifflin VMware integration
 
-Build and installation commands below require a [prepared hardware inventory
-checkout](../../docs/hardware-identities.md). The remote rebuild helper prepares
-it automatically; direct Nix commands must run inside that prepared checkout.
+Production builds and installation require a [local hardware input](../../docs/hardware-identities.md).
+Add `--override-input hardware-identities path:/LOCAL/INPUT` to direct Nix and
+rebuild commands. The remote helper supplies it automatically. Without an
+override, builds use synthetic fixtures that cannot be activated.
 
 ## Guest integration
 
@@ -113,7 +114,8 @@ cleanly before trying again. Boot and swap partitions are not zeroed.
 To install the entries for the next boot without switching the running system:
 
 ```sh
-sudo nixos-rebuild boot --flake ~/nixos-config#mifflin
+sudo nixos-rebuild boot --flake ~/nixos-config#mifflin \
+  --override-input hardware-identities path:/LOCAL/INPUT
 ```
 
 Select the entry containing `reclaim-space` in the systemd-boot menu for that

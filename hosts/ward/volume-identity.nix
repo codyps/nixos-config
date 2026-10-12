@@ -1,1 +1,1 @@
-(import ../../lib/hardware-identities.nix) "ward" [ "storage" "luks" "luksroot" "volumeKeyId" ]
+{ hardwareIdentities }: hardwareIdentities "ward" [ "storage" "luks" "luksroot" "volumeKeyId" ]

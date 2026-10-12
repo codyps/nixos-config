@@ -1,7 +1,7 @@
-{ config, lib, pkgs, ... }:
+{ config, lib, pkgs, hardwareIdentities, ... }:
 let
   inherit (import ../../nixos/ssh-auth.nix) authorizedKeys;
-  volumeIdentity = import ./volume-identity.nix;
+  volumeIdentity = import ./volume-identity.nix { inherit hardwareIdentities; };
 in
 {
   imports = [

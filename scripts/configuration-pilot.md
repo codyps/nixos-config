@@ -60,7 +60,7 @@ The Docker builder's `nix.conf` carries matching settings; rebuild/recreate the
 builder using its setup instructions to apply them to an existing container.
 
 Hardware-dependent configurations are built with deterministic synthetic identifiers.
-CI has no production hardware decryption step. Publishing verifies the prepared
-source contains exactly the synthetic inventory. These systems must not be
+CI has no production hardware decryption step. Publishing resolves the selected hardware input and verifies that it contains
+exactly the synthetic inventory. These systems must not be
 installed; production builds reuse shared package dependencies and rebuild the
 identity-dependent outputs locally. See [hardware settings](../docs/hardware-identities.md).

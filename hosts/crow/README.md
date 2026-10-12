@@ -1,8 +1,9 @@
 # Crow
 
-Build and installation commands below require a [prepared hardware inventory
-checkout](../../docs/hardware-identities.md). The remote rebuild helper prepares
-it automatically; direct Nix commands must run inside that prepared checkout.
+Production builds and installation require a [local hardware input](../../docs/hardware-identities.md).
+Use `--override-input hardware-identities path:/LOCAL/INPUT` with direct Nix
+and rebuild commands. The remote helper supplies it automatically. Commands
+without an override use synthetic fixtures and cannot be activated.
 
 Crow is an x86_64 AMD machine with 64 GB RAM, UEFI, and TPM 2.0.
 Wi-Fi is `wlp6s0` (`mt7921e`). The installation disk is a WD_BLACK SN850X
@@ -23,7 +24,7 @@ homes, Nix store, system state, SSH identity, and container storage survive.
 Never run Warbler's reset script against this machine: its filesystem is
 directly on `cryptroot`, while Crow's filesystem is on the root LV.
 
-`volume-identity.nix` reads the installed volume identity from the prepared inventory. Use `.#crow`
+`volume-identity.nix` reads the installed volume identity from the local input. Use `.#crow`
 throughout: staged provisioning defers credentials and TPM policy until the
 pinned host boots with Secure Boot enabled. The first unlock is at the console.
 Signing keys must exist before boot-file installation. Neither the configuration
@@ -110,10 +111,10 @@ Ethernet is not required. Firmware menus may differ from Warbler's HP machine.
    the installer SSH key pair in a private location outside the checkout; it must
    survive the installer reboot. Prepare a separate LUKS recovery password in
    the root-owned mode-0600 installer file `/run/crow-luks-password`.
-2. For a fresh format, set `crow.rootVolumeKeyId` to `null` in the
-   prepared checkout's `hardware-identities.json` so it cannot reuse the previous disk identity.
+2. For a fresh format, set `crow.storage.luks.cryptroot.volumeKeyId` to `null` in the
+   local input's `hardware-identities.json` so it cannot reuse the previous disk identity.
    Build and review the disk script. Running it is the destructive operation:
-   `nix build --no-link --print-out-paths path:.#nixosConfigurations.crow.config.system.build.diskoScript`.
+   `nix build --no-link --print-out-paths path:.#nixosConfigurations.crow.config.system.build.diskoScript --override-input hardware-identities path:/LOCAL/INPUT`.
    Only after approval, run that exact script on the installer. Verify `/mnt`,
    `/mnt/nix`, `/mnt/home`, `/mnt/persist`, and `/mnt/boot` mount the intended
    devices. `lvs` must show the root and swap LVs; `vgs` must show free extents.
@@ -127,13 +128,13 @@ Ethernet is not required. Firmware menus may differ from Warbler's HP machine.
    `/mnt/persist/var/lib/sbctl/keys` and GUID file to
    `/mnt/persist/var/lib/sbctl/GUID`, as in Warbler's procedure. Copy this
    checkout into `/mnt/persist/nixos-config`, then install with
-   `nixos-install --no-root-passwd --flake path:.#crow`.
+   `nixos-install --no-root-passwd --flake path:.#crow --override-input hardware-identities path:/LOCAL/INPUT`.
 5. Boot with local console access, unlock LUKS, and verify Wi-Fi, SOPS,
    persistent files, swap, and container connectivity. Back up existing firmware
    keys with `sudo sys backup-secure-boot`, then complete the documented manual
    Secure Boot enrollment and cold-boot verification.
 6. Obtain `sudo sys root-volume-key-id` and record the value in
-   `crow.rootVolumeKeyId` in both the prepared inventory and the SOPS-encrypted source; never reuse Warbler's value or a test pin.
+   `crow.storage.luks.cryptroot.volumeKeyId` in both the local input and the SOPS-encrypted source; never reuse Warbler's value or a test pin.
    Rebuild `.#crow`; the hook automatically generates the initrd SSH host key
    and seals available credentials. No manual SSH key generation is needed.
    Run `sudo sys setup-unlock-tailscale` to provision the separate `crow-unlock`
@@ -145,6 +146,9 @@ Ethernet is not required. Firmware menus may differ from Warbler's HP machine.
    `sudo sys setup-luks-tpm-unlock`. Verify an unattended cold boot separately.
 
 ## Validation
+
+These commands use synthetic fixtures unless given the production input override.
+Do not install their outputs or run their Disko scripts on real disks.
 
 From this checkout (the `path:` form includes newly created, untracked files):
 

@@ -1,8 +1,9 @@
 # Robin installation
 
-Build and installation commands below require a [prepared hardware inventory
-checkout](../../docs/hardware-identities.md). The remote rebuild helper prepares
-it automatically; direct Nix commands must run inside that prepared checkout.
+Production builds and installation require a [local hardware input](../../docs/hardware-identities.md).
+Add `--override-input hardware-identities path:/LOCAL/INPUT` to direct Nix and
+rebuild commands. The remote helper supplies it automatically. Without an
+override, builds use synthetic fixtures that cannot be activated.
 
 Robin is a BIOS-booted x86_64 KVM guest. Its disk selector is configured in
 `disko.nix`.
@@ -26,7 +27,8 @@ nix run .#nixos-rebuild-remote -- robin switch
 This archives the checkout and its flake inputs into Robin's Nix store over
 SSH as `cody@robin`, then runs `sudo nixos-rebuild` there using the archived
 source. The default action is `boot`: install the next boot generation without
-rebooting. Tracked edits and untracked source files are included; Git-ignored files are excluded.
+rebooting. Tracked edits are included. Stage new files with Git before rebuilding;
+untracked and ignored files are excluded by normal Git flake rules.
 The SSH name `robin` must resolve or be configured in your SSH config.
 Supported actions are `boot`, `switch`, `test`, `build`, `dry-build`, and
 `dry-activate`. The shortcut `nix run .#robin-nixos-rebuild-remote -- switch`

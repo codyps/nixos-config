@@ -1,0 +1,297 @@
+{
+  "forbes": {
+    "storage": {
+      "luks": {
+        "rcrypt": {
+          "uuid": "22440937-6d53-4000-8000-d96016f8cfa3"
+        }
+      },
+      "zfs": {
+        "hostId": "64446d54"
+      },
+      "fileSystems": {
+        "/boot": {
+          "uuid": "d97aa883-2083-4000-8000-2d7308bcd788"
+        }
+      }
+    }
+  },
+  "warbler": {
+    "storage": {
+      "luks": {
+        "cryptroot": {
+          "volumeKeyId": "7f103fe389d40ea7fccd3916b0da214561b0fcfc9cd18e7ca1b5e753223e6491"
+        }
+      }
+    },
+    "network": {
+      "containers": {
+        "warbler-ai": {
+          "interfaces": {
+            "mv-eno1": {
+              "macAddress": "02:a0:ee:a7:74:f0"
+            }
+          }
+        }
+      },
+      "interfaces": {
+        "eno1": {
+          "dhcp": {
+            "duid": "00:04:31:77:91:19:be:f6:8f:d4:40:a1:6c:c3:6c:86:44:a4",
+            "iaid": 860226190
+          }
+        }
+      }
+    },
+    "usb": {
+      "devices": {
+        "logitechReceiver": {
+          "descriptorHash": "+RLnzHMPd4VUcHBEYV/zPa6ZRzFfLjm//qh1mfh3vVI="
+        }
+      }
+    }
+  },
+  "arnold": {
+    "storage": {
+      "luks": {
+        "z10.1": {
+          "uuid": "95410d62-ae97-4000-8000-cceb5971d153"
+        },
+        "z8.1": {
+          "uuid": "3a23a220-527e-4000-8000-279d77fbcc4d"
+        },
+        "z8.2": {
+          "uuid": "afb781dc-146e-4000-8000-405bbfec6a20"
+        },
+        "z10.2": {
+          "uuid": "d02ad29e-ec36-4000-8000-90169c33cab6"
+        },
+        "z10.3": {
+          "uuid": "08dc8047-8138-4000-8000-f6053ef8d5e1"
+        },
+        "z8.3": {
+          "uuid": "3e4ef67d-66e9-4000-8000-dcc08fefd22a"
+        },
+        "z10.4": {
+          "uuid": "2349ee1c-152a-4000-8000-78af5162f450"
+        },
+        "z10.5": {
+          "uuid": "842db674-3307-4000-8000-5b64ee34c35c"
+        },
+        "z8.4": {
+          "uuid": "eb66df51-6463-4000-8000-61c0772ecfce"
+        },
+        "z10.6": {
+          "uuid": "706e3a4f-9a94-4000-8000-6d14a13040c5"
+        },
+        "z8.5": {
+          "uuid": "e3937f3c-e0e4-4000-8000-5c0dfb92f218"
+        },
+        "z12.0": {
+          "uuid": "efb8165c-8da2-4000-8000-f3dff9e4ae0b"
+        },
+        "z12.1": {
+          "uuid": "a52dbeaf-0f89-4000-8000-8d6739b62f84"
+        },
+        "z12.2": {
+          "uuid": "c8482050-5b90-4000-8000-5e15ea69a266"
+        },
+        "z12.3": {
+          "uuid": "4f4d58a0-0987-4000-8000-d71612b2fb9d"
+        },
+        "z12.4": {
+          "uuid": "a9f24064-20fd-4000-8000-6d89eebfb696"
+        },
+        "z12.5": {
+          "uuid": "27350ed5-ad29-4000-8000-a4484531b7e2"
+        },
+        "z12.6": {
+          "uuid": "1703e343-3902-4000-8000-146f0054247c"
+        },
+        "z12.7": {
+          "uuid": "e5825a56-fdea-4000-8000-bfe13b0d643c"
+        },
+        "z12.8": {
+          "uuid": "1d1a0a70-fa3c-4000-8000-d8a8734d4252"
+        },
+        "z14.0": {
+          "uuid": "7407a754-6fbf-4000-8000-9602f431162a"
+        },
+        "z14.1": {
+          "uuid": "b9463cfa-dfc5-4000-8000-85f135825491"
+        },
+        "z14.2": {
+          "uuid": "4a477aab-900e-4000-8000-3e15cb553b4f"
+        },
+        "z14.3": {
+          "uuid": "18ba07d2-0173-4000-8000-d11285112804"
+        },
+        "i01": {
+          "uuid": "74187371-3868-4000-8000-6eb955cb19f9"
+        },
+        "f01": {
+          "uuid": "0f5c7df2-e191-4000-8000-e0f05e430ca2"
+        },
+        "ru1": {
+          "uuid": "2d32ad42-384b-4000-8000-9f4e34da2a3b"
+        },
+        "pair1": {
+          "uuid": "8f04c6f3-b5c9-4000-8000-5560561392bc"
+        }
+      },
+      "zfs": {
+        "hostId": "6248ae03"
+      },
+      "fileSystems": {
+        "/boot.d/0": {
+          "uuid": "f10d0471-453b-4000-8000-afe092ccf4c6"
+        },
+        "/boot.d/1": {
+          "uuid": "541966a0-f269-4000-8000-506ad3c7fc93"
+        }
+      }
+    }
+  },
+  "crow": {
+    "storage": {
+      "luks": {
+        "cryptroot": {
+          "volumeKeyId": "a3c45b66a4e485aad8c78772971a9f1f6f46be08e107b56706e9c4af8b1f66c8"
+        }
+      },
+      "installationDisk": {
+        "byId": "synthetic-ci-disk-cf72a371"
+      }
+    },
+    "network": {
+      "interfaces": {
+        "wlp6s0": {
+          "permanentMacAddress": "02:e4:7a:25:a3:c5"
+        }
+      }
+    }
+  },
+  "mifflin": {
+    "storage": {
+      "fileSystems": {
+        "/": {
+          "uuid": "3f94136f-b88c-4000-8000-05dc1b5416e0"
+        },
+        "/boot": {
+          "uuid": "ea12fb55-5464-4000-8000-c6ff227d67e0"
+        }
+      },
+      "swap": {
+        "uuid": "e925b4cd-6ace-4000-8000-e7b152ba01d9"
+      }
+    }
+  },
+  "constance": {
+    "storage": {
+      "fileSystems": {
+        "/": {
+          "uuid": "f338800e-ee2e-4000-8000-9a8c40ac3edc"
+        }
+      }
+    }
+  },
+  "finch": {
+    "storage": {
+      "zfs": {
+        "hostId": "7d8fb271"
+      },
+      "fileSystems": {
+        "/boot": {
+          "uuid": "5798788c-da73-4000-8000-4fe96f665cc8"
+        }
+      }
+    }
+  },
+  "ward": {
+    "storage": {
+      "luks": {
+        "luksroot": {
+          "volumeKeyId": "8f97eecb3cbd4d975935549ca8db0afcd7785907421fd19855fc30475f41ac56",
+          "uuid": "82a93e94-2c92-4000-8000-2889074f406a"
+        }
+      },
+      "zfs": {
+        "hostId": "f624ba03"
+      },
+      "fileSystems": {
+        "/boot": {
+          "uuid": "4f6c6705-2b23-4000-8000-9802417771c3"
+        }
+      }
+    }
+  },
+  "maclay": {
+    "storage": {
+      "fileSystems": {
+        "/": {
+          "uuid": "a921613f-44d4-4000-8000-b24d59750a64"
+        },
+        "/boot": {
+          "uuid": "82a765b2-b67b-4000-8000-6c2c79300cf8"
+        }
+      },
+      "swap": {
+        "uuid": "4b39321a-ecc3-4000-8000-f006977a58d7"
+      }
+    }
+  },
+  "robin": {
+    "storage": {
+      "zfs": {
+        "hostId": "b0242576"
+      },
+      "installationDisk": {
+        "byId": "synthetic-ci-disk-6750b77f"
+      }
+    }
+  },
+  "adams": {
+    "storage": {
+      "fileSystems": {
+        "/": {
+          "uuid": "3f3f090f-1cdc-4000-8000-da6be2ff8a6d"
+        },
+        "/boot": {
+          "uuid": "3edad5d7-e4a2-4000-8000-d8e7bfabea77"
+        }
+      }
+    }
+  },
+  "calvin": {
+    "storage": {
+      "luks": {
+        "calvin-crypt": {
+          "uuid": "d347a525-14ca-4000-8000-b8640f73d377"
+        }
+      },
+      "zfs": {
+        "hostId": "0e618af3"
+      },
+      "fileSystems": {
+        "/boot": {
+          "uuid": "c87d7499-3dad-4000-8000-74ac903277ad"
+        }
+      }
+    }
+  },
+  "trunix": {
+    "storage": {
+      "fileSystems": {
+        "/": {
+          "uuid": "97157cd9-f06c-4000-8000-cecc038e79ac"
+        },
+        "/boot": {
+          "uuid": "5157d4ad-075e-4000-8000-f5bfa6d9de42"
+        }
+      },
+      "swap": {
+        "uuid": "01e80df7-c0e6-4000-8000-006b5720affc"
+      }
+    }
+  }
+}

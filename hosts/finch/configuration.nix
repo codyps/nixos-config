@@ -2,7 +2,7 @@
 # your system.  Help is available in the configuration.nix(5) man page
 # and in the NixOS manual (accessible by running ‘nixos-help’).
 
-{ config, pkgs, lib, modulesPath, self, ... }:
+{ config, pkgs, lib, modulesPath, self, hardwareIdentities, ... }:
 
 let
   ssh-auth = (import ../../nixos/ssh-auth.nix);
@@ -125,7 +125,7 @@ in
   systemd.sockets.caddy.enable = false;
   systemd.timers.podman-libation.enable = false;
 
-  networking.hostId = "${(import ../../lib/hardware-identities.nix) "finch" [ "storage" "zfs" "hostId" ]}";
+  networking.hostId = "${hardwareIdentities "finch" [ "storage" "zfs" "hostId" ]}";
   networking.hostName = "finch";
   networking.useDHCP = false;
 

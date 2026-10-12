@@ -1,1 +1,1 @@
-(import ../../lib/hardware-identities.nix) "warbler" [ "storage" "luks" "cryptroot" "volumeKeyId" ]
+{ hardwareIdentities }: hardwareIdentities "warbler" [ "storage" "luks" "cryptroot" "volumeKeyId" ]

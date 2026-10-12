@@ -95,7 +95,7 @@ class InstallTests(unittest.TestCase):
                     patch.object(installer, "run", return_value=b"flake.nix\0"):
                 archive = installer.source_archive()
             with tarfile.open(fileobj=io.BytesIO(archive), mode="r:gz") as contents:
-                self.assertEqual(contents.getnames(), ["flake.nix", "hardware-identities.json", ".hardware-source-files.json"])
+                self.assertEqual(contents.getnames(), ["flake.nix", "hardware-input/hardware-identities.json", "hardware-input/metadata.json"])
 
     def test_source_refuses_tracked_keys(self):
         with patch.object(installer, "run", return_value=b"keys/private\0"):
@@ -175,11 +175,11 @@ class InstallTests(unittest.TestCase):
             calls.append(command)
             if "mktemp" in command:
                 return b"/run/warbler-install.12345678\n"
-            if " eval --raw" in command:
+            if " eval " in command and " --raw " in command:
                 return installer.DISK.encode()
-            if " eval --json" in command:
+            if " eval " in command and " --json " in command:
                 return b'["system"]'
-            if " build --accept-flake-config" in command:
+            if " build " in command and "--accept-flake-config" in command:
                 return b"/nix/store/" + b"a" * 32 + b"-test\n"
             return b""
         with patch.object(installer, "validate_bundle", return_value=Path("/external")), \
@@ -207,7 +207,7 @@ class InstallTests(unittest.TestCase):
                 installer.install("/external")
                 self.assertFalse(any("warbler-bootstrap" in cmd for cmd in calls))
                 clear_pin = next(i for i, cmd in enumerate(calls) if "['volumeKeyId'] = None" in cmd)
-                build = next(i for i, cmd in enumerate(calls) if " build --accept-flake-config" in cmd)
+                build = next(i for i, cmd in enumerate(calls) if " build " in cmd and "--accept-flake-config" in cmd)
                 transfer = next(i for i, cmd in enumerate(calls) if "tar -xf -" in cmd)
                 installation = next(i for i, cmd in enumerate(calls) if "nixos-install --" in cmd)
                 self.assertLess(clear_pin, build)
@@ -220,6 +220,10 @@ class InstallTests(unittest.TestCase):
                                 calls[installation].index("nixos-install --"))
                 self.assertLess(calls[installation].index("warbler-account-passwords initialize"),
                                 calls[installation].index("nixos-install --"))
+            for cmd in calls:
+                if " eval " in cmd or " build " in cmd:
+                    self.assertIn("--override-input hardware-identities path:/run/warbler-install.12345678/source/hardware-input", cmd)
+                    self.assertIn("--no-write-lock-file", cmd)
             self.assertEqual(calls[-1], "rm -rf -- /run/warbler-install.12345678")
 
     def test_cancel_never_transfers_secrets_or_formats(self):
@@ -236,7 +240,7 @@ class InstallTests(unittest.TestCase):
             root = Path(temporary) / "paths with spaces"
             helper = root / "system/sw/bin/root-volume-key-id"
             helper.parent.mkdir(parents=True)
-            output = root / "checkout/hardware-identities.json"
+            output = root / "checkout/hardware-input/hardware-identities.json"
             output.parent.mkdir(parents=True)
             script = installer.volume_identity_script(root / "system", root / "checkout")
             for value, status in [("b" * 64, 0), ("invalid", 0), ("c" * 64, 1)]:

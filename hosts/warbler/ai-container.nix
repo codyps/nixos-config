@@ -1,4 +1,4 @@
-{ config, pkgs, ... }:
+{ config, pkgs, hardwareIdentities, ... }:
 {
   # These controls are host-wide, not namespaced. Allow per-process profiling
   # (including kernel time) and debugger attachment to same-UID dumpable tasks.
@@ -33,6 +33,7 @@
     # changing the guest's LAN default route or depending on its DHCP lease.
     extraVeths.ai-ssh = { };
     config = {
+      _module.args.hardwareIdentities = hardwareIdentities;
       imports = [ ./ai-container-guest.nix ];
       nixpkgs.pkgs = pkgs;
       networking.interfaces.ai-ssh.ipv4.addresses = [{ address = "10.79.0.2"; prefixLength = 24; }];

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Prepare a disposable path flake with SOPS hardware inventory outside Git."""
+"""Provision a local hardware flake input from SOPS, without wrapping Nix."""
 import argparse
 import base64
 import hashlib
@@ -7,7 +7,6 @@ import re
 import json
 import os
 from pathlib import Path
-import shutil
 import subprocess
 import sys
 import tempfile
@@ -87,103 +86,73 @@ def read_inventory(repo, inventory_file=None, fixtures=False):
     return validate_inventory(inventory, schema)
 
 
-def verify_fixtures(repo):
-    """Require exact synthetic data, not merely an easily copied marker."""
-    repo = Path(repo)
-    if not (repo / FIXTURE_MARKER).is_file():
-        raise ValueError("Public publishing requires a fixture source")
-    actual = json.loads((repo / INVENTORY).read_text())
-    expected = fixture_inventory(json.loads((repo / "lib/hardware-identities-schema.json").read_text()))
-    if actual != expected:
+def verify_fixtures(repo, directory):
+    """Verify the resolved flake input before a public upload."""
+    directory = Path(directory)
+    metadata = json.loads((directory / "metadata.json").read_text())
+    if metadata != {"version": 1, "fixture": True}:
+        raise ValueError("Public publishing requires a fixture input")
+    expected = fixture_inventory(json.loads((Path(repo) / "lib/hardware-identities-schema.json").read_text()))
+    if json.loads((directory / INVENTORY).read_text()) != expected:
         raise ValueError("Public publishing refused: inventory differs from synthetic fixtures")
+    if {p.name for p in directory.iterdir()} != {INVENTORY, "metadata.json"}:
+        raise ValueError("Fixture input contains unexpected files")
 
 
-def source_files(repo):
-    if (repo / MANIFEST).is_file():
-        names = json.loads((repo / MANIFEST).read_text())
-    else:
-        root = subprocess.run(["git", "-C", str(repo), "rev-parse", "--show-toplevel"],
-                              capture_output=True, text=True, check=True).stdout.strip()
-        if Path(root).resolve() != repo.resolve():
-            raise ValueError("Source must be the repository root or a prepared snapshot")
-        names = subprocess.check_output(["git", "-C", str(repo), "ls-files", "-z", "--cached", "--others", "--exclude-standard"]).decode().split('\0')
-    result = []
-    for name in sorted(set(names)):
-        if not name:
-            continue
-        path = Path(name)
-        if path.is_absolute() or '..' in path.parts or path.parts[0] in ('.git', 'keys'):
-            raise ValueError("Unsafe source path")
-        if name in (INVENTORY, MANIFEST, FIXTURE_MARKER):
-            raise ValueError("Decrypted inventory must never be tracked or listed in the source manifest")
-        source = repo / path
-        if source.is_symlink() and (not source.resolve().is_relative_to(repo) or str(source.resolve().relative_to(repo)) not in names):
-            raise ValueError(f"Source symlink requires review: {name}")
-        if any((repo / p).is_symlink() for p in source.relative_to(repo).parents if p != Path('.')):
-            raise ValueError(f"Source directory symlink requires review: {name}")
-        if not source.exists():
-            continue  # tracked deletion
-        if not source.is_file():
-            raise ValueError(f"Not a regular source file: {name}")
-        result.append(name)
-    return result
-
-
-def prepare(repo, destination, inventory_file=None, fixtures=False):
+def provision(repo, destination, inventory_file=None, fixtures=False):
     repo = Path(repo).resolve()
     destination = Path(destination).absolute()
-    if destination.exists() or destination.is_symlink():
-        raise ValueError("Destination must not exist")
-    if destination.resolve().is_relative_to(repo):
-        raise ValueError("Prepared source must be outside the repository")
+    if destination.is_symlink() or destination.resolve().is_relative_to(repo):
+        raise ValueError("Hardware input must be outside the repository and not a symlink")
     inventory = read_inventory(repo, inventory_file, fixtures)
-    files = source_files(repo)
-    destination.mkdir(mode=0o700)
-    try:
-        for name in files:
-            target = destination / name
-            target.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copy2(repo / name, target, follow_symlinks=False)
-        if fixtures or (repo / FIXTURE_MARKER).exists():
-            (destination / FIXTURE_MARKER).write_text("Synthetic CI configuration; do not install.\n")
-        for name, data in ((INVENTORY, inventory), (MANIFEST, files)):
-            target = destination / name
-            target.write_text(json.dumps(data, indent=2) + '\n')
-            target.chmod(0o600)
-    except BaseException:
-        shutil.rmtree(destination)
-        raise
+    metadata = {"version": 1, "fixture": fixtures}
+    if not fixtures and inventory == fixture_inventory(json.loads((repo / "lib/hardware-identities-schema.json").read_text())):
+        raise ValueError("Synthetic inventory cannot be provisioned as production")
+    data = json.dumps(inventory, indent=2) + '\n'
+    if destination.exists():
+        if not destination.is_dir() or destination.stat().st_uid != os.getuid() or destination.stat().st_mode & 0o077:
+            raise ValueError("Existing input must be an owned private directory")
+        if {p.name for p in destination.iterdir()} != {INVENTORY, "metadata.json"} or any(p.is_symlink() for p in destination.iterdir()):
+            raise ValueError("Existing input contains unexpected files or symlinks")
+        if json.loads((destination / "metadata.json").read_text()) != metadata:
+            raise ValueError("Cannot change an existing input's fixture mode")
+        # Refresh only the inventory atomically. Its metadata is unchanged.
+        with tempfile.NamedTemporaryFile(mode='w', dir=destination, delete=False) as output:
+            pending = Path(output.name)
+            output.write(data)
+        try:
+            os.replace(pending, destination / INVENTORY)
+        finally:
+            pending.unlink(missing_ok=True)
+    else:
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        with tempfile.TemporaryDirectory(prefix='.hardware-input-', dir=destination.parent) as temporary:
+            stage = Path(temporary) / 'input'
+            stage.mkdir(mode=0o700)
+            for name, value in ((INVENTORY, data), ("metadata.json", json.dumps(metadata) + '\n')):
+                (stage / name).write_text(value)
+                (stage / name).chmod(0o600)
+            stage.rename(destination)
     return destination
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--repo', type=Path, default=Path.cwd())
-    parser.add_argument('--inventory', type=Path, help='Use an existing local plaintext inventory instead of SOPS')
-    parser.add_argument('--fixtures', action='store_true', help='Use synthetic CI identities; never install these builds')
-    commands = parser.add_subparsers(dest='action', required=True)
-    commands.add_parser('verify-fixtures')
-    stage = commands.add_parser('prepare')
-    stage.add_argument('destination', type=Path)
-    run = commands.add_parser('run')
-    run.add_argument('command', nargs=argparse.REMAINDER)
+    parser.add_argument('--inventory', type=Path, help='Read existing local plaintext instead of decrypting SOPS')
+    parser.add_argument('--fixtures', action='store_true', help='Generate synthetic data; never install these builds')
+    parser.add_argument('--verify-fixtures', action='store_true', help='Verify an existing input for public publishing')
+    parser.add_argument('destination', type=Path, help='Local input directory outside the checkout')
     args = parser.parse_args()
     os.umask(0o077)
     try:
-        if args.action == 'verify-fixtures':
-            verify_fixtures(args.repo)
-            return 0
-        if args.action == 'prepare':
-            print(prepare(args.repo, args.destination, args.inventory, args.fixtures))
-            return 0
-        command = args.command
-        if command[:1] == ['--']:
-            command = command[1:]
-        if not command:
-            raise ValueError('run requires a command after --')
-        with tempfile.TemporaryDirectory(prefix='nixos-hardware-') as temporary:
-            source = prepare(args.repo, Path(temporary) / 'source', args.inventory, args.fixtures)
-            return subprocess.run(command, cwd=source).returncode
+        if args.verify_fixtures:
+            if args.inventory or args.fixtures:
+                raise ValueError('Verification cannot generate or replace input data')
+            verify_fixtures(args.repo, args.destination)
+        else:
+            print(provision(args.repo, args.destination, args.inventory, args.fixtures))
+        return 0
     except (ValueError, OSError, RuntimeError, subprocess.CalledProcessError) as error:
         print(f'Hardware provisioning stopped: {error}', file=sys.stderr)
         return 1

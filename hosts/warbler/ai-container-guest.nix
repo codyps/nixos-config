@@ -1,4 +1,4 @@
-{ config, lib, pkgs, ... }:
+{ config, lib, pkgs, hardwareIdentities, ... }:
 let
   user = "cody-ai";
   home = "/home/${user}";
@@ -84,7 +84,7 @@ in
     enable = true;
     networks."10-lan" = {
       matchConfig.Name = "mv-eno1";
-      linkConfig.MACAddress = "${(import ../../lib/hardware-identities.nix) "warbler" [ "network" "containers" "warbler-ai" "interfaces" "mv-eno1" "macAddress" ]}";
+      linkConfig.MACAddress = "${hardwareIdentities "warbler" [ "network" "containers" "warbler-ai" "interfaces" "mv-eno1" "macAddress" ]}";
       networkConfig = { DHCP = "yes"; IPv6AcceptRA = true; };
       dhcpV4Config = { ClientIdentifier = "mac"; SendHostname = true; };
     };

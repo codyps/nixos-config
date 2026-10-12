@@ -1,8 +1,9 @@
 # Warbler
 
-Build and installation commands below require a [prepared hardware inventory
-checkout](../../docs/hardware-identities.md). The remote rebuild helper prepares
-it automatically; direct Nix commands must run inside that prepared checkout.
+Production builds and installation require a [local hardware input](../../docs/hardware-identities.md).
+Use `--override-input hardware-identities path:/LOCAL/INPUT` with direct Nix
+and rebuild commands. The remote helper supplies it automatically. Commands
+without an override use synthetic fixtures and cannot be activated.
 
 The reusable module and setup commands are documented in [Secure unlock](../../docs/secure-unlock.md).
 
@@ -20,7 +21,8 @@ nix run .#nixos-rebuild-remote -- warbler
 This archives the checkout and its flake inputs into Warbler's Nix store over
 SSH as `cody@warbler`, then runs `sudo nixos-rebuild boot` there using the
 archived source. It installs the next boot generation without rebooting.
-Tracked edits and untracked source files are included; Git-ignored files are excluded.
+Tracked edits are included. Stage new source files with Git before rebuilding;
+untracked and Git-ignored files are excluded by the normal Git flake rules.
 To select another rebuild action, use e.g.
 `nix run .#nixos-rebuild-remote -- warbler switch` or `warbler build`.
 The existing `nix run .#warbler-nixos-rebuild-remote` shortcut remains available.
@@ -96,11 +98,11 @@ or the digest stored in the LUKS header. Changing the volume key, UUID, or
 mapper name requires a new pin. Changing the recovery password does not.
 
 Use `.#warbler` at every stage. For a freshly formatted disk, set
-`warbler.rootVolumeKeyId` to `null` in the prepared `hardware-identities.json` first. Staged
+`warbler.storage.luks.cryptroot.volumeKeyId` to `null` in the local input's `hardware-identities.json` first. Staged
 provisioning omits recovery credentials and TPM unlock until the new pin is
 recorded and the installed host boots with Secure Boot enabled.
 The remote installer records the freshly formatted volume's identity in
-`warbler.rootVolumeKeyId` in the installed checkout's `hardware-identities.json`. For a manual
+`warbler.storage.luks.cryptroot.volumeKeyId` in the installed `hardware-input/hardware-identities.json`. For a manual
 installation, obtain the identity on the trusted installed system and update
 that file and the SOPS-encrypted inventory before building the normal configuration. `configuration.nix` imports
 it as `boot.secureUnlock.rootVolumeKeyId`; the SOPS inventory retains the current installation's
@@ -134,8 +136,8 @@ sudo nix run .#luks-volume-key-id -- --device /dev/sdb2 --name data
 ```
 
 Enter the LUKS recovery passphrase. The command prints just the 64-character
-public ID to stdout; save it as the JSON string `warbler.rootVolumeKeyId` in
-the prepared `hardware-identities.json` and update the SOPS-encrypted inventory.
+public ID to stdout; save it as the JSON string `warbler.storage.luks.cryptroot.volumeKeyId` in
+the local input's `hardware-identities.json` and update the SOPS-encrypted inventory.
 It reads the configured LUKS device and
 derives the ID for mapper name `cryptroot`, without opening a mapping,
 changing the header, or writing the raw volume key to a file. The derivation
@@ -287,7 +289,7 @@ and `build` runs are optional rehearsals, not required installation steps.
   the installer retains its private local copy.
   After formatting, it derives the new root-volume identity using the recovery
   passphrase file and records it in the installed checkout's
-  `warbler.rootVolumeKeyId` in the prepared `hardware-identities.json`. It does not print the identity or modify
+  `warbler.storage.luks.cryptroot.volumeKeyId` in the local input's `hardware-identities.json`. It does not print the identity or modify
   the source checkout on the Mac. Preserve that installed file when updating
   the checkout; copying another installation's pin will prevent unlocking.
   Before a later deployment from the Mac, copy the installed public identity
@@ -376,11 +378,13 @@ the TPM helper. Commands below are instructions, not evidence of installation.
    through installation. The later BIOS visits only clear keys after backup
    and enable Secure Boot after enrollment.
 
-2. **Live USB: prepare the checkout:** obtain a prepared hardware-inventory
-   checkout on the live host (see the provisioning link above). Enter a root
+2. **Live USB: prepare the checkout:** copy the checkout and provision a separate
+   local hardware input on the live host (see the provisioning link above). Replace
+   `/LOCAL/INPUT` below with its absolute directory. Retain a copy at
+   `/mnt/persist/nixos-config/hardware-input` for installed-system rebuilds. Enter a root
    shell (`sudo -i`) and `cd` to it. All installer commands below run there as root.
    Use `.#warbler` throughout. Before formatting a new volume, write `null`
-   to `warbler.rootVolumeKeyId` in this prepared checkout's `hardware-identities.json`. Do not
+   to `warbler.storage.luks.cryptroot.volumeKeyId` in this local input's `hardware-identities.json`. Do not
    clear the valid pin when repairing an existing volume. Initial unlocking
    uses the console; administration after boot is via wired SSH. The shared
    hook defers credential sealing until the pinned installed host boots with
@@ -393,7 +397,8 @@ the TPM helper. Commands below are instructions, not evidence of installation.
    test -d /sys/firmware/efi
    lsblk -o NAME,PATH,SIZE,MODEL,TYPE,FSTYPE,MOUNTPOINTS
    nix build --accept-flake-config --no-link --print-out-paths \
-     .#nixosConfigurations.warbler.config.system.build.diskoScript
+     .#nixosConfigurations.warbler.config.system.build.diskoScript \
+     --override-input hardware-identities path:/LOCAL/INPUT
    ```
 
    Confirm `/dev/nvme0n1` is the intended 512 GB NVMe, not the 4 TB SATA SSD
@@ -452,7 +457,7 @@ the TPM helper. Commands below are instructions, not evidence of installation.
      sbctl --config /run/warbler-sbctl-install.conf create-keys
    mkdir -p /mnt/persist/nixos-config
    cp -a . /mnt/persist/nixos-config/
-   nixos-install --no-root-passwd --flake .#warbler
+   nixos-install --no-root-passwd --flake .#warbler --override-input hardware-identities path:/LOCAL/INPUT
    ```
 
    Stop on any failure. Lanzaboote needs these keys before installation signs
@@ -517,7 +522,7 @@ the TPM helper. Commands below are instructions, not evidence of installation.
 
 9. **Prepare remote unlock and optional disk enrollment in one rebuild.**
    Work from `/persist/nixos-config`. The remote installer has already recorded
-   the new volume identity in `warbler.rootVolumeKeyId` in the prepared `hardware-identities.json`. For a manual
+   the new volume identity in `warbler.storage.luks.cryptroot.volumeKeyId` in the local input's `hardware-identities.json`. For a manual
    install, run `sudo sys root-volume-key-id` and save the returned ID as a
    quoted Nix string in that file. Never reuse the previous installation's pin.
 
@@ -549,7 +554,7 @@ the TPM helper. Commands below are instructions, not evidence of installation.
    Rebuild and record the initrd SSH fingerprint:
 
    ```sh
-   sudo nixos-rebuild boot --flake .#warbler
+   sudo nixos-rebuild boot --flake .#warbler --override-input hardware-identities path:/persist/nixos-config/hardware-input
    sudo ssh-keygen -lf /persist/credstore.encrypted/ssh-host-key.pub
    ```
 
@@ -626,6 +631,9 @@ configuration before enrollment. The helper never rebuilds, changes firmware,
 or reboots the machine itself.
 
 ## Validation
+
+These commands use synthetic fixtures unless given the production input override.
+Do not install their outputs or run their Disko scripts on real disks.
 
 Run these checks from the flake checkout:
 

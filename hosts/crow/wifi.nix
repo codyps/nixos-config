@@ -1,4 +1,4 @@
-{ config, pkgs, ... }:
+{ config, pkgs, hardwareIdentities, ... }:
 {
   sops.useSystemdActivation = true;
   sops.age.sshKeyPaths = [ "/persist/ssh/ssh_host_ed25519_key" ];
@@ -34,7 +34,7 @@
   systemd.network = {
     enable = true;
     links."10-crow-wifi" = {
-      matchConfig.PermanentMACAddress = "${(import ../../lib/hardware-identities.nix) "crow" [ "network" "interfaces" "wlp6s0" "permanentMacAddress" ]}";
+      matchConfig.PermanentMACAddress = "${hardwareIdentities "crow" [ "network" "interfaces" "wlp6s0" "permanentMacAddress" ]}";
       linkConfig.Name = "wlp6s0";
     };
     networks."20-wifi" = {

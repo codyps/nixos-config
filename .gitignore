@@ -7,7 +7,9 @@ __pycache__/
 .security-audit/
 /target
 
-# Decrypted hardware inventory belongs only in prepared source snapshots.
+# Local hardware inputs and legacy prepared-source files never belong in Git.
 /hardware-identities.json
 /.hardware-source-files.json
 /.hardware-fixture
+
+/hardware-input/

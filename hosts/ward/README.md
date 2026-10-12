@@ -1,8 +1,9 @@
 # Ward recovery and secure unlock
 
-Build and installation commands below require a [prepared hardware inventory
-checkout](../../docs/hardware-identities.md). The remote rebuild helper prepares
-it automatically; direct Nix commands must run inside that prepared checkout.
+Production builds and installation require a [local hardware input](../../docs/hardware-identities.md).
+Use `--override-input hardware-identities path:/LOCAL/INPUT` with direct Nix
+and rebuild commands. The remote helper supplies it automatically. Commands
+without an override use synthetic fixtures and cannot be activated.
 
 Ward uses LUKS2 (mapper `luksroot`), then LVM (`ward/zroot`, `ward/swap`),
 then the `ward` ZFS pool. Do not run disko or format these existing devices.

@@ -29,7 +29,9 @@ assert !metadata.fixture || values == fixtures;
 {
   # Copying fixtures and changing their marker must not make them deployable.
   fixture = metadata.fixture || values == fixtures;
-  inputPath = toString input;
+  # Newer Nix can evaluate a Git tree without materializing its source path.
+  # The external CI verifier needs an actual directory, not that virtual path.
+  inputPath = toString (builtins.path { path = input; name = "hardware-fixtures"; });
   inherit values;
   runtimeGet = host: path:
     let kind = builtins.foldl' (value: key: builtins.getAttr key value) schema.${host} path;

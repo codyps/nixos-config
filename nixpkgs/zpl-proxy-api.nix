@@ -1,6 +1,6 @@
 { lib, callPackage, zpl }:
 let
-  root = /. + zpl.outPath;
+  root = /. + builtins.unsafeDiscardStringContext zpl.outPath;
   workspace = (builtins.fromTOML (builtins.readFile (root + "/Cargo.toml"))).workspace;
 in
 (callPackage (root + "/nix/package.nix") { }).overrideAttrs {

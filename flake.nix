@@ -1,6 +1,6 @@
 {
   inputs = {
-    hardware-identities = { url = "path:./config/hardware-fixtures"; flake = false; };
+    hardware-identities = { url = "github:codyps/nixos-config"; flake = false; };
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
     zpl.url = "github:codyps/zpl";
     zpl.inputs.nixpkgs.follows = "nixpkgs";

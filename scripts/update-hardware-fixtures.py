@@ -1,10 +1,9 @@
 #!/usr/bin/env python3
-"""Refresh synthetic hardware fixtures and their Nix/Lix-compatible lock entry."""
+"""Refresh deterministic synthetic hardware fixtures."""
 import argparse
 import importlib.util
 import json
 from pathlib import Path
-import subprocess
 
 REPO = Path(__file__).resolve().parent.parent
 spec = importlib.util.spec_from_file_location('hardware', Path(__file__).with_name('hardware-identities.py'))
@@ -26,26 +25,8 @@ def update(repo, check=False):
                 raise ValueError('Synthetic fixtures need regeneration')
         else:
             path.write_text(text)
-    # Fail before hashing if anything other than synthetic data is in this input.
+    # Reject extra files or anything other than synthetic data.
     hardware.verify_fixtures(repo, fixtures)
-    nar_hash = subprocess.check_output(['nix', 'hash', 'path', str(fixtures)], text=True).strip()
-    lock_path = repo / 'flake.lock'
-    lock = json.loads(lock_path.read_text())
-    node_name = lock['nodes']['root']['inputs']['hardware-identities']
-    node = {
-        'flake': False,
-        'locked': {'lastModified': 1, 'narHash': nar_hash,
-                   'path': './config/hardware-fixtures', 'type': 'path'},
-        'original': {'path': './config/hardware-fixtures', 'type': 'path'},
-        # Nix >= 2.26 needs the relative input's parent. Lix 2.94 also needs
-        # the legacy hash. Both accept this combined entry without rewriting.
-        'parent': [],
-    }
-    if lock['nodes'][node_name] != node:
-        if check:
-            raise ValueError('Hardware input lock needs normalization')
-        lock['nodes'][node_name] = node
-        lock_path.write_text(json.dumps(lock, indent=2) + '\n')
 
 
 if __name__ == '__main__':
@@ -54,5 +35,5 @@ if __name__ == '__main__':
     args = parser.parse_args()
     try:
         update(REPO, args.check)
-    except (OSError, ValueError, subprocess.CalledProcessError) as error:
+    except (OSError, ValueError) as error:
         parser.exit(1, f'{error}; run python3 scripts/update-hardware-fixtures.py\n')

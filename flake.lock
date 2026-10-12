@@ -206,16 +206,18 @@
     "hardware-identities": {
       "flake": false,
       "locked": {
-        "lastModified": 1,
-        "narHash": "sha256-CV+FRYx2Y8tRGUwJrX4oicO1sJLGD7dVImVRiikYdNM=",
-        "path": "./config/hardware-fixtures",
-        "type": "path"
+        "lastModified": 1791769927,
+        "narHash": "sha256-rFUcYkk1KnmHQzgdr3tGlPn7KnTTq3PJBDb62QNtOdM=",
+        "owner": "codyps",
+        "repo": "nixos-config",
+        "rev": "03a856aefc1df885eeec60e533f607b3d68f277a",
+        "type": "github"
       },
       "original": {
-        "path": "./config/hardware-fixtures",
-        "type": "path"
-      },
-      "parent": []
+        "owner": "codyps",
+        "repo": "nixos-config",
+        "type": "github"
+      }
     },
     "home-manager": {
       "inputs": {

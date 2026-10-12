@@ -7,7 +7,9 @@ interface MAC addresses and USB device hashes. Passwords and private keys remain
 separate runtime secrets.
 
 The flake declares a non-flake input named `hardware-identities`. Its default is
-`config/hardware-fixtures`, containing deterministic synthetic values. Ordinary
+a locked public snapshot of this repository, using only its
+`config/hardware-fixtures` directory of deterministic synthetic values. This
+avoids relative-input incompatibilities between Nix and Lix. Ordinary
 Nix commands work on a fresh checkout without any decryption key. These default
 builds are for tests and public caching; activation rejects them. Never run a
 fixture Disko script on physical hardware.
@@ -132,11 +134,18 @@ nix eval --json .#lib.hardwareIdentityChecks \
   --override-input hardware-identities "path:$HOME/.local/share/nixos-hardware"
 ```
 
-The checks report booleans, not identifiers. After changing the schema or running `nix flake update`, run
+The checks report booleans, not identifiers. After changing the schema, run
 `python3 scripts/update-hardware-fixtures.py`. It generates fixtures from field
-names alone and maintains a lock entry compatible with both Lix 2.94 and newer
-Nix relative-input handling. The automated updater runs it, and CI checks the
-result before evaluation. Never generate fixtures from production values.
+names alone. Never generate fixtures from production values.
+
+The public default is pinned by `flake.lock`; it does not recursively evaluate
+the snapshot's flake. When changing fixture fields, first publish the updated
+schema and fixtures, then run `nix flake update hardware-identities` to select
+that snapshot. Before publication, test with
+`--override-input hardware-identities "path:$PWD/config/hardware-fixtures"`.
+CI checks both the generated fixtures and the selected input, rejecting stale
+schemas or mismatched fixture values. Ordinary dependency updates can refresh
+the snapshot automatically.
 
 ## Removing the override flag later
 

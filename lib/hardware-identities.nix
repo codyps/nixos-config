@@ -1,6 +1,10 @@
 # Hardware data is an explicit flake input, never ambient state or a SOPS build.
-input:
+source:
 let
+  # The public default is a locked repository snapshot; local overrides are
+  # small standalone directories. Neither path performs decryption.
+  input = if builtins.pathExists (source + "/metadata.json") then source
+    else source + "/config/hardware-fixtures";
   metadata = builtins.fromJSON (builtins.readFile (input + "/metadata.json"));
   values = builtins.fromJSON (builtins.readFile (input + "/hardware-identities.json"));
   schema = builtins.fromJSON (builtins.readFile ./hardware-identities-schema.json);

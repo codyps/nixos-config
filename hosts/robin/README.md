@@ -1,9 +1,10 @@
 # Robin installation
 
-Production builds and installation require a [local hardware input](../../docs/hardware-identities.md).
-Add `--override-input hardware-identities path:/LOCAL/INPUT` to direct Nix and
-rebuild commands. The remote helper supplies it automatically. Without an
-override, builds use synthetic fixtures that cannot be activated.
+Production rebuilds use a [machine-local deployment flake](../../docs/hardware-identities.md):
+`--flake /LOCAL/DEPLOYMENT#robin`, with no input override. Refresh the deployment
+after source or inventory changes. The remote helper provisions it automatically.
+Building the repository directly still uses synthetic fixtures that cannot be activated.
+Manual installation steps below may use the supported standalone input override.
 
 Robin is a BIOS-booted x86_64 KVM guest. Its disk selector is configured in
 `disko.nix`.

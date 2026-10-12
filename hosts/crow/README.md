@@ -1,9 +1,10 @@
 # Crow
 
-Production builds and installation require a [local hardware input](../../docs/hardware-identities.md).
-Use `--override-input hardware-identities path:/LOCAL/INPUT` with direct Nix
-and rebuild commands. The remote helper supplies it automatically. Commands
-without an override use synthetic fixtures and cannot be activated.
+Production rebuilds use a [machine-local deployment flake](../../docs/hardware-identities.md):
+`--flake /LOCAL/DEPLOYMENT#crow`, with no input override. Refresh the deployment
+after source or inventory changes. The remote helper provisions it automatically.
+Building the repository directly still uses synthetic fixtures that cannot be activated.
+Manual installation steps below may use the supported standalone input override.
 
 Crow is an x86_64 AMD machine with 64 GB RAM, UEFI, and TPM 2.0.
 Wi-Fi is `wlp6s0` (`mt7921e`). The installation disk is a WD_BLACK SN850X
@@ -135,7 +136,8 @@ Ethernet is not required. Firmware menus may differ from Warbler's HP machine.
    Secure Boot enrollment and cold-boot verification.
 6. Obtain `sudo sys root-volume-key-id` and record the value in
    `crow.storage.luks.cryptroot.volumeKeyId` in both the local input and the SOPS-encrypted source; never reuse Warbler's value or a test pin.
-   Rebuild `.#crow`; the hook automatically generates the initrd SSH host key
+   Refresh the local deployment from that inventory and rebuild
+   `/LOCAL/DEPLOYMENT#crow`; the hook automatically generates the initrd SSH host key
    and seals available credentials. No manual SSH key generation is needed.
    Run `sudo sys setup-unlock-tailscale` to provision the separate `crow-unlock`
    identity, then rebuild for boot to include it. Wi-Fi requires the profile

@@ -1,9 +1,10 @@
 # Warbler
 
-Production builds and installation require a [local hardware input](../../docs/hardware-identities.md).
-Use `--override-input hardware-identities path:/LOCAL/INPUT` with direct Nix
-and rebuild commands. The remote helper supplies it automatically. Commands
-without an override use synthetic fixtures and cannot be activated.
+Production rebuilds use a [machine-local deployment flake](../../docs/hardware-identities.md):
+`--flake /LOCAL/DEPLOYMENT#warbler`, with no input override. Refresh the deployment
+after source or inventory changes. The remote helper provisions it automatically.
+Building the repository directly still uses synthetic fixtures that cannot be activated.
+Manual installation steps below may use the supported standalone input override.
 
 The reusable module and setup commands are documented in [Secure unlock](../../docs/secure-unlock.md).
 
@@ -554,7 +555,10 @@ the TPM helper. Commands below are instructions, not evidence of installation.
    Rebuild and record the initrd SSH fingerprint:
 
    ```sh
-   sudo nixos-rebuild boot --flake .#warbler --override-input hardware-identities path:/persist/nixos-config/hardware-input
+   sudo sys hardware-deployment --repo /persist/nixos-config \
+     --inventory /persist/nixos-config/hardware-input/hardware-identities.json \
+     /persist/nixos-deployment
+   sudo nixos-rebuild boot --flake /persist/nixos-deployment#warbler
    sudo ssh-keygen -lf /persist/credstore.encrypted/ssh-host-key.pub
    ```
 

@@ -6,7 +6,7 @@ let
   '';
   command = pkgs.writeShellApplication {
     name = "hardware-source";
-    runtimeInputs = [ pkgs.python3 pkgs.git pkgs.sops pkgs.gnupg ];
+    runtimeInputs = [ pkgs.nix pkgs.python3 pkgs.git pkgs.sops pkgs.gnupg ];
     text = ''
       exec python3 ${scripts}/hardware-identities.py "$@"
     '';
@@ -26,6 +26,7 @@ in
   imports = [ ./admin-commands.nix ];
   config = lib.mkMerge [
     {
+      programs.adminCommands.commands.hardware-deployment = [ "${command}/bin/hardware-source" "--deployment" ];
       programs.adminCommands.commands.hardware-input = [ "${command}/bin/hardware-source" ];
       programs.adminCommands.commands.hardware-source = [ "${command}/bin/hardware-source" ];
     }

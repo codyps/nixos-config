@@ -23,7 +23,7 @@ REPO = Path(__file__).resolve().parents[1]
 TARGET = "nixos@nixos.bed.einic.org"
 DISK = "/dev/nvme0n1"
 DEFAULT_SECRETS = Path.home() / ".local/share/warbler-install"
-CONFIG = "path:.#nixosConfigurations.warbler.config"
+CONFIG = "path:../deployment#nixosConfigurations.warbler.config"
 NIX = "nix --extra-experimental-features 'nix-command flakes'"
 
 
@@ -303,17 +303,20 @@ def install(directory, *, build_only=False):
             "path = Path(sys.argv[1])\ndata = json.loads(path.read_text())\n"
             "data['warbler']['storage']['luks']['cryptroot']['volumeKeyId'] = None\n"
             "path.write_text(json.dumps(data) + '\\n')\nPYTHON")
+        ssh(f"NIX_CONFIG='experimental-features = nix-command flakes' python3 {q}/source/scripts/hardware-identities.py "
+            f"--repo {q}/source --inventory {q}/source/hardware-input/hardware-identities.json "
+            f"--deployment {q}/deployment")
         print("Building attended system and disko on the live host (no secrets supplied)...", flush=True)
         root = f"cd {q}/source; "
-        configured = ssh(root + f"{NIX} eval --override-input hardware-identities path:{work}/source/hardware-input --no-write-lock-file --raw {CONFIG}.disko.devices.disk.system.device").decode()
+        configured = ssh(root + f"{NIX} eval --no-update-lock-file --raw {CONFIG}.disko.devices.disk.system.device").decode()
         if configured != DISK:
             raise RuntimeError("Evaluated disko target differs from inspected disk")
-        disks = json.loads(ssh(root + f"{NIX} eval --override-input hardware-identities path:{work}/source/hardware-input --no-write-lock-file --json {CONFIG}.disko.devices.disk --apply builtins.attrNames"))
+        disks = json.loads(ssh(root + f"{NIX} eval --no-update-lock-file --json {CONFIG}.disko.devices.disk --apply builtins.attrNames"))
         if disks != ["system"]:
             raise RuntimeError("Unexpected additional disko disks")
         outputs = []
         for attribute in ("system.build.toplevel", "system.build.diskoScript"):
-            output = ssh(root + f"{NIX} build --override-input hardware-identities path:{work}/source/hardware-input --no-write-lock-file --accept-flake-config --no-link --print-out-paths {CONFIG}.{attribute}").decode().strip()
+            output = ssh(root + f"{NIX} build --no-update-lock-file --accept-flake-config --no-link --print-out-paths {CONFIG}.{attribute}").decode().strip()
             if not re.fullmatch(r"/nix/store/[a-z0-9]{32}-[^/\s]+", output):
                 raise RuntimeError("Unexpected build output")
             outputs.append(output)
@@ -351,6 +354,7 @@ cp -a {q}/source/. /mnt/persist/nixos-config/
 {volume_identity_script(outputs[0], '/mnt/persist/nixos-config')}
 {shlex.quote(outputs[0])}/sw/bin/warbler-account-passwords initialize --root /mnt --password-dir {q}/secrets/account-passwords
 nixos-install --no-root-passwd --system {shlex.quote(outputs[0])}
+nixos-enter --root /mnt -c '{shlex.quote(outputs[0])}/sw/bin/sys hardware-deployment --repo /persist/nixos-config --inventory /persist/nixos-config/hardware-input/hardware-identities.json /persist/nixos-deployment'
 sync
 """
         print("Installing to the confirmed NVMe; no automatic reboot...", flush=True)

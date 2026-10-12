@@ -19,10 +19,9 @@ fixture Disko script on physical hardware.
 No `nix` wrapper, shell alias, impure evaluation or custom rebuild executable is
 needed. If you previously activated the wrapper, your next configuration
 activation removes it; building alone does not change the installed commands.
-Provision a small local input directory once, then select it with Nix's
-standard `--override-input` option. Refresh that directory after edits or pulls that change the
-SOPS files or their schema. Provisioning validates the schema and atomically replaces the data;
-failed decryption leaves the previous input intact.
+Provision a machine-local deployment flake outside the checkout. It selects the
+repository and decrypted hardware data as standard Nix inputs and forwards the
+repository's outputs. Rebuilds use its path with no `--override-input`.
 
 Before using this on a controller, make an authorized SOPS identity available to
 your normal user: the administrator GPG private key, or an age key supplied via
@@ -35,64 +34,82 @@ From the checkout, bootstrap with the development shell:
 
 ```sh
 nix develop
-python3 scripts/hardware-identities.py "$HOME/.local/share/nixos-hardware"
+python3 scripts/hardware-identities.py --deployment "$HOME/.local/share/nixos-deployment"
 ```
 
 After this configuration has been activated, the same exporter is available as:
 
 ```sh
-sys hardware-input --repo "$PWD" "$HOME/.local/share/nixos-hardware"
+sys hardware-deployment --repo "$PWD" "$HOME/.local/share/nixos-deployment"
 ```
 
-`sys hardware-source` remains an alias for the exporter. The former whole-source
-`prepare`/`run` interface is removed. An existing plaintext inventory can be
-migrated with `--inventory /absolute/path/to/hardware-identities.json`.
+Rerun this command after pulling or editing the repository or changing its SOPS
+inventory. It refreshes **only the local deployment's lock**, leaving the
+repository lock untouched. Git sources include tracked edits but exclude
+untracked/ignored files; stage new source files before refreshing. Rebuilds use
+the locked source snapshot until you refresh, even if the checkout has changed.
+Failed decryption or lock refresh preserves the previous deployment. Do not run
+a rebuild concurrently with provisioning.
+
+To migrate an existing plaintext inventory without a SOPS key, add
+`--inventory /absolute/path/to/hardware-identities.json`. That imports its current
+values; it does not pick up subsequent encrypted inventory changes. For a
+source-only refresh, rerun provisioning with
+`--inventory /LOCAL/DEPLOYMENT/hardware-input/hardware-identities.json`.
+Provisioning captures the tracked checkout as a store snapshot, including
+tracked edits, then creates the local lock from the repository's dependency
+lock. Updating the local lock alone does not select a newer checkout snapshot.
 
 Build without activating:
 
 ```sh
-nix build .#nixosConfigurations.ward.config.system.build.toplevel --no-link \
-  --override-input hardware-identities "path:$HOME/.local/share/nixos-hardware"
-
-nix build .#darwinConfigurations.u3.system --no-link \
-  --override-input hardware-identities "path:$HOME/.local/share/nixos-hardware"
+nix build "path:$HOME/.local/share/nixos-deployment#nixosConfigurations.ward.config.system.build.toplevel" --no-link
+nix build "path:$HOME/.local/share/nixos-deployment#darwinConfigurations.u3.system" --no-link
 ```
 
-Use the same flag with ordinary rebuild commands. Choose the configuration for
-the machine being updated:
+Choose the configuration for the machine being updated:
 
 ```sh
-sudo nixos-rebuild boot --flake .#ward \
-  --override-input hardware-identities "path:$HOME/.local/share/nixos-hardware"
-
-sudo darwin-rebuild switch --flake .#u3 \
-  --override-input hardware-identities "path:$HOME/.local/share/nixos-hardware"
+sudo nixos-rebuild boot --flake "path:$HOME/.local/share/nixos-deployment#ward"
+sudo darwin-rebuild switch --flake "path:$HOME/.local/share/nixos-deployment#u3"
+home-manager switch --flake "path:$HOME/.local/share/nixos-deployment#cody@arch1"
 ```
 
-Here `$HOME` expands in your shell before `sudo`; root can read the private local
-input. NixOS `boot` prepares the next boot generation without rebooting or
-switching running services. Standalone `home-manager switch` accepts the same
-flake input override. Platform builds still need a compatible native or remote
-builder.
+Here `$HOME` expands before `sudo`. NixOS `boot` prepares the next generation
+without rebooting or switching running services. Platform builds still need a
+compatible native or remote builder. A deployment can instead live at
+`/etc/nixos` if that is an unused, machine-local location; keep the tracked
+repository elsewhere. Provisioning refuses to overwrite an unmanaged flake.
+With `/etc/nixos/flake.nix` provisioned, NixOS can use its normal default flake
+location and hostname selection.
 
-`--override-input` implies `--no-write-lock-file`: the committed lock keeps the
-synthetic input, and the production directory and its hash are not recorded in
-Git. Do not use `--write-lock-file` with production input overrides. The input is
-copied to the local store; production closures and their input paths must never
-be pushed to public caches. Public dependencies remain reusable, while files,
-initrds and systems that depend on production values rebuild locally.
+The deployment contains `flake.nix`, `flake.lock`, `deployment.json`, `hardware-input/`,
+and a `source-root` GC-root symlink. The symlink keeps the source snapshot alive
+across Nix garbage collection. Keep the entire directory out of Git and public caches. Its absolute input paths are
+machine-local; rerun provisioning on a new controller. The local lock pins the
+source and input in the local store, so archived deployments can also be copied
+to trusted remote stores without the original checkout or decryption key.
+Do not edit the generated flake or add unrelated files to this directory.
+
+The lower-level `sys hardware-input` and `sys hardware-source` exporters remain
+available. Their standalone input can still be used with
+`--override-input hardware-identities path:/LOCAL/INPUT`; never write that
+override into the repository lock. Production closures and their input paths
+must never be pushed to public caches. Public dependencies remain reusable,
+while files, initrds and systems depending on production values rebuild locally.
 
 The input directory contains only `hardware-identities.json` and `metadata.json`.
-It has mode 0700 and its files have mode 0600. It belongs outside the checkout.
+The deployment and input directories have mode 0700; generated files have mode
+0600. Both belong outside the checkout.
 These permissions do not make copies in the Nix store confidential from local
 users. Plaintext is allowed on trusted systems and in private caches, never in
 Git, public logs or public caches.
 
 ## Remote rebuilding and installation
 
-The optional remote helper still provisions from SOPS and transfers the checkout
-and local input to the target store. It supplies the same override to the remote
-standard rebuild command, so the target needs no production decryption key:
+The optional remote helper provisions a temporary deployment from SOPS and
+archives it and its inputs to the target store. The remote standard rebuild
+command selects that archived flake without overrides or a decryption key:
 
 ```sh
 nix run .#nixos-rebuild-remote -- ward build
@@ -103,11 +120,17 @@ It expects an installed host with `cody@HOST` SSH and sudo access. It never
 reboots; `switch` activates services immediately. A live installer uses the
 host-specific installation guide instead.
 
-The Warbler installer transfers a separate `hardware-input` directory alongside
-the source, supplies the override for every evaluation/build, and retains it at
-`/persist/nixos-config/hardware-input`. Its pin is updated after formatting. A
-manual rebuild of that installed checkout must select that local directory with
-`--override-input hardware-identities path:/persist/nixos-config/hardware-input`.
+The Warbler installer builds through a temporary deployment. After formatting,
+it records the fresh volume pin in `/persist/nixos-config/hardware-input` and
+creates `/persist/nixos-deployment` inside the installed system. Subsequent
+rebuilds use `sudo nixos-rebuild boot --flake /persist/nixos-deployment#warbler`.
+For source-only reprovisioning there, use:
+
+```sh
+sudo sys hardware-deployment --repo /persist/nixos-config \
+  --inventory /persist/nixos-config/hardware-input/hardware-identities.json \
+  /persist/nixos-deployment
+```
 
 For an attended fresh format, set only the local input's
 `HOST.storage.luks.MAPPER.volumeKeyId` to `null`. MAPPER is `cryptroot` for Crow
@@ -130,8 +153,7 @@ production builder.
 python3 scripts/test-hardware-identities.py
 python3 scripts/test-warbler-install.py
 nix eval --json .#lib.hardwareIdentityChecks
-nix eval --json .#lib.hardwareIdentityChecks \
-  --override-input hardware-identities "path:$HOME/.local/share/nixos-hardware"
+nix eval --json "path:$HOME/.local/share/nixos-deployment#lib.hardwareIdentityChecks"
 ```
 
 The checks report booleans, not identifiers. After changing the schema, run
@@ -147,16 +169,9 @@ CI checks both the generated fixtures and the selected input, rejecting stale
 schemas or mismatched fixture values. Ordinary dependency updates can refresh
 the snapshot automatically.
 
-## Removing the override flag later
+## What remains local
 
-The remaining flag selects a build input; it is not a decryption hook. Pure Nix
-cannot silently read undeclared local files or invoke the user's SOPS keyring.
-A separate local deployment flake can select this input using standard Nix, but
-adds a local lock/update lifecycle.
-
-A more extensive redesign would supply identities at runtime or during local
-boot-image installation. Network and USB settings are candidates for runtime
-files. Root device selection, ZFS host IDs and LUKS volume pins require early-boot
-provisioning, with the pins covered by the Secure Boot/TPM trust chain. They must
-be available before unlocking root; decrypting them from that root at normal
-service startup is too late. That work is separate from this input refactor.
+Provisioning supplies explicit inputs; rebuilds do not decrypt SOPS or read an
+ambient keyring. The repository itself stays reproducible with synthetic data.
+A deployment lock is private machine state with an explicit refresh lifecycle,
+not a replacement for the repository's dependency lock.

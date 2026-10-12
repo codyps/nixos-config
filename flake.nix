@@ -273,13 +273,12 @@
                 esac
                 work=$(mktemp -d)
                 trap 'rm -rf "$work"' EXIT
-                python3 ${./scripts/hardware-identities.py} "$work/hardware-input" >/dev/null
+                python3 ${./scripts/hardware-identities.py} --deployment "$work/deployment" >/dev/null
                 archive=$(nix flake archive --json --no-write-lock-file --to "ssh-ng://cody@$host" \
-                  --override-input hardware-identities "path:$work/hardware-input" .)
+                  "path:$work/deployment")
                 source=$(jq -er .path <<< "$archive")
-                identities=$(jq -er '.inputs["hardware-identities"].path' <<< "$archive")
-                printf -v command 'sudo nixos-rebuild %q --flake %q --override-input hardware-identities %q --no-write-lock-file' \
-                  "$action" "$source#$host" "path:$identities"
+                printf -v command 'sudo nixos-rebuild %q --flake %q --no-update-lock-file' \
+                  "$action" "$source#$host"
                 ssh -t "cody@$host" "$command"
               '';
             };

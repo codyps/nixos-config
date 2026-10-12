@@ -2,6 +2,7 @@
 """Hardware input provisioning contracts; no production identifiers or keys."""
 import importlib.util
 import json
+import shutil
 from pathlib import Path
 import subprocess
 import tempfile
@@ -184,6 +185,90 @@ class HardwareTests(unittest.TestCase):
         fixture.write_text('{}')
         with self.assertRaisesRegex(ValueError, 'regeneration'):
             updater.update(self.repo, check=True)
+
+    def fake_lock(self, command, **kwargs):
+        if command[0] == 'nix-store':
+            (self.dest / 'source-root').symlink_to(command[2])
+            return subprocess.CompletedProcess(command, 0)
+        if 'metadata' in command:
+            return subprocess.CompletedProcess(command, 0, stdout=json.dumps({'path': '/nix/store/' + 'a' * 32 + '-source'}).encode())
+        (self.dest / 'flake.lock').write_text('{"locked":true}')
+        return subprocess.CompletedProcess(command, 0)
+
+    def test_deployment_forwards_outputs_and_keeps_data_private(self):
+        with patch.object(hardware.subprocess, 'run', side_effect=self.fake_lock) as run:
+            hardware.provision_deployment(self.repo, self.dest, self.local)
+        flake = (self.dest / 'flake.nix').read_text()
+        self.assertIn('configuration.outputs', flake)
+        self.assertIn('inputs.configuration.inputs.hardware-identities.follows', flake)
+        self.assertIn('path:/nix/store/', flake)
+        self.assertIn('git+file://', run.call_args_list[0].args[0][-1])
+        self.assertNotIn(self.inventory['example']['wifiMac'], flake)
+        self.assertEqual(json.loads((self.dest / 'hardware-input' / hardware.INVENTORY).read_text()), self.inventory)
+        self.assertEqual((self.dest / 'flake.lock').stat().st_mode & 0o777, 0o600)
+        self.assertEqual(run.call_args_list[1].args[0][-2:], ['configuration', 'hardware-identities'])
+        self.assertTrue((self.dest / 'source-root').is_symlink())
+
+    def test_deployment_failed_refresh_restores_inventory_and_lock(self):
+        with patch.object(hardware.subprocess, 'run', side_effect=self.fake_lock):
+            hardware.provision_deployment(self.repo, self.dest, self.local)
+        before = {str(p.relative_to(self.dest)): p.read_bytes() for p in self.dest.rglob('*') if p.is_file() and not p.is_symlink()}
+        self.inventory['example']['iaid'] = 99
+        self.local.write_text(json.dumps(self.inventory))
+        def fail_lock(command, **kwargs):
+            return self.fake_lock(command, **kwargs) if 'metadata' in command else subprocess.CompletedProcess(command, 1)
+        with patch.object(hardware.subprocess, 'run', side_effect=fail_lock):
+            with self.assertRaisesRegex(RuntimeError, 'restored'):
+                hardware.provision_deployment(self.repo, self.dest, self.local)
+        self.assertEqual(before, {str(p.relative_to(self.dest)): p.read_bytes() for p in self.dest.rglob('*') if p.is_file() and not p.is_symlink()})
+
+    def test_deployment_refuses_unmanaged_directories_and_checkout(self):
+        with self.assertRaisesRegex(ValueError, 'outside'):
+            hardware.provision_deployment(self.repo, self.repo / 'deployment', self.local)
+        self.dest.mkdir(mode=0o700)
+        (self.dest / 'flake.nix').write_text('unmanaged')
+        with self.assertRaisesRegex(ValueError, 'unmanaged'):
+            hardware.provision_deployment(self.repo, self.dest, self.local)
+        self.assertEqual((self.dest / 'flake.nix').read_text(), 'unmanaged')
+
+    def test_deployment_escapes_nix_interpolation(self):
+        self.assertIn(r'\${unsafe}', hardware.nix_string('${unsafe}'))
+
+    @unittest.skipUnless(shutil.which('nix'), 'Nix integration requires a local Nix installation')
+    def test_deployment_real_nix_refresh_and_archive_without_override(self):
+        fixtures = hardware.provision(self.repo, self.root / 'fixture-input', fixtures=True)
+        flake = self.repo / 'flake.nix'
+        flake.write_text('''{
+          inputs.hardware-identities = { url = "path:/unused-fixture-input"; flake = false; };
+          outputs = { hardware-identities, ... }: {
+            marker = "first";
+            fixture = (builtins.fromJSON (builtins.readFile (hardware-identities + "/metadata.json"))).fixture;
+          };
+        }'''.replace('/unused-fixture-input', str(fixtures)))
+        subprocess.run(['git', '-C', str(self.repo), 'add', '.'], check=True, capture_output=True)
+        subprocess.run(['git', '-C', str(self.repo), '-c', 'user.name=Test', '-c', 'user.email=test@example.invalid',
+                        'commit', '-qm', 'Synthetic test source'], check=True, capture_output=True)
+        hardware.provision_deployment(self.repo, self.dest, self.local)
+        def evaluate(source, attribute):
+            return json.loads(subprocess.check_output(['nix', 'eval', '--offline', '--no-update-lock-file', '--json',
+                                                       f'path:{source}#{attribute}'], stderr=subprocess.PIPE))
+        self.assertTrue((self.dest / 'source-root').is_dir())
+        roots = subprocess.check_output(['nix-store', '--query', '--roots', str((self.dest / 'source-root').resolve())], stderr=subprocess.PIPE).decode()
+        self.assertIn(str(self.dest / 'source-root'), roots)
+        before = (self.dest / 'flake.lock').read_bytes()
+        self.assertFalse(evaluate(self.dest, 'fixture'))
+        self.assertEqual(evaluate(self.dest, 'marker'), 'first')
+        self.assertEqual((self.dest / 'flake.lock').read_bytes(), before)
+        flake.write_text(flake.read_text().replace('first', 'second'))
+        self.assertEqual(evaluate(self.dest, 'marker'), 'first')
+        hardware.provision_deployment(self.repo, self.dest, self.local)
+        self.assertEqual(evaluate(self.dest, 'marker'), 'second')
+        archive = json.loads(subprocess.check_output(['nix', 'flake', 'archive', '--json', 'path:' + str(self.dest)],
+                                                     stderr=subprocess.PIPE))
+        self.repo.rename(self.root / 'hidden-repo')
+        self.dest.rename(self.root / 'hidden-deployment')
+        self.assertFalse(evaluate(archive['path'], 'fixture'))
+        self.assertEqual(evaluate(archive['path'], 'marker'), 'second')
 
     def test_cli_export_without_nix_or_repository_copy(self):
         result = subprocess.run(['python3', str(Path(hardware.__file__)), '--repo', str(self.repo),

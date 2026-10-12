@@ -220,10 +220,17 @@ class InstallTests(unittest.TestCase):
                                 calls[installation].index("nixos-install --"))
                 self.assertLess(calls[installation].index("warbler-account-passwords initialize"),
                                 calls[installation].index("nixos-install --"))
+            provision = next(i for i, cmd in enumerate(calls) if "--deployment /run/warbler-install.12345678/deployment" in cmd)
+            first_eval = next(i for i, cmd in enumerate(calls) if " eval " in cmd)
+            self.assertLess(provision, first_eval)
+            if answer and not build_only:
+                self.assertIn("sys hardware-deployment --repo /persist/nixos-config", calls[installation])
+                self.assertLess(calls[installation].index("nixos-install --"), calls[installation].index("nixos-enter --"))
             for cmd in calls:
                 if " eval " in cmd or " build " in cmd:
-                    self.assertIn("--override-input hardware-identities path:/run/warbler-install.12345678/source/hardware-input", cmd)
-                    self.assertIn("--no-write-lock-file", cmd)
+                    self.assertIn("path:../deployment#nixosConfigurations.warbler.config", cmd)
+                    self.assertIn("--no-update-lock-file", cmd)
+                    self.assertNotIn("--override-input", cmd)
             self.assertEqual(calls[-1], "rm -rf -- /run/warbler-install.12345678")
 
     def test_cancel_never_transfers_secrets_or_formats(self):

@@ -170,6 +170,29 @@ class HardwareTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'unexpected'):
             hardware.verify_fixtures(self.repo, self.dest)
 
+    def test_fixture_updater_preserves_dependencies_and_checks_compatibility(self):
+        spec = importlib.util.spec_from_file_location('updater', Path(__file__).with_name('update-hardware-fixtures.py'))
+        updater = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(updater)
+        (self.repo / 'config/hardware-fixtures').mkdir(parents=True)
+        lock = {'nodes': {'root': {'inputs': {'hardware-identities': 'hardware'}},
+                          'hardware': {}, 'other': {'locked': {'rev': 'unchanged'}}}}
+        path = self.repo / 'flake.lock'
+        path.write_text(json.dumps(lock))
+        with patch.object(updater.subprocess, 'check_output', return_value='sha256-test\n'):
+            updater.update(self.repo)
+            updated = json.loads(path.read_text())
+            self.assertEqual(updated['nodes']['other'], lock['nodes']['other'])
+            self.assertEqual(updated['nodes']['hardware']['parent'], [])
+            self.assertEqual(updated['nodes']['hardware']['locked']['narHash'], 'sha256-test')
+            before = path.read_bytes()
+            updater.update(self.repo, check=True)
+            self.assertEqual(path.read_bytes(), before)
+            del updated['nodes']['hardware']['parent']
+            path.write_text(json.dumps(updated))
+            with self.assertRaisesRegex(ValueError, 'normalization'):
+                updater.update(self.repo, check=True)
+
     def test_cli_export_without_nix_or_repository_copy(self):
         result = subprocess.run(['python3', str(Path(hardware.__file__)), '--repo', str(self.repo),
                                  '--inventory', str(self.local), str(self.dest)], capture_output=True, text=True)

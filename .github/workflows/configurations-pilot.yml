@@ -41,6 +41,8 @@ jobs:
           ref: ${{ inputs.ref || github.sha }}
           persist-credentials: false
       - uses: cachix/install-nix-action@b85815f71a6de0ddee80b8a80a98d43f4bcc66c7 # v31
+      - name: Check synthetic hardware data and lock compatibility
+        run: python3 scripts/update-hardware-fixtures.py --check
       - name: Verify the resolved hardware input is synthetic
         run: |
           input=$(nix eval --raw .#lib.hardwareIdentities.inputPath)
@@ -69,14 +71,14 @@ jobs:
         id: matrix
         run: |
           nix eval --accept-flake-config --no-update-lock-file --impure --json \
-            --expr 'let flake = builtins.getFlake ("path:" + toString ./.); in import (flake.outPath + "/scripts/configuration-matrix.nix") flake' > "$GITHUB_WORKSPACE/matrix.json"
-          jq -e '.include | length > 0' matrix.json
-          echo "configurations=$(jq -c . matrix.json)" >> "$GITHUB_OUTPUT"
+            --expr 'let flake = builtins.getFlake ("path:" + toString ./.); in import (flake.outPath + "/scripts/configuration-matrix.nix") flake' > "$RUNNER_TEMP/matrix.json"
+          jq -e '.include | length > 0' "$RUNNER_TEMP/matrix.json"
+          echo "configurations=$(jq -c . "$RUNNER_TEMP/matrix.json")" >> "$GITHUB_OUTPUT"
           {
             echo '### Flake cache targets'
             echo "Revision: $(git rev-parse HEAD)"
             echo '```json'
-            jq . matrix.json
+            jq . "$RUNNER_TEMP/matrix.json"
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
 
@@ -108,6 +110,8 @@ jobs:
           test -n "$CACHIX_AUTH_TOKEN" || { echo 'Set the CACHIX_AUTH_TOKEN repository secret.'; exit 1; }
 
       - uses: cachix/install-nix-action@b85815f71a6de0ddee80b8a80a98d43f4bcc66c7 # v31
+      - name: Check synthetic hardware data and lock compatibility
+        run: python3 scripts/update-hardware-fixtures.py --check
       - name: Verify the resolved hardware input is synthetic
         run: |
           input=$(nix eval --raw .#lib.hardwareIdentities.inputPath)

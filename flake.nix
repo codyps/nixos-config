@@ -187,6 +187,7 @@
             hardware-identities = pkgs.runCommand "test-hardware-identities" { nativeBuildInputs = [ pkgs.python3 pkgs.git ]; } ''
               cp ${./scripts/hardware-identities.py} hardware-identities.py
               cp ${./scripts/test-hardware-identities.py} test-hardware-identities.py
+              cp ${./scripts/update-hardware-fixtures.py} update-hardware-fixtures.py
               python3 test-hardware-identities.py
               touch "$out"
             '';

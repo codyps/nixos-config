@@ -132,10 +132,11 @@ nix eval --json .#lib.hardwareIdentityChecks \
   --override-input hardware-identities "path:$HOME/.local/share/nixos-hardware"
 ```
 
-The checks report booleans, not identifiers. When the schema changes, regenerate
-the synthetic input outside the checkout with `--fixtures`, verify it, and copy
-only those two synthetic files to `config/hardware-fixtures`; update its lock.
-Never generate fixtures from production values.
+The checks report booleans, not identifiers. After changing the schema or running `nix flake update`, run
+`python3 scripts/update-hardware-fixtures.py`. It generates fixtures from field
+names alone and maintains a lock entry compatible with both Lix 2.94 and newer
+Nix relative-input handling. The automated updater runs it, and CI checks the
+result before evaluation. Never generate fixtures from production values.
 
 ## Removing the override flag later
 

@@ -33,10 +33,6 @@
   systemd.tmpfiles.rules = [ "d /persist/credstore 0700 root root -" ];
   systemd.network = {
     enable = true;
-    links."10-crow-wifi" = {
-      matchConfig.PermanentMACAddress = "${hardwareIdentities "crow" [ "network" "interfaces" "wlp6s0" "permanentMacAddress" ]}";
-      linkConfig.Name = "wlp6s0";
-    };
     networks."20-wifi" = {
       matchConfig.Name = "wlp6s0";
       networkConfig = { DHCP = "yes"; IPv6AcceptRA = true; };
@@ -44,6 +40,14 @@
       linkConfig.RequiredForOnline = "routable";
     };
   };
-  boot.initrd.systemd.network.links."10-crow-wifi" = config.systemd.network.links."10-crow-wifi";
+  services.hardwareIdentities.templates."etc/systemd/network/10-crow-wifi.link" = {
+    initrd = true;
+    text = ''
+      [Match]
+      PermanentMACAddress=${hardwareIdentities "crow" [ "network" "interfaces" "wlp6s0" "permanentMacAddress" ]}
+      [Link]
+      Name=wlp6s0
+    '';
+  };
   services.resolved.enable = true;
 }

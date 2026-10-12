@@ -5,6 +5,7 @@ import fcntl
 import getpass
 import json
 import os
+import re
 from pathlib import Path
 import subprocess
 import sys
@@ -380,6 +381,13 @@ def enroll_disk(config, work):
     print("TPM enrolled; recovery slots preserved. Test a reboot with console access available.")
 
 
+def resolve_volume_pin(config):
+    if config.get("rootVolumeKeyIdFile"):
+        pin = json.loads(Path(config["rootVolumeKeyIdFile"]).read_text())
+        require(pin is None or isinstance(pin, str) and re.fullmatch(r"[0-9a-f]{64}", pin), "Invalid local root volume pin.")
+        config["rootVolumeKeyId"] = pin
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--config", type=Path, default=Path("/etc/secure-unlock.json"))
@@ -398,6 +406,8 @@ def main():
     require(not (args.command == "credentials" and args.ssh_only and args.wifi_file),
             "--ssh-only cannot be combined with --wifi-file.")
     config = json.loads(args.config.read_text())
+    resolve_volume_pin(config)
+
     if args.command == "credentials" and not config["wifi"]:
         require(not args.wifi_file, "Enable Wi-Fi in the host configuration before supplying credentials.")
         args.ssh_only = True

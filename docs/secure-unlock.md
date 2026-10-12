@@ -60,15 +60,20 @@ on an encrypted root cannot supply pre-unlock Wi-Fi directly.
 
 Ward, Crow and Warbler each use their normal host output throughout installation
 and operation (`.#ward`, `.#crow`, `.#warbler`). There are no `*-bootstrap` outputs
-or unlock feature toggles to change between stages.
+or unlock feature toggles to change between stages. The repository builds public
+templates; [machine-local provisioning](hardware-identities.md) supplies the actual
+volume pin before boot-image signing and measurement. The setup helper reads the
+same local pin through `rootVolumeKeyIdFile`. Ordinary source changes need no
+inventory refresh.
 
 1. **Install and unlock at the console.** Create signing keys before installing
    boot files. With Secure Boot disabled, in Setup Mode, or when running from
    the installer, the bootloader hook stages an empty credential directory and
    skips TPM policy creation. It still signs boot files with Lanzaboote.
-   For a freshly formatted disk, set `volume-identity.nix` to `null` in the
-   installation checkout first; never reuse the old volume's pin. Record the
-   new public ID from `sudo sys root-volume-key-id`, then rebuild the same host.
+   For a freshly formatted disk, set the private inventory field
+   `HOST.storage.luks.MAPPER.volumeKeyId` to `null` and provision it first; never reuse the old volume's pin. Record the
+   new ID from `sudo sys root-volume-key-id`, update SOPS and the local inventory,
+   provision again, then rebuild the same host.
    An unpinned generation cannot start remote recovery or attempt TPM
    unlock. Keep an existing valid pin when repairing an existing installation.
 2. **Enroll Secure Boot with local console access.** Back up firmware databases

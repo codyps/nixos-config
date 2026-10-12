@@ -10,7 +10,15 @@
 
   # Primary AI environment; no AI account or sandbox is created on the host.
   # /var/lib is persisted on Crow's encrypted /persist filesystem.
+  services.hardwareIdentities.templates."containers/warbler-ai/90-hardware.conf".text = ''
+    [Link]
+    MACAddress=${hardwareIdentities "warbler" [ "network" "containers" "warbler-ai" "interfaces" "mv-eno1" "macAddress" ]}
+  '';
   containers.ai = {
+    bindMounts."/run/hardware-identities" = {
+      hostPath = "${config.services.hardwareIdentities.stateDirectory}/current/containers/warbler-ai";
+      isReadOnly = true;
+    };
     autoStart = true;
     restartIfChanged = false;
     ephemeral = false;
@@ -31,7 +39,6 @@
     localAddress = "10.80.0.2";
     hostAddress = "10.80.0.1";
     config = {
-      _module.args.hardwareIdentities = hardwareIdentities;
       imports = [ ../warbler/ai-container-guest.nix ];
       networking.hostName = lib.mkForce "crow-ai";
       systemd.network.networks."10-lan".enable = false;

@@ -31,7 +31,7 @@
 
   fileSystems."/boot" =
     {
-      device = "/dev/disk/by-uuid/${hardwareIdentities "finch" [ "storage" "fileSystems" "/boot" "uuid" ]}";
+      device = "/dev/disk/by-hardware/${hardwareIdentities "finch" [ "storage" "fileSystems" "/boot" "uuid" ]}";
       fsType = "ext4";
     };
 

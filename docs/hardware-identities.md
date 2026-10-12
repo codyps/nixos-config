@@ -1,4 +1,4 @@
-# Local hardware input and public CI fixtures
+# Machine-local hardware identities
 
 Production identifiers live in per-host SOPS files under `secrets/hardware/`.
 `lib/hardware-identities-schema.json` names their consumers: filesystem UUIDs,
@@ -6,172 +6,164 @@ LUKS volume pins, ZFS host IDs, installation disk selectors, DHCP identities,
 interface MAC addresses and USB device hashes. Passwords and private keys remain
 separate runtime secrets.
 
-The flake declares a non-flake input named `hardware-identities`. Its default is
-a locked public snapshot of this repository, using only its
-`config/hardware-fixtures` directory of deterministic synthetic values. This
-avoids relative-input incompatibilities between Nix and Lix. Ordinary
-Nix commands work on a fresh checkout without any decryption key. These default
-builds are for tests and public caching; activation rejects them. Never run a
-fixture Disko script on physical hardware.
+## Build and rebuild directly from the repository
 
-## Production builds with normal Nix
+All builds use the repository flake and its ordinary dependency lock. They need
+no decryption key, hardware input override, Nix wrapper or local deployment flake:
 
-No `nix` wrapper, shell alias, impure evaluation or custom rebuild executable is
-needed. If you previously activated the wrapper, your next configuration
-activation removes it; building alone does not change the installed commands.
-Provision a machine-local deployment flake outside the checkout. It selects the
-repository and decrypted hardware data as standard Nix inputs and forwards the
-repository's outputs. Rebuilds use its path with no `--override-input`.
+```sh
+nix build .#nixosConfigurations.ward.config.system.build.toplevel --no-link
+nix build .#darwinConfigurations.u3.system --no-link
+sudo nixos-rebuild boot --flake .#ward
+sudo darwin-rebuild switch --flake .#u3
+home-manager switch --flake '.#cody@arch1'
+```
 
-Before using this on a controller, make an authorized SOPS identity available to
-your normal user: the administrator GPG private key, or an age key supplied via
-SOPS's normal configuration (such as `SOPS_AGE_KEY_FILE`). The exporter decrypts
-all host files, so that identity must have access to all of them. It never copies
-private keys into the input. Build machines need no SOPS key once the input has
-been provisioned.
+Choose the output for the target machine. Platform builds still need a compatible
+native or remote builder. NixOS `boot` installs the next boot generation without
+rebooting or switching running services.
 
-From the checkout, bootstrap with the development shell:
+NixOS installation and activation require provisioned local inventory, described
+below. Building needs none. Darwin and Home Manager outputs do not consume this
+inventory. Pulling source changes needs no separate provisioning or lock refresh.
+
+## One-time provisioning on a NixOS target
+
+Before the first installation or activation of this configuration, provision
+the target's inventory. Build the helper directly from the checkout:
+
+```sh
+nix build .#nixosConfigurations.ward.config.system.build.hardwareProvisioner
+sudo ./result/bin/hardware-runtime provision --repo "$PWD" \
+  --inventory /PRIVATE/hardware-identities.json
+```
+
+Replace `ward` with the host. The plaintext inventory must be outside the checkout.
+It has the complete nested schema, preserving existing values. An existing
+inventory from the former local input/deployment can be imported with
+`--inventory /OLD/DEPLOYMENT/hardware-input/hardware-identities.json`.
+
+Omit `--inventory` to decrypt the per-host SOPS files. The helper needs an
+authorized SOPS recipient for all files: an administrator GPG key or an age key
+configured using SOPS's normal environment. When using sudo, pass the intended
+key environment explicitly rather than assuming the root account has your key.
+Alternatively, export on a trusted controller and securely transfer the inventory:
 
 ```sh
 nix develop
-python3 scripts/hardware-identities.py --deployment "$HOME/.local/share/nixos-deployment"
+python3 scripts/hardware-identities.py /PRIVATE/hardware-export
 ```
 
-After this configuration has been activated, the same exporter is available as:
+This exporter creates `hardware-identities.json` and metadata with private
+permissions. It does not build a flake or modify Git. Transfer only through a
+trusted private channel; never print the file in CI or paste it into logs.
+
+For a mounted installation, add `--root /mnt` to the provisioning command,
+**after mounting persistent storage and before nixos-install**. Crow and Robin
+also need provisioning without `--root` on the live installer before running
+Disko: their installation disk selector is a local symlink. After formatting,
+provision again under `/mnt`, using the intended new volume pin or `null` for
+an attended first boot.
+
+The helper validates and renders the inventory before replacing active state.
+Missing files, invalid fields or synthetic fixture state prevent installation
+and activation. Do not run provisioning concurrently with rebuilding.
+
+After activation, the same operations are available as:
 
 ```sh
-sys hardware-deployment --repo "$PWD" "$HOME/.local/share/nixos-deployment"
+sudo sys hardware-provision --repo "$PWD" --inventory /PRIVATE/hardware-identities.json
+sudo sys hardware-verify
+sudo nixos-rebuild boot --flake .#ward
 ```
 
-Rerun this command after pulling or editing the repository or changing its SOPS
-inventory. It refreshes **only the local deployment's lock**, leaving the
-repository lock untouched. Git sources include tracked edits but exclude
-untracked/ignored files; stage new source files before refreshing. Rebuilds use
-the locked source snapshot until you refresh, even if the checkout has changed.
-Failed decryption or lock refresh preserves the previous deployment. Do not run
-a rebuild concurrently with provisioning.
+Reprovision when identifiers change; ordinary source edits and pulls do not need
+it. Update the corresponding encrypted SOPS file as well. After verifying a
+successful rebuild, obsolete local deployment directories can be removed; they
+are no longer build entry points. Activation removes any previously managed Nix
+wrapper. A build alone does not change installed commands.
 
-To migrate an existing plaintext inventory without a SOPS key, add
-`--inventory /absolute/path/to/hardware-identities.json`. That imports its current
-values; it does not pick up subsequent encrypted inventory changes. For a
-source-only refresh, rerun provisioning with
-`--inventory /LOCAL/DEPLOYMENT/hardware-input/hardware-identities.json`.
-Provisioning captures the tracked checkout as a store snapshot, including
-tracked edits, then creates the local lock from the repository's dependency
-lock. Updating the local lock alone does not select a newer checkout snapshot.
+## What happens locally
 
-Build without activating:
+State lives at `/persist/nixos-hardware` on hosts with a `/persist` filesystem,
+otherwise `/var/lib/nixos-hardware`. Its `input/` directory is mode 0700 and its
+inventory files are mode 0600. The `current` symlink selects generated runtime
+files; those files are readable by services that need them. Plaintext identifiers
+are acceptable on trusted systems.
 
-```sh
-nix build "path:$HOME/.local/share/nixos-deployment#nixosConfigurations.ward.config.system.build.toplevel" --no-link
-nix build "path:$HOME/.local/share/nixos-deployment#darwinConfigurations.u3.system" --no-link
-```
+Repository configurations refer to semantic `/dev/disk/by-hardware/...` aliases.
+Local UUID mapping files supply these aliases through udev in both boot stages.
+Activation renders network drop-ins, USBGuard rules and the ZFS host ID from the
+same inventory. Container network identities come from a read-only local bind
+mount. After changing a container identity, restart that container during an
+appropriate maintenance window so its bind mount selects the new generation.
+The first migration to this design also needs that container restart.
+Installation disk selectors remain under local state.
 
-Choose the configuration for the machine being updated:
+The bootloader's late initrd appender adds the actual crypttab pin, device
+mappings, host ID and early network configuration directly to the initrd
+**before PID 1 and its generators run**. It preserves other initrd secrets.
+Lanzaboote then signs and measures that personalized image. Its installer is
+patched to refresh generations with local initrd inputs even when their store
+path has not changed.
 
-```sh
-sudo nixos-rebuild boot --flake "path:$HOME/.local/share/nixos-deployment#ward"
-sudo darwin-rebuild switch --flake "path:$HOME/.local/share/nixos-deployment#u3"
-home-manager switch --flake "path:$HOME/.local/share/nixos-deployment#cody@arch1"
-```
+Thus the Nix store build remains reusable, while installed ESP boot files and
+runtime files contain production identifiers. Secure Boot verification, pinned
+LUKS volume validation, TPM policy updates and sealed recovery credentials remain
+in the existing staged provisioning workflow. Do not upload personalized ESP
+files or local state to public storage.
 
-Here `$HOME` expands before `sudo`. NixOS `boot` prepares the next generation
-without rebooting or switching running services. Platform builds still need a
-compatible native or remote builder. A deployment can instead live at
-`/etc/nixos` if that is an unused, machine-local location; keep the tracked
-repository elsewhere. Provisioning refuses to overwrite an unmanaged flake.
-With `/etc/nixos/flake.nix` provisioned, NixOS can use its normal default flake
-location and hostname selection.
+For a freshly formatted LUKS volume only, a `null` value at
+`HOST.storage.luks.MAPPER.volumeKeyId` permits an attended first boot and omits
+TPM unlock options. MAPPER is `cryptroot` for Crow/Warbler and `luksroot` for Ward.
+Never clear a valid pin to bypass a mismatch on an existing disk. Obtain
+`sudo sys root-volume-key-id` on the trusted installed system, update the private
+inventory and encrypted source, provision, then rebuild. See
+[secure unlock](secure-unlock.md) for firmware enrollment and TPM enrollment.
 
-The deployment contains `flake.nix`, `flake.lock`, `deployment.json`, `hardware-input/`,
-and a `source-root` GC-root symlink. The symlink keeps the source snapshot alive
-across Nix garbage collection. Keep the entire directory out of Git and public caches. Its absolute input paths are
-machine-local; rerun provisioning on a new controller. The local lock pins the
-source and input in the local store, so archived deployments can also be copied
-to trusted remote stores without the original checkout or decryption key.
-Do not edit the generated flake or add unrelated files to this directory.
+## Remote builds and installation
 
-The lower-level `sys hardware-input` and `sys hardware-source` exporters remain
-available. Their standalone input can still be used with
-`--override-input hardware-identities path:/LOCAL/INPUT`; never write that
-override into the repository lock. Production closures and their input paths
-must never be pushed to public caches. Public dependencies remain reusable,
-while files, initrds and systems depending on production values rebuild locally.
-
-The input directory contains only `hardware-identities.json` and `metadata.json`.
-The deployment and input directories have mode 0700; generated files have mode
-0600. Both belong outside the checkout.
-These permissions do not make copies in the Nix store confidential from local
-users. Plaintext is allowed on trusted systems and in private caches, never in
-Git, public logs or public caches.
-
-## Remote rebuilding and installation
-
-The optional remote helper provisions a temporary deployment from SOPS and
-archives it and its inputs to the target store. The remote standard rebuild
-command selects that archived flake without overrides or a decryption key:
+The optional helper archives the repository to the target and invokes the
+standard rebuild command there:
 
 ```sh
 nix run .#nixos-rebuild-remote -- ward build
 nix run .#nixos-rebuild-remote -- ward boot
 ```
 
-It expects an installed host with `cody@HOST` SSH and sudo access. It never
-reboots; `switch` activates services immediately. A live installer uses the
-host-specific installation guide instead.
+It expects `cody@HOST` SSH and sudo access. The target must already be provisioned
+for boot/switch actions; no production inventory is sent to a builder. It never
+reboots. `switch` activates services immediately.
 
-The Warbler installer builds through a temporary deployment. After formatting,
-it records the fresh volume pin in `/persist/nixos-config/hardware-input` and
-creates `/persist/nixos-deployment` inside the installed system. Subsequent
-rebuilds use `sudo nixos-rebuild boot --flake /persist/nixos-deployment#warbler`.
-For source-only reprovisioning there, use:
-
-```sh
-sudo sys hardware-deployment --repo /persist/nixos-config \
-  --inventory /persist/nixos-config/hardware-input/hardware-identities.json \
-  /persist/nixos-deployment
-```
-
-For an attended fresh format, set only the local input's
-`HOST.storage.luks.MAPPER.volumeKeyId` to `null`. MAPPER is `cryptroot` for Crow
-and Warbler, and `luksroot` for Ward. Never clear a pin to bypass a mismatch on an
-existing disk. After formatting, obtain `sudo sys root-volume-key-id` and record
-it in both the local input and the corresponding encrypted host file before
-refreshing the input or rebuilding elsewhere. SSH, account passwords and signing
-keys retain their separate provisioning workflows.
+The Warbler installer keeps its private seed inventory outside the source used
+for building. After formatting it records the new volume pin, provisions
+`/mnt/persist/nixos-hardware`, installs the system, and removes the temporary
+seed from the live installer. The seed is never copied into the installed checkout. Subsequent rebuilds use
+`sudo nixos-rebuild boot --flake /persist/nixos-config#warbler`.
 
 ## CI and validation
 
-CI uses the committed fixture input directly, without SOPS keys or source
-rewriting. Before building and before publishing, it resolves the actual input
-through Nix and verifies the complete contents against the deterministic fixture
-generator. Extra files, a production marker, or any different values prevent
-publishing. Do not add whole-store uploads or public post-build hooks to a
-production builder.
+CI builds the same pure outputs used by production machines. Committed
+deterministic fixtures are template markers and test data, not installable
+machine identities. Before public uploads CI verifies those files against the
+fixture generator. It has no production decryption key. Production host
+installation rejects fixture state; tests must explicitly enable test fixtures
+or supply invented test inventory.
+
+Do not enable public whole-store upload hooks on trusted production builders.
+They may still contain older identity-dependent builds or unrelated private data.
+Only the reviewed pure outputs of this design are intended for public CI caching.
 
 ```sh
 python3 scripts/test-hardware-identities.py
+python3 scripts/test-hardware-runtime.py
 python3 scripts/test-warbler-install.py
+python3 scripts/test-secure-unlock-setup.py
 nix eval --json .#lib.hardwareIdentityChecks
-nix eval --json "path:$HOME/.local/share/nixos-deployment#lib.hardwareIdentityChecks"
+nix build .#checks.x86_64-linux.warbler-vm --no-link
 ```
 
-The checks report booleans, not identifiers. After changing the schema, run
-`python3 scripts/update-hardware-fixtures.py`. It generates fixtures from field
-names alone. Never generate fixtures from production values.
-
-The public default is pinned by `flake.lock`; it does not recursively evaluate
-the snapshot's flake. When changing fixture fields, first publish the updated
-schema and fixtures, then run `nix flake update hardware-identities` to select
-that snapshot. Before publication, test with
-`--override-input hardware-identities "path:$PWD/config/hardware-fixtures"`.
-CI checks both the generated fixtures and the selected input, rejecting stale
-schemas or mismatched fixture values. Ordinary dependency updates can refresh
-the snapshot automatically.
-
-## What remains local
-
-Provisioning supplies explicit inputs; rebuilds do not decrypt SOPS or read an
-ambient keyring. The repository itself stays reproducible with synthetic data.
-A deployment lock is private machine state with an explicit refresh lifecycle,
-not a replacement for the repository's dependency lock.
+After schema changes, run `python3 scripts/update-hardware-fixtures.py`.
+Fixtures derive from field names only and are committed with the schema; there
+is no hardware flake input to update. Successful builds prove evaluation and
+construction, not host activation or physical firmware/TPM behavior.

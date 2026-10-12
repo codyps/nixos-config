@@ -28,6 +28,15 @@ let
   '';
 in
 {
+  options.boot.lanzaboote.package = lib.mkOption {
+    apply = package:
+      if cfg.enable && config.services.hardwareIdentities.enable then
+        package.overrideAttrs
+          (old: {
+            patches = (old.patches or [ ]) ++ [ ./patches/refresh-local-initrd.patch ];
+          })
+      else package;
+  };
   config = lib.mkIf cfg.enable {
     boot.loader.external.installHook = lib.mkForce (pkgs.writeShellScript "secure-unlock-install-bootloader" ''
       set -euo pipefail

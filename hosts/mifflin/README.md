@@ -1,10 +1,9 @@
 # Mifflin VMware integration
 
-Production rebuilds use a [machine-local deployment flake](../../docs/hardware-identities.md):
-`--flake /LOCAL/DEPLOYMENT#mifflin`, with no input override. Refresh the deployment
-after source or inventory changes. The remote helper provisions it automatically.
-Building the repository directly still uses synthetic fixtures that cannot be activated.
-Manual installation steps below may use the supported standalone input override.
+Build and rebuild directly from this repository with `--flake .#mifflin`.
+[Provision local hardware identities](../../docs/hardware-identities.md) once
+before installation or activation. Source changes need no provisioning refresh;
+identifiers remain in local state and are appended during bootloader installation.
 
 ## Guest integration
 
@@ -115,7 +114,7 @@ cleanly before trying again. Boot and swap partitions are not zeroed.
 To install the entries for the next boot without switching the running system:
 
 ```sh
-sudo nixos-rebuild boot --flake /LOCAL/DEPLOYMENT#mifflin
+sudo nixos-rebuild boot --flake .#mifflin
 ```
 
 Select the entry containing `reclaim-space` in the systemd-boot menu for that

@@ -220,15 +220,17 @@ class InstallTests(unittest.TestCase):
                                 calls[installation].index("nixos-install --"))
                 self.assertLess(calls[installation].index("warbler-account-passwords initialize"),
                                 calls[installation].index("nixos-install --"))
-            provision = next(i for i, cmd in enumerate(calls) if "--deployment /run/warbler-install.12345678/deployment" in cmd)
-            first_eval = next(i for i, cmd in enumerate(calls) if " eval " in cmd)
-            self.assertLess(provision, first_eval)
             if answer and not build_only:
-                self.assertIn("sys hardware-deployment --repo /persist/nixos-config", calls[installation])
-                self.assertLess(calls[installation].index("nixos-install --"), calls[installation].index("nixos-enter --"))
+                self.assertLess(calls[installation].index("warbler_volume_key_id="),
+                                calls[installation].index("sys hardware-provision"))
+                self.assertLess(calls[installation].index("sys hardware-provision"),
+                                calls[installation].index("nixos-install --"))
+            else:
+                self.assertFalse(any("sys hardware-provision" in cmd for cmd in calls))
+            self.assertTrue(any("mv /run/warbler-install.12345678/source/hardware-input /run/warbler-install.12345678/inventory" in cmd for cmd in calls))
             for cmd in calls:
                 if " eval " in cmd or " build " in cmd:
-                    self.assertIn("path:../deployment#nixosConfigurations.warbler.config", cmd)
+                    self.assertIn("path:.#nixosConfigurations.warbler.config", cmd)
                     self.assertIn("--no-update-lock-file", cmd)
                     self.assertNotIn("--override-input", cmd)
             self.assertEqual(calls[-1], "rm -rf -- /run/warbler-install.12345678")
@@ -247,9 +249,9 @@ class InstallTests(unittest.TestCase):
             root = Path(temporary) / "paths with spaces"
             helper = root / "system/sw/bin/root-volume-key-id"
             helper.parent.mkdir(parents=True)
-            output = root / "checkout/hardware-input/hardware-identities.json"
+            output = root / "private/hardware-identities.json"
             output.parent.mkdir(parents=True)
-            script = installer.volume_identity_script(root / "system", root / "checkout")
+            script = installer.volume_identity_script(root / "system", output)
             for value, status in [("b" * 64, 0), ("invalid", 0), ("c" * 64, 1)]:
                 with self.subTest(value=value, status=status):
                     output.write_text(json.dumps({"warbler": {"storage": {"luks": {"cryptroot": {"volumeKeyId": "existing-pin"}}}}, "other": "preserved"}))

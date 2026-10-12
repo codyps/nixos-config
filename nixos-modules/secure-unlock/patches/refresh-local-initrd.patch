@@ -1,0 +1,12 @@
+--- a/systemd/src/install.rs
++++ b/systemd/src/install.rs
+@@ -260,3 +260,8 @@
+         // If the generation is already properly installed, don't overwrite it.
+-        if self.register_installed_generation(generation)? {
++        // Machine-local initrd inputs can change without changing the store path.
++        // Reassemble before signing/measuring; content-addressed boot files retain
++        // the previous contents until successful installation and pruning.
++        if generation.spec.bootspec.bootspec.initrd_secrets.is_none()
++            && self.register_installed_generation(generation)?
++        {
+             return Ok(());

@@ -25,6 +25,9 @@ let
       printf '{"probe":"warbler-sops-test"}' | \
         sops --encrypt --age "$recipient" --input-type json --output-type json /dev/stdin > "$out"
     '';
+  runtimeInventory = pkgs.writeText "test-hardware-inventory.json" (builtins.toJSON (lib.recursiveUpdate
+    (builtins.fromJSON (builtins.readFile ../../config/hardware-fixtures/hardware-identities.json))
+    { warbler.storage.luks.cryptroot.volumeKeyId = "77e740d9d987a52981ee75ae6ab327c2b70a8b49c6e36258abc426db85c5f831"; }));
   authVariables = pkgs.runCommand "warbler-test-efi-auth"
     {
       nativeBuildInputs = [ pkgs.sbctl ];
@@ -97,6 +100,13 @@ pkgs.testers.runNixOSTest {
         ./configuration.nix
       ];
       disko.devices.disk.system.device = lib.mkForce "/dev/vda";
+      # Exercise the local udev alias before cryptsetup runs, using a public
+      # UUID from the test disk. Unit tests cover inventory-to-rule rendering.
+      boot.initrd.luks.devices.cryptroot.device = lib.mkForce "/dev/disk/by-hardware/test-root";
+      services.hardwareIdentities.templates."etc/nixos-hardware/devices/${volumeUuid}" = {
+        initrd = true;
+        text = "HARDWARE_LINKS=disk/by-hardware/test-root\n";
+      };
       sops.secrets.vm-probe = {
         sopsFile = "${testSecrets}";
         format = "json";
@@ -127,7 +137,6 @@ pkgs.testers.runNixOSTest {
       nix.gc.automatic = lib.mkForce false;
       nix.optimise.automatic = lib.mkForce false;
       boot.secureUnlock.remoteUnlock.wifi.enable = true;
-      boot.secureUnlock.rootVolumeKeyId = lib.mkForce "77e740d9d987a52981ee75ae6ab327c2b70a8b49c6e36258abc426db85c5f831";
       boot.lanzaboote.settings.secure-boot-enroll = "force";
       boot.loader.timeout = 1;
       boot.initrd.network.ssh.authorizedKeys = lib.mkForce [ (builtins.readFile (sshKey + ".pub")) ];
@@ -206,6 +215,7 @@ pkgs.testers.runNixOSTest {
         installer.succeed("mount --bind /nix/store /mnt/nix/store")
         installer.succeed("cp -r ${keys}/. /mnt/persist/var/lib/sbctl/; chmod -R u+w /mnt/persist/var/lib/sbctl")
         installer.succeed("touch /mnt/etc/NIXOS; mkdir -p /mnt/nix/var/nix/profiles")
+        installer.succeed("${nodes.warbler.system.build.hardwareProvisioner}/bin/hardware-runtime provision --repo ${self.outPath} --inventory ${runtimeInventory} --root /mnt")
         installer.succeed("nixos-enter --root /mnt --system ${nodes.warbler.system.build.toplevel} -- nix-store --load-db < ${nodes.warbler.system.build.testClosure}/registration")
         installer.succeed("nixos-enter --root /mnt --system ${nodes.warbler.system.build.toplevel} -- nix-env -p /nix/var/nix/profiles/system --set ${nodes.warbler.system.build.toplevel}")
         installer.succeed("install -d -m 700 /run/account-passwords; umask 077; printf %s Abcdef-ghijkl-mnopq7-RS > /run/account-passwords/root; printf %s Tuvwxy-zabcde-fghij8-KL > /run/account-passwords/cody")
@@ -225,6 +235,7 @@ pkgs.testers.runNixOSTest {
     with subtest("UEFI Secure Boot and manual recovery unlock"):
         console_unlock()
         warbler.succeed("test ! -e /run/warbler-initrd-networkd-started && test ! -e /run/warbler-initrd-sshd-started")
+        assert warbler.succeed("cat /persist/nixos-hardware/current/root-volume-key-id.json").strip() == '"77e740d9d987a52981ee75ae6ab327c2b70a8b49c6e36258abc426db85c5f831"'
         warbler.succeed("bootctl status | grep 'Secure Boot: enabled'")
         # No manual provisioning command has run: the boot service creates the
         # stable initrd identity automatically on this first Secure Boot boot.
@@ -258,11 +269,18 @@ pkgs.testers.runNixOSTest {
         client.succeed("printf %s " + shlex.quote("[192.168.1.3]:2222 " + identity) + " > /etc/test-known-hosts")
 
     with subtest("boot signed remote-unlock generation"):
-        # Reinstall exactly the same generation with newly sealed credentials.
+        # Change only local inventory, then reinstall the identical store system.
+        # The signed initrd must change even though the generation did not.
+        old_initrds = warbler.succeed("sha256sum /boot/EFI/nixos/initrd-*.efi")
+        warbler.succeed("cp /persist/nixos-hardware/input/hardware-identities.json /run/hardware-updated.json")
+        warbler.succeed("""${pkgs.python3}/bin/python3 -c 'import json; from pathlib import Path; p=Path("/run/hardware-updated.json"); d=json.loads(p.read_text()); d["warbler"]["network"]["interfaces"]["eno1"]["dhcp"]["iaid"]=42; p.write_text(json.dumps(d))'""")
+        warbler.succeed("sys hardware-provision --repo ${self.outPath} --inventory /run/hardware-updated.json")
         remote = "${nodes.warbler.system.build.toplevel}"
         warbler.succeed(f"nix-env -p /nix/var/nix/profiles/system --set {remote}")
         warbler.succeed(f"test $(readlink -f /nix/var/nix/profiles/system) = {remote}")
         warbler.succeed(f"{remote}/bin/switch-to-configuration boot")
+        assert old_initrds != warbler.succeed("sha256sum /boot/EFI/nixos/initrd-*.efi")
+        warbler.succeed("grep -qx IAID=42 /persist/nixos-hardware/current/etc/systemd/network/10-wired.network.d/90-hardware.conf")
         warbler.succeed("cmp /boot/loader/credentials/ssh-host-key.cred /persist/credstore.encrypted/ssh-host-key")
         warbler.succeed("cmp /boot/loader/credentials/tailscale-state.cred /persist/credstore.encrypted/tailscale-state")
         warbler.shutdown()

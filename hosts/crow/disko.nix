@@ -1,10 +1,10 @@
-{ hardwareIdentities, ... }:
+{ config, ... }:
 {
   disko.devices = {
     disk.system = {
       type = "disk";
       # Inspected on the installer: WD_BLACK SN850X 4000GB. Formatting erases NTFS.
-      device = "/dev/disk/by-id/${hardwareIdentities "crow" [ "storage" "installationDisk" "byId" ]}";
+      device = "${config.services.hardwareIdentities.stateDirectory}/installation-disk";
       content = {
         type = "gpt";
         partitions = {

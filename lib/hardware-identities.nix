@@ -1,10 +1,7 @@
-# Hardware data is an explicit flake input, never ambient state or a SOPS build.
+# Public template markers and semantic device names; identities are resolved at installation.
 source:
 let
-  # The public default is a locked repository snapshot; local overrides are
-  # small standalone directories. Neither path performs decryption.
-  input = if builtins.pathExists (source + "/metadata.json") then source
-    else source + "/config/hardware-fixtures";
+  input = source;
   metadata = builtins.fromJSON (builtins.readFile (input + "/metadata.json"));
   values = builtins.fromJSON (builtins.readFile (input + "/hardware-identities.json"));
   schema = builtins.fromJSON (builtins.readFile ./hardware-identities-schema.json);
@@ -34,5 +31,9 @@ assert !metadata.fixture || values == fixtures;
   fixture = metadata.fixture || values == fixtures;
   inputPath = toString input;
   inherit values;
+  runtimeGet = host: path:
+    let kind = builtins.foldl' (value: key: builtins.getAttr key value) schema.${host} path;
+    in if kind == "uuid" then host + "-" + builtins.concatStringsSep "-" (map (builtins.replaceStrings [ "/" "." ] [ "_" "_" ]) path)
+    else builtins.foldl' (value: key: builtins.getAttr key value) values.${host} path;
   get = host: path: builtins.foldl' (value: key: builtins.getAttr key value) values.${host} path;
 }

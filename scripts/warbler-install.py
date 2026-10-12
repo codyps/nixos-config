@@ -23,7 +23,7 @@ REPO = Path(__file__).resolve().parents[1]
 TARGET = "nixos@nixos.bed.einic.org"
 DISK = "/dev/nvme0n1"
 DEFAULT_SECRETS = Path.home() / ".local/share/warbler-install"
-CONFIG = "path:../deployment#nixosConfigurations.warbler.config"
+CONFIG = "path:.#nixosConfigurations.warbler.config"
 NIX = "nix --extra-experimental-features 'nix-command flakes'"
 
 
@@ -254,10 +254,10 @@ def secret_archive(directory):
     return buffer.getvalue()
 
 
-def volume_identity_script(system, checkout):
+def volume_identity_script(system, inventory_file):
     """Pin only the freshly installed volume, using its existing recovery input."""
     helper = shlex.quote(str(Path(system) / "sw/bin/root-volume-key-id"))
-    output = shlex.quote(str(Path(checkout) / "hardware-input" / hardware.INVENTORY))
+    output = shlex.quote(str(inventory_file))
     return f"""
 warbler_volume_key_id=$({helper} --key-file /tmp/warbler-luks-password)
 if [[ ! "$warbler_volume_key_id" =~ ^[0-9a-f]{{64}}$ ]]; then
@@ -288,7 +288,7 @@ def install(directory, *, build_only=False):
         print(f"Initial account passwords retained locally: {directory / 'account-passwords'} (not printed)")
     verify_registered_host_key(directory)
     inspect_target()
-    # Hardware identifiers enter the prepared source; passwords and private keys stay separate.
+    # Keep the inventory outside the source before Nix snapshots the checkout.
     work = ssh("mktemp -d /run/warbler-install.XXXXXXXX").decode().strip()
     if not re.fullmatch(r"/run/warbler-install\.[A-Za-z0-9]+", work):
         raise RuntimeError("Unexpected staging path")
@@ -296,16 +296,14 @@ def install(directory, *, build_only=False):
     try:
         ssh(f"mkdir -m 700 {q}/source {q}/secrets")
         ssh(f"tar -xzf - --no-same-owner -C {q}/source", source_archive())
+        ssh(f"mv {q}/source/hardware-input {q}/inventory")
         # Formatting creates a new volume identity. Clear only the disposable
         # install source's old pin; save the new public identity after formatting.
-        ssh(f"python3 - {q}/source/hardware-input/hardware-identities.json <<'PYTHON'\n"
+        ssh(f"python3 - {q}/inventory/hardware-identities.json <<'PYTHON'\n"
             "import json, sys\nfrom pathlib import Path\n"
             "path = Path(sys.argv[1])\ndata = json.loads(path.read_text())\n"
             "data['warbler']['storage']['luks']['cryptroot']['volumeKeyId'] = None\n"
             "path.write_text(json.dumps(data) + '\\n')\nPYTHON")
-        ssh(f"NIX_CONFIG='experimental-features = nix-command flakes' python3 {q}/source/scripts/hardware-identities.py "
-            f"--repo {q}/source --inventory {q}/source/hardware-input/hardware-identities.json "
-            f"--deployment {q}/deployment")
         print("Building attended system and disko on the live host (no secrets supplied)...", flush=True)
         root = f"cd {q}/source; "
         configured = ssh(root + f"{NIX} eval --no-update-lock-file --raw {CONFIG}.disko.devices.disk.system.device").decode()
@@ -351,10 +349,10 @@ mkdir -p /mnt/persist/var/lib/sbctl /mnt/persist/nixos-config /mnt/persist/ssh
 cp -a {q}/secrets/sbctl/. /mnt/persist/var/lib/sbctl/
 cp -a {q}/secrets/ssh/. /mnt/persist/ssh/
 cp -a {q}/source/. /mnt/persist/nixos-config/
-{volume_identity_script(outputs[0], '/mnt/persist/nixos-config')}
+{volume_identity_script(outputs[0], work + '/inventory/hardware-identities.json')}
 {shlex.quote(outputs[0])}/sw/bin/warbler-account-passwords initialize --root /mnt --password-dir {q}/secrets/account-passwords
+{shlex.quote(outputs[0])}/sw/bin/sys hardware-provision --repo /mnt/persist/nixos-config --inventory {q}/inventory/hardware-identities.json --root /mnt
 nixos-install --no-root-passwd --system {shlex.quote(outputs[0])}
-nixos-enter --root /mnt -c '{shlex.quote(outputs[0])}/sw/bin/sys hardware-deployment --repo /persist/nixos-config --inventory /persist/nixos-config/hardware-input/hardware-identities.json /persist/nixos-deployment'
 sync
 """
         print("Installing to the confirmed NVMe; no automatic reboot...", flush=True)

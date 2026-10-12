@@ -4,7 +4,8 @@ pkgs.testers.runNixOSTest {
   name = "warbler-ai-container";
   nodes = {
     host = { lib, ... }: {
-      imports = [ ./ai-container.nix ];
+      imports = [ ../../modules/hardware-identities.nix ./ai-container.nix ];
+      containers.ai.bindMounts."/run/hardware-identities".hostPath = lib.mkForce (toString (pkgs.writeTextDir "90-hardware.conf" "[Link]\nMACAddress=${hardwareIdentities "warbler" [ "network" "containers" "warbler-ai" "interfaces" "mv-eno1" "macAddress" ]}\n"));
       _module.args.hardwareIdentities = hardwareIdentities;
       # Model the trusted Tailscale interface separately from the other LAN.
       services.tailscale.interfaceName = "testvpn";

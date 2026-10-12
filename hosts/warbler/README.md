@@ -1,10 +1,9 @@
 # Warbler
 
-Production rebuilds use a [machine-local deployment flake](../../docs/hardware-identities.md):
-`--flake /LOCAL/DEPLOYMENT#warbler`, with no input override. Refresh the deployment
-after source or inventory changes. The remote helper provisions it automatically.
-Building the repository directly still uses synthetic fixtures that cannot be activated.
-Manual installation steps below may use the supported standalone input override.
+Build and rebuild directly from this repository with `--flake .#warbler`.
+[Provision local hardware identities](../../docs/hardware-identities.md) once
+before installation or activation. Source changes need no provisioning refresh;
+identifiers remain in local state and are appended before boot-image signing.
 
 The reusable module and setup commands are documented in [Secure unlock](../../docs/secure-unlock.md).
 
@@ -103,10 +102,10 @@ Use `.#warbler` at every stage. For a freshly formatted disk, set
 provisioning omits recovery credentials and TPM unlock until the new pin is
 recorded and the installed host boots with Secure Boot enabled.
 The remote installer records the freshly formatted volume's identity in
-`warbler.storage.luks.cryptroot.volumeKeyId` in the installed `hardware-input/hardware-identities.json`. For a manual
+`warbler.storage.luks.cryptroot.volumeKeyId` in `/persist/nixos-hardware/input/hardware-identities.json`. For a manual
 installation, obtain the identity on the trusted installed system and update
-that file and the SOPS-encrypted inventory before building the normal configuration. `configuration.nix` imports
-it as `boot.secureUnlock.rootVolumeKeyId`; the SOPS inventory retains the current installation's
+the private inventory and the SOPS-encrypted source, then provision and rebuild.
+The installer inserts the local pin before signing the initrd; the SOPS inventory retains the current installation's
 known identity. Never automatically
 learn the expected identity from a disk during boot. An unpinned configuration
 cannot enable remote or TPM unlock. Pinning authenticates volume identity,
@@ -382,7 +381,7 @@ the TPM helper. Commands below are instructions, not evidence of installation.
 2. **Live USB: prepare the checkout:** copy the checkout and provision a separate
    local hardware input on the live host (see the provisioning link above). Replace
    `/LOCAL/INPUT` below with its absolute directory. Retain a copy at
-   `/mnt/persist/nixos-config/hardware-input` for installed-system rebuilds. Enter a root
+   a private location outside the checkout until provisioning is complete. Enter a root
    shell (`sudo -i`) and `cd` to it. All installer commands below run there as root.
    Use `.#warbler` throughout. Before formatting a new volume, write `null`
    to `warbler.storage.luks.cryptroot.volumeKeyId` in this local input's `hardware-identities.json`. Do not
@@ -398,8 +397,7 @@ the TPM helper. Commands below are instructions, not evidence of installation.
    test -d /sys/firmware/efi
    lsblk -o NAME,PATH,SIZE,MODEL,TYPE,FSTYPE,MOUNTPOINTS
    nix build --accept-flake-config --no-link --print-out-paths \
-     .#nixosConfigurations.warbler.config.system.build.diskoScript \
-     --override-input hardware-identities path:/LOCAL/INPUT
+     .#nixosConfigurations.warbler.config.system.build.diskoScript
    ```
 
    Confirm `/dev/nvme0n1` is the intended 512 GB NVMe, not the 4 TB SATA SSD
@@ -458,7 +456,10 @@ the TPM helper. Commands below are instructions, not evidence of installation.
      sbctl --config /run/warbler-sbctl-install.conf create-keys
    mkdir -p /mnt/persist/nixos-config
    cp -a . /mnt/persist/nixos-config/
-   nixos-install --no-root-passwd --flake .#warbler --override-input hardware-identities path:/LOCAL/INPUT
+   nix build .#nixosConfigurations.warbler.config.system.build.hardwareProvisioner
+   ./result/bin/hardware-runtime provision --repo "$PWD" \
+     --inventory /LOCAL/INPUT/hardware-identities.json --root /mnt
+   nixos-install --no-root-passwd --flake .#warbler
    ```
 
    Stop on any failure. Lanzaboote needs these keys before installation signs
@@ -555,10 +556,7 @@ the TPM helper. Commands below are instructions, not evidence of installation.
    Rebuild and record the initrd SSH fingerprint:
 
    ```sh
-   sudo sys hardware-deployment --repo /persist/nixos-config \
-     --inventory /persist/nixos-config/hardware-input/hardware-identities.json \
-     /persist/nixos-deployment
-   sudo nixos-rebuild boot --flake /persist/nixos-deployment#warbler
+   sudo nixos-rebuild boot --flake /persist/nixos-config#warbler
    sudo ssh-keygen -lf /persist/credstore.encrypted/ssh-host-key.pub
    ```
 

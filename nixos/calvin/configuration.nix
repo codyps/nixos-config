@@ -50,7 +50,7 @@ in
 
   boot.initrd.luks.devices = {
     calvin-crypt = {
-      device = "/dev/disk/by-uuid/${hardwareIdentities "calvin" [ "storage" "luks" "calvin-crypt" "uuid" ]}";
+      device = "/dev/disk/by-hardware/${hardwareIdentities "calvin" [ "storage" "luks" "calvin-crypt" "uuid" ]}";
       allowDiscards = true;
       preLVM = true;
       bypassWorkqueues = true;

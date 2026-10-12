@@ -6,8 +6,6 @@ let
   # identifiers are public; DUIDRawData excludes the two-byte DUID type.
   wiredDhcpIdentity = {
     DUIDType = "vendor";
-    DUIDRawData = "${hardwareIdentities "warbler" [ "network" "interfaces" "eno1" "dhcp" "duid" ]}";
-    IAID = hardwareIdentities "warbler" [ "network" "interfaces" "eno1" "dhcp" "iaid" ];
   };
   wiredDhcpConfig = {
     dhcpV4Config = wiredDhcpIdentity // { ClientIdentifier = "duid"; };
@@ -24,6 +22,17 @@ in
     programs.actions-vm-image.enable = true;
     programs.adminCommands.commands.backup-secure-boot = [ "${pkgs.callPackage ./secure-boot-backup.nix { }}/bin/warbler-secure-boot-backup" ];
     boot.secureUnlock.rootVolumeKeyId = import ./volume-identity.nix { inherit hardwareIdentities; };
+    services.hardwareIdentities.templates."etc/systemd/network/10-wired.network.d/90-hardware.conf" = {
+      initrd = true;
+      text = ''
+        [DHCPv4]
+        DUIDRawData=${hardwareIdentities "warbler" [ "network" "interfaces" "eno1" "dhcp" "duid" ]}
+        IAID=${toString (hardwareIdentities "warbler" [ "network" "interfaces" "eno1" "dhcp" "iaid" ])}
+        [DHCPv6]
+        DUIDRawData=${hardwareIdentities "warbler" [ "network" "interfaces" "eno1" "dhcp" "duid" ]}
+        IAID=${toString (hardwareIdentities "warbler" [ "network" "interfaces" "eno1" "dhcp" "iaid" ])}
+      '';
+    };
     networking.hostName = "warbler";
     time.timeZone = "America/New_York";
     system.stateVersion = "26.05";

@@ -18,7 +18,7 @@
   boot.loader.systemd-boot.enable = true;
   boot.loader.efi.canTouchEfiVariables = true;
   boot.initrd.luks.devices.rcrypt = {
-    device = "/dev/disk/by-uuid/${hardwareIdentities "forbes" [ "storage" "luks" "rcrypt" "uuid" ]}";
+    device = "/dev/disk/by-hardware/${hardwareIdentities "forbes" [ "storage" "luks" "rcrypt" "uuid" ]}";
     allowDiscards = true;
     bypassWorkqueues = true;
   };

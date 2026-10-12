@@ -1,6 +1,5 @@
 {
   inputs = {
-    hardware-identities = { url = "github:codyps/nixos-config"; flake = false; };
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
     zpl.url = "github:codyps/zpl";
     zpl.inputs.nixpkgs.follows = "nixpkgs";
@@ -57,12 +56,12 @@
     ];
   };
 
-  outputs = { self, hardware-identities, zpl, atuin, nixpkgs, nixpkgs-darwin, flake-utils, nix-darwin, nix-darwin-26-05, home-manager, home-manager-26-05, nixos-wsl, nixos-vscode-server, impermanence, sops-nix, disko, lanzaboote, clipway }:
+  outputs = { self, zpl, atuin, nixpkgs, nixpkgs-darwin, flake-utils, nix-darwin, nix-darwin-26-05, home-manager, home-manager-26-05, nixos-wsl, nixos-vscode-server, impermanence, sops-nix, disko, lanzaboote, clipway }:
     let
-      hardwareSettings = import ./lib/hardware-identities.nix hardware-identities;
+      hardwareSettings = import ./lib/hardware-identities.nix ./config/hardware-fixtures;
       withCommonModules = constructor: args: constructor (args // {
         modules = [
-          { _module.args = { hardwareIdentities = hardwareSettings.get; hardwareFixture = hardwareSettings.fixture; }; }
+          { _module.args = { hardwareIdentities = hardwareSettings.runtimeGet; }; }
           ./modules/nix-cache.nix
           ./modules/terminfo.nix
           ./modules/admin-commands.nix
@@ -188,7 +187,10 @@
               cp ${./scripts/hardware-identities.py} hardware-identities.py
               cp ${./scripts/test-hardware-identities.py} test-hardware-identities.py
               cp ${./scripts/update-hardware-fixtures.py} update-hardware-fixtures.py
+              cp ${./scripts/hardware-runtime.py} hardware-runtime.py
+              cp ${./scripts/test-hardware-runtime.py} test-hardware-runtime.py
               python3 test-hardware-identities.py
+              python3 test-hardware-runtime.py
               touch "$out"
             '';
             admin-commands = pkgs.runCommand "test-admin-commands" { nativeBuildInputs = [ pkgs.python3 ]; } ''
@@ -246,7 +248,7 @@
             nix-dynamic-machines = pkgs.nix-dynamic-machines;
             nixos-rebuild-remote = pkgs.writeShellApplication {
               name = "nixos-rebuild-remote";
-              runtimeInputs = [ pkgs.nix pkgs.openssh pkgs.jq pkgs.python3 pkgs.git pkgs.sops pkgs.gnupg ];
+              runtimeInputs = [ pkgs.nix pkgs.openssh pkgs.jq pkgs.git ];
               text = ''
                 usage() {
                   echo 'Usage: nixos-rebuild-remote HOST [boot|switch|test|build|dry-build|dry-activate]'
@@ -271,11 +273,8 @@
                   boot|switch|test|build|dry-build|dry-activate) ;;
                   *) echo "Unsupported rebuild action: $action" >&2; exit 2 ;;
                 esac
-                work=$(mktemp -d)
-                trap 'rm -rf "$work"' EXIT
-                python3 ${./scripts/hardware-identities.py} --deployment "$work/deployment" >/dev/null
                 archive=$(nix flake archive --json --no-write-lock-file --to "ssh-ng://cody@$host" \
-                  "path:$work/deployment")
+                  .)
                 source=$(jq -er .path <<< "$archive")
                 printf -v command 'sudo nixos-rebuild %q --flake %q --no-update-lock-file' \
                   "$action" "$source#$host"

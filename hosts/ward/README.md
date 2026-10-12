@@ -1,10 +1,9 @@
 # Ward recovery and secure unlock
 
-Production rebuilds use a [machine-local deployment flake](../../docs/hardware-identities.md):
-`--flake /LOCAL/DEPLOYMENT#ward`, with no input override. Refresh the deployment
-after source or inventory changes. The remote helper provisions it automatically.
-Building the repository directly still uses synthetic fixtures that cannot be activated.
-Manual installation steps below may use the supported standalone input override.
+Build and rebuild directly from this repository with `--flake .#ward`.
+[Provision local hardware identities](../../docs/hardware-identities.md) once
+before installation or activation. Source changes need no provisioning refresh;
+identifiers remain in local state and are appended before boot-image signing.
 
 Ward uses LUKS2 (mapper `luksroot`), then LVM (`ward/zroot`, `ward/swap`),
 then the `ward` ZFS pool. Do not run disko or format these existing devices.

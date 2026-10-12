@@ -43,13 +43,14 @@ jobs:
       - uses: cachix/install-nix-action@b85815f71a6de0ddee80b8a80a98d43f4bcc66c7 # v31
       - name: Check generated synthetic hardware data
         run: python3 scripts/update-hardware-fixtures.py --check
-      - name: Verify the resolved hardware input is synthetic
+      - name: Verify public hardware templates are synthetic
         run: |
           input=$(nix eval --raw .#lib.hardwareIdentities.inputPath)
           python3 scripts/hardware-identities.py --verify-fixtures "$input"
       - name: Test hardware provisioning
         run: |
           python3 scripts/test-hardware-identities.py
+          python3 scripts/test-hardware-runtime.py
           python3 scripts/test-warbler-install.py
       - name: Test pilot reporting
         run: python3 scripts/test-configuration-pilot.py
@@ -112,7 +113,7 @@ jobs:
       - uses: cachix/install-nix-action@b85815f71a6de0ddee80b8a80a98d43f4bcc66c7 # v31
       - name: Check generated synthetic hardware data
         run: python3 scripts/update-hardware-fixtures.py --check
-      - name: Verify the resolved hardware input is synthetic
+      - name: Verify public hardware templates are synthetic
         run: |
           input=$(nix eval --raw .#lib.hardwareIdentities.inputPath)
           python3 scripts/hardware-identities.py --verify-fixtures "$input"

@@ -1,10 +1,9 @@
 # Robin installation
 
-Production rebuilds use a [machine-local deployment flake](../../docs/hardware-identities.md):
-`--flake /LOCAL/DEPLOYMENT#robin`, with no input override. Refresh the deployment
-after source or inventory changes. The remote helper provisions it automatically.
-Building the repository directly still uses synthetic fixtures that cannot be activated.
-Manual installation steps below may use the supported standalone input override.
+Build and rebuild directly from this repository with `--flake .#robin`.
+[Provision local hardware identities](../../docs/hardware-identities.md) once
+before installation or activation. Source changes need no provisioning refresh;
+identifiers remain in local state and are appended during bootloader installation.
 
 Robin is a BIOS-booted x86_64 KVM guest. Its disk selector is configured in
 `disko.nix`.
@@ -100,6 +99,14 @@ Use a current installer environment compatible with the configured ZFS/disko
 tooling. Detection of
 an existing NixOS ISO normally skips nixos-anywhere's kexec step. A reboot
 into an updated ISO or a deliberately selected kexec workflow is required.
+
+Before running Disko, provision the live installer with Robin's
+`system.build.hardwareProvisioner` and the private inventory (without `--root`).
+This establishes the local installation disk selector. After formatting, run
+the helper again with `--root /mnt` before installation, once `/persist` is mounted.
+An automatic nixos-anywhere flow must split formatting from installation so this
+provisioning step can run; `--extra-files` containing SSH keys alone is insufficient.
+See [hardware provisioning](../../docs/hardware-identities.md) for commands.
 
 After formatting, transfer closures into the mounted target store, stage
 identities, install, and export the pool cleanly before reboot. Detach the ISO

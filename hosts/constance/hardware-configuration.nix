@@ -16,7 +16,7 @@
 
   fileSystems."/" =
     {
-      device = "/dev/disk/by-uuid/${hardwareIdentities "constance" [ "storage" "fileSystems" "/" "uuid" ]}";
+      device = "/dev/disk/by-hardware/${hardwareIdentities "constance" [ "storage" "fileSystems" "/" "uuid" ]}";
       fsType = "ext4";
     };
 

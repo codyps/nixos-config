@@ -73,7 +73,7 @@ in
 
     luks.devices = {
       luksroot = {
-        device = "/dev/disk/by-uuid/${hardwareIdentities "ward" [ "storage" "luks" "luksroot" "uuid" ]}";
+        device = "/dev/disk/by-hardware/${hardwareIdentities "ward" [ "storage" "luks" "luksroot" "uuid" ]}";
         allowDiscards = true;
       };
     };

@@ -47,6 +47,24 @@ class ProvisioningTests(unittest.TestCase):
         stdout.__enter__()
         self.addCleanup(stdout.__exit__, None, None, None)
 
+    def test_local_pin_overrides_public_template_and_allows_attended_null(self):
+        local = self.root / "pin.json"
+        config = {"rootVolumeKeyId": "b" * 64, "rootVolumeKeyIdFile": str(local)}
+        for value in ("a" * 64, None):
+            local.write_text(json.dumps(value))
+            setup.resolve_volume_pin(config)
+            self.assertEqual(config["rootVolumeKeyId"], value)
+
+    def test_missing_or_invalid_local_pin_never_falls_back_to_fixture(self):
+        local = self.root / "pin.json"
+        config = {"rootVolumeKeyId": "b" * 64, "rootVolumeKeyIdFile": str(local)}
+        with self.assertRaises(OSError):
+            setup.resolve_volume_pin(config)
+        for value in ("bad", 123, {}, []):
+            local.write_text(json.dumps(value))
+            with self.assertRaises(RuntimeError):
+                setup.resolve_volume_pin(config)
+
     def prepare_stage(self, *, ready=True):
         self.config.update(stateDirectory=str(self.root / "state"), rootVolumeKeyId="a" * 64,
                            remoteUnlock=True, wifi=True, tailscale=True)

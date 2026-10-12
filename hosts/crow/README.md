@@ -1,10 +1,9 @@
 # Crow
 
-Production rebuilds use a [machine-local deployment flake](../../docs/hardware-identities.md):
-`--flake /LOCAL/DEPLOYMENT#crow`, with no input override. Refresh the deployment
-after source or inventory changes. The remote helper provisions it automatically.
-Building the repository directly still uses synthetic fixtures that cannot be activated.
-Manual installation steps below may use the supported standalone input override.
+Build and rebuild directly from this repository with `--flake .#crow`.
+[Provision local hardware identities](../../docs/hardware-identities.md) once
+before installation or activation. Source changes need no provisioning refresh;
+identifiers remain in local state and are appended before boot-image signing.
 
 Crow is an x86_64 AMD machine with 64 GB RAM, UEFI, and TPM 2.0.
 Wi-Fi is `wlp6s0` (`mt7921e`). The installation disk is a WD_BLACK SN850X
@@ -114,8 +113,9 @@ Ethernet is not required. Firmware menus may differ from Warbler's HP machine.
    the root-owned mode-0600 installer file `/run/crow-luks-password`.
 2. For a fresh format, set `crow.storage.luks.cryptroot.volumeKeyId` to `null` in the
    local input's `hardware-identities.json` so it cannot reuse the previous disk identity.
-   Build and review the disk script. Running it is the destructive operation:
-   `nix build --no-link --print-out-paths path:.#nixosConfigurations.crow.config.system.build.diskoScript --override-input hardware-identities path:/LOCAL/INPUT`.
+   Provision the live installer from that inventory using the host hardwareProvisioner
+   (without `--root`) to establish its installation disk selector. Build and review the disk script. Running it is the destructive operation:
+   `nix build --no-link --print-out-paths path:.#nixosConfigurations.crow.config.system.build.diskoScript`.
    Only after approval, run that exact script on the installer. Verify `/mnt`,
    `/mnt/nix`, `/mnt/home`, `/mnt/persist`, and `/mnt/boot` mount the intended
    devices. `lvs` must show the root and swap LVs; `vgs` must show free extents.
@@ -128,16 +128,17 @@ Ethernet is not required. Firmware menus may differ from Warbler's HP machine.
 4. Generate sbctl signing keys with its key directory set to
    `/mnt/persist/var/lib/sbctl/keys` and GUID file to
    `/mnt/persist/var/lib/sbctl/GUID`, as in Warbler's procedure. Copy this
-   checkout into `/mnt/persist/nixos-config`, then install with
-   `nixos-install --no-root-passwd --flake path:.#crow --override-input hardware-identities path:/LOCAL/INPUT`.
+   checkout into `/mnt/persist/nixos-config`. Provision hardware state again with
+   `--root /mnt --inventory /LOCAL/INPUT/hardware-identities.json`, then install with
+   `nixos-install --no-root-passwd --flake path:.#crow`.
 5. Boot with local console access, unlock LUKS, and verify Wi-Fi, SOPS,
    persistent files, swap, and container connectivity. Back up existing firmware
    keys with `sudo sys backup-secure-boot`, then complete the documented manual
    Secure Boot enrollment and cold-boot verification.
 6. Obtain `sudo sys root-volume-key-id` and record the value in
    `crow.storage.luks.cryptroot.volumeKeyId` in both the local input and the SOPS-encrypted source; never reuse Warbler's value or a test pin.
-   Refresh the local deployment from that inventory and rebuild
-   `/LOCAL/DEPLOYMENT#crow`; the hook automatically generates the initrd SSH host key
+   Run `sudo sys hardware-provision --repo "$PWD" --inventory /LOCAL/INPUT/hardware-identities.json`
+   and rebuild `.#crow`; the hook automatically generates the initrd SSH host key
    and seals available credentials. No manual SSH key generation is needed.
    Run `sudo sys setup-unlock-tailscale` to provision the separate `crow-unlock`
    identity, then rebuild for boot to include it. Wi-Fi requires the profile

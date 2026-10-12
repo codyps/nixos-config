@@ -13,13 +13,13 @@
 
   fileSystems."/" =
     {
-      device = "/dev/disk/by-uuid/${hardwareIdentities "adams" [ "storage" "fileSystems" "/" "uuid" ]}";
+      device = "/dev/disk/by-hardware/${hardwareIdentities "adams" [ "storage" "fileSystems" "/" "uuid" ]}";
       fsType = "ext4";
     };
 
   fileSystems."/boot" =
     {
-      device = "/dev/disk/by-uuid/${hardwareIdentities "adams" [ "storage" "fileSystems" "/boot" "uuid" ]}";
+      device = "/dev/disk/by-hardware/${hardwareIdentities "adams" [ "storage" "fileSystems" "/boot" "uuid" ]}";
       fsType = "vfat";
     };
 

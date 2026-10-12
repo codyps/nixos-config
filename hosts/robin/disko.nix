@@ -1,4 +1,4 @@
-{ lib, hardwareIdentities, ... }:
+{ lib, config, ... }:
 {
   virtualisation.vmVariantWithDisko = {
     disko.devices.disk.root.content.partitions.crypt.content.passwordFile = lib.mkForce null;
@@ -9,7 +9,7 @@
     disk = {
       root = {
         type = "disk";
-        device = "/dev/disk/by-id/${hardwareIdentities "robin" [ "storage" "installationDisk" "byId" ]}";
+        device = "${config.services.hardwareIdentities.stateDirectory}/installation-disk";
         content = {
           type = "gpt";
           partitions = {

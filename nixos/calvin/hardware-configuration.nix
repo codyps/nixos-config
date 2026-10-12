@@ -34,7 +34,7 @@
 
   fileSystems."/boot" =
     {
-      device = "/dev/disk/by-uuid/${hardwareIdentities "calvin" [ "storage" "fileSystems" "/boot" "uuid" ]}";
+      device = "/dev/disk/by-hardware/${hardwareIdentities "calvin" [ "storage" "fileSystems" "/boot" "uuid" ]}";
       fsType = "vfat";
     };
 

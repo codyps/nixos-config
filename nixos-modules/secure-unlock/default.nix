@@ -5,7 +5,7 @@ let
   remote = cfg.remoteUnlock.enable && cfg.rootVolumeKeyId != null;
 in
 {
-  imports = [ ../../modules/admin-commands.nix ./remote-unlock.nix ./wifi.nix ./tailscale.nix ./tpm-setup.nix ./bootloader.nix ];
+  imports = [ ../../modules/hardware-identities.nix ../../modules/admin-commands.nix ./remote-unlock.nix ./wifi.nix ./tailscale.nix ./tpm-setup.nix ./bootloader.nix ];
 
   options.boot.secureUnlock = {
     enable = lib.mkEnableOption "pinned LUKS root with Secure Boot, remote recovery and optional TPM unlocking";
@@ -23,6 +23,11 @@ in
       type = types.nullOr (types.strMatching "[0-9a-f]{64}");
       default = null;
       description = "Public identity from root-volume-key-id; required before provisioning remote or TPM unlock. Null permits attended installation only.";
+    };
+    rootVolumeKeyIdFile = mkOption {
+      type = types.nullOr types.str;
+      default = null;
+      description = "Machine-local JSON volume pin, resolved by provisioning and appended before boot-image signing.";
     };
     tpmUnlock.enable = lib.mkEnableOption "TPM measured-boot unlocking after explicit enrollment";
     remoteUnlock = {

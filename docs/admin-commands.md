@@ -37,8 +37,9 @@ in their documentation. Repository development scripts and flake-only installer
 or remote-build entry points can retain their existing invocation until packaged
 for an installed host.
 
-`sys hardware-deployment --repo /CHECKOUT /LOCAL/DEPLOYMENT` provisions or
-refreshes a private deployment flake for ordinary rebuild commands. See
-[local hardware provisioning](hardware-identities.md) for key setup, input
-migration, and the local lock refresh lifecycle. `sys hardware-input` exports
-only the hardware input; `sys hardware-source` retains that alias.
+`sys hardware-provision --repo /CHECKOUT` decrypts SOPS inventory and renders
+machine-local hardware state. Use `--inventory /PRIVATE/hardware-identities.json`
+to import existing plaintext instead, or `--root /mnt` for a mounted installation.
+`sys hardware-verify` checks local inventory before installation/activation.
+See [hardware provisioning](hardware-identities.md). Rebuilds use the repository
+flake directly; source changes need no provisioning refresh.

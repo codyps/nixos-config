@@ -1,4 +1,4 @@
-{ config, lib, pkgs, hardwareIdentities, ... }:
+{ config, lib, pkgs, ... }:
 let
   user = "cody-ai";
   home = "/home/${user}";
@@ -84,11 +84,11 @@ in
     enable = true;
     networks."10-lan" = {
       matchConfig.Name = "mv-eno1";
-      linkConfig.MACAddress = "${hardwareIdentities "warbler" [ "network" "containers" "warbler-ai" "interfaces" "mv-eno1" "macAddress" ]}";
       networkConfig = { DHCP = "yes"; IPv6AcceptRA = true; };
       dhcpV4Config = { ClientIdentifier = "mac"; SendHostname = true; };
     };
   };
+  environment.etc."systemd/network/10-lan.network.d/90-hardware.conf".source = "/run/hardware-identities/90-hardware.conf";
   services.resolved.enable = true;
   services.avahi = {
     enable = true;

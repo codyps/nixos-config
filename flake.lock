@@ -203,22 +203,6 @@
         "type": "github"
       }
     },
-    "hardware-identities": {
-      "flake": false,
-      "locked": {
-        "lastModified": 1791772399,
-        "narHash": "sha256-XxPvtw7xub0eZzj3s3is+TL2aJ3TJYwNIg+anTTfLp8=",
-        "owner": "codyps",
-        "repo": "nixos-config",
-        "rev": "46f2e0ce7157551e712fd82b3461ce6447777ad9",
-        "type": "github"
-      },
-      "original": {
-        "owner": "codyps",
-        "repo": "nixos-config",
-        "type": "github"
-      }
-    },
     "home-manager": {
       "inputs": {
         "nixpkgs": [
@@ -496,7 +480,6 @@
         "clipway": "clipway",
         "disko": "disko",
         "flake-utils": "flake-utils",
-        "hardware-identities": "hardware-identities",
         "home-manager": "home-manager",
         "home-manager-26-05": "home-manager-26-05",
         "impermanence": "impermanence",

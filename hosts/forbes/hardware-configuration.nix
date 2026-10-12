@@ -40,7 +40,7 @@
 
   fileSystems."/boot" =
     {
-      device = "/dev/disk/by-uuid/${hardwareIdentities "forbes" [ "storage" "fileSystems" "/boot" "uuid" ]}";
+      device = "/dev/disk/by-hardware/${hardwareIdentities "forbes" [ "storage" "fileSystems" "/boot" "uuid" ]}";
       fsType = "vfat";
     };
 

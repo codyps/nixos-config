@@ -34,14 +34,14 @@
 
   fileSystems."/boot.d/0" =
     {
-      device = "/dev/disk/by-uuid/${hardwareIdentities "arnold" [ "storage" "fileSystems" "/boot.d/0" "uuid" ]}";
+      device = "/dev/disk/by-hardware/${hardwareIdentities "arnold" [ "storage" "fileSystems" "/boot.d/0" "uuid" ]}";
       fsType = "vfat";
       options = [ "fmask=0137" "dmask=0022" ];
     };
 
   fileSystems."/boot.d/1" =
     {
-      device = "/dev/disk/by-uuid/${hardwareIdentities "arnold" [ "storage" "fileSystems" "/boot.d/1" "uuid" ]}";
+      device = "/dev/disk/by-hardware/${hardwareIdentities "arnold" [ "storage" "fileSystems" "/boot.d/1" "uuid" ]}";
       fsType = "vfat";
       options = [ "fmask=0137" "dmask=0022" ];
     };

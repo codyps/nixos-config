@@ -4,7 +4,7 @@ let
   setupConfig = pkgs.writeText "secure-unlock.json" (builtins.toJSON {
     disk = config.boot.initrd.luks.devices.${cfg.mapperName}.device;
     hostName = config.networking.hostName;
-    inherit (cfg) mapperName stateDirectory rootVolumeKeyId;
+    inherit (cfg) mapperName stateDirectory rootVolumeKeyId rootVolumeKeyIdFile;
     remoteUnlock = cfg.remoteUnlock.enable;
     wifi = cfg.remoteUnlock.wifi.enable;
     tailscale = cfg.remoteUnlock.enable && cfg.remoteUnlock.tailscale.enable;

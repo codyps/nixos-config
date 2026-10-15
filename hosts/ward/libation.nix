@@ -58,7 +58,8 @@ let
         install -o libation -g libation -m 0600 "$backup/AccountsSettings.json" "$config/AccountsSettings.json"
       }
       trap restore_account EXIT
-      jq 'del(.Accounts[0].IdentityTokens)' "$backup/AccountsSettings.json" > "$backup/new-account.json"
+      # Keep the locale so Libation updates this row instead of adding another.
+      jq '.Accounts[0].IdentityTokens = {LocaleName: .Accounts[0].IdentityTokens.LocaleName}' "$backup/AccountsSettings.json" > "$backup/new-account.json"
       install -o libation -g libation -m 0600 "$backup/new-account.json" "$config/AccountsSettings.json"
       ${cli}/bin/libation-cli login-external --account "$account" --locale "$locale" "$@"
       trap - EXIT

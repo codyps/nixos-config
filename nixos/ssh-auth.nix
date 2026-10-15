@@ -10,5 +10,6 @@
     "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIMCqZBEh8awB3mvZtIgmhTPQuCXrlHS+0GwfxVvRDs3H cody@penguin"
     "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIO3g6VnuBzgIUl/RjXA1PR/s9bR0oLaWigUKHnciMT67 x@DESKTOP-LGMEAA4"
     "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIDSgwdNKJw1zcrzRhpwybTADsfI/Kl95rvCBSQlnAYT8 cody@Mac-mini.bed.einic.org"
+    "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAICZq3kiOEyCwgHzsX/uKV9R8ta5RHx1vNtHYfvhD/cZ/ cody@warbler"
   ];
 }

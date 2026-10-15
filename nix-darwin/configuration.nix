@@ -6,7 +6,7 @@ let
   nonnative_linux = "${nonnative_processor}-linux";
 in
 {
-  imports = [ ../modules/wren-builder-client.nix ];
+  imports = [ ../modules/wren-builder-client.nix ./modules/gpg-agent-forwarding.nix ];
 
   # List packages installed in system profile. To search by name, run:
   # $ nix-env -qaP | grep wget

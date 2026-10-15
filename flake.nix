@@ -330,7 +330,9 @@
     } //
     (
       let
-        nixosSystem = withCommonModules nixpkgs.lib.nixosSystem;
+        nixosSystem = args: withCommonModules nixpkgs.lib.nixosSystem (args // {
+          modules = [ ./nixos-modules/gpg-agent-forwarding.nix ] ++ args.modules;
+        });
       in
       {
         nixosModules.secure-unlock = {

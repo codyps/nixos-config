@@ -473,10 +473,9 @@ in
   services.xserver.enable = true;
 
 
-  # Enable the GNOME Desktop Environment.
-  services.desktopManager.gnome.enable = true;
-  services.displayManager.gdm.enable = true;
-  services.displayManager.gdm.autoSuspend = false;
+  # Enable the KDE Plasma Desktop Environment.
+  services.desktopManager.plasma6.enable = true;
+  services.displayManager.sddm.enable = true;
   systemd.targets.sleep.enable = false;
   systemd.targets.suspend.enable = false;
   systemd.targets.hibernate.enable = false;
@@ -492,15 +491,6 @@ in
         }
     });
   '';
-
-  environment.etc."gdm/greeter.dconf-defaults" = {
-    text = ''
-      [org/gnome/settings-daemon/plugins/power]
-      sleep-inactive-ac-type='nothing'
-      sleep-inactive-ac-timeout=0
-    '';
-  };
-
 
   # Configure keymap in X11
   # services.xserver.xkb.layout = "us";

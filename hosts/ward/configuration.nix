@@ -7,6 +7,7 @@ in
   imports =
     [
       ./hardware-configuration.nix
+      ./libation.nix
       ../../nixos-modules/secure-boot-admin.nix
       ../../nixos-modules/secure-unlock
       ../../nixos-modules/account-passwords.nix
@@ -331,65 +332,6 @@ in
       ];
     };
 
-  };
-
-  # FIXME: use dynamic user.
-  users.users.libation = {
-    isSystemUser = true;
-    group = "libation";
-  };
-  users.groups.libation = { };
-
-  systemd.services.libation = {
-    serviceConfig = {
-      ExecStartPre = ''
-        ${pkgs.coreutils}/bin/chown -R libation:libation /ward/keep/libation
-      '';
-    };
-
-    # again, we're tweaking the systemd service so we can pick up with uid
-    # because otherwise podman tries to resovle the user inside the container
-    # and fails.
-    # FIXME: modify oci-containers.nix instead
-    script = lib.mkForce ''
-      #!${pkgs.bash}/bin/bash
-      set -e
-
-      exec ${pkgs.podman}/bin/podman  \
-        run \
-        --rm \
-        --name=libation \
-        --log-driver=journald \
-        --cidfile=/run/libation/ctr-id \
-        --cgroups=enabled \
-        --sdnotify=conmon \
-        -d \
-        --replace \
-        -e SLEEP_TIME=2h \
-        --user $(id -u libation):$(id -g libation) \
-        -v /ward/keep/libation/data:/data \
-        -v /ward/keep/libation/config:/config \
-        -l io.containers.autoupdate=registry \
-        --pull missing \
-        docker.io/rmcrackan/libation:latest
-    '';
-  };
-
-
-  virtualisation.oci-containers.containers.libation = {
-    serviceName = "libation";
-    image = "docker.io/rmcrackan/libation:latest";
-    user = "libation:libation";
-    volumes = [
-      "/ward/keep/libation/data:/data"
-      "/ward/keep/libation/config:/config"
-    ];
-    environment = {
-      SLEEP_TIME = "2h";
-    };
-    labels = {
-      "io.containers.autoupdate" = "registry";
-    };
   };
 
   services.grafana = {

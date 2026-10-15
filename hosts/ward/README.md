@@ -82,3 +82,24 @@ and rebuilds. No password or hash belongs in the repository or Nix store.
 
 Hydra, PostgreSQL, and Grafana state persist across root rollback.
 Automatic flake upgrades are disabled during staged boot provisioning.
+
+## Libation
+
+Libation reads and saves its database, account tokens and encryption key under
+`/ward/keep/libation/config`. This directory is private to its service account;
+container replacement preserves refreshed credentials and the encryption key.
+Books remain under `/ward/keep/libation/data/Books`, as configured in the local
+`Settings.json`. Scans run every two hours; failed scans retry after two hours.
+
+When Audible requires a new login, run from your own terminal:
+
+```sh
+ssh -t ward 'sudo sys libation-login'
+```
+
+Open the printed URL in your browser, sign in, then paste the final redirect URL
+back into that terminal. The helper selects the single configured account,
+stops Libation during login, saves credentials on the persistent volume, and
+starts the service after a successful login. Passwords and redirect URLs do not
+belong in the repository. For other CLI operations, stop `libation.service`
+first and use `sudo sys libation-cli COMMAND [ARGUMENT ...]`.

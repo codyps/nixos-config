@@ -60,10 +60,26 @@ def fixture_inventory(schema, path=()):
     }[schema]
 
 
-def read_inventory(repo, inventory_file=None, fixtures=False):
+def select_host(inventory, schema, host):
+    """Accept a host file or a legacy combined export; return only this host."""
+    if host not in schema:
+        raise ValueError('Unknown hardware host')
+    if isinstance(inventory, dict) and host in inventory:
+        if not inventory.keys() <= schema.keys():
+            raise ValueError('Unknown hosts in hardware inventory')
+        inventory = inventory[host]
+    return validate_inventory({host: inventory}, {host: schema[host]})
+
+
+def read_inventory(repo, inventory_file=None, fixtures=False, *, host=None,
+                   schema_file=None, encrypted_file=None, sops_env=None):
     if (repo / MANIFEST).exists() and (repo / ".git").exists():
         raise ValueError("Prepared source manifest must not be placed in a Git checkout")
-    schema = json.loads((repo / "lib/hardware-identities-schema.json").read_text())
+    schema = json.loads(Path(schema_file or repo / "lib/hardware-identities-schema.json").read_text())
+    if not fixtures and host is None:
+        raise ValueError('Select a host for production hardware inventory')
+    if host is not None and host not in schema:
+        raise ValueError('Unknown hardware host')
     if fixtures:
         if inventory_file:
             raise ValueError("Fixtures cannot use production inventory")
@@ -73,17 +89,16 @@ def read_inventory(repo, inventory_file=None, fixtures=False):
     elif (repo / MANIFEST).is_file():
         inventory = json.loads((repo / INVENTORY).read_text())
     else:
-        inventory = {}
-        for host in schema:
-            result = subprocess.run(["sops", "--decrypt", str(repo / "secrets/hardware" / (host + ".json"))],
-                                    stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-            if result.returncode:
-                raise RuntimeError(f"Cannot decrypt hardware settings for {host}; configure a SOPS recipient key (output withheld)")
-            try:
-                inventory[host] = json.loads(result.stdout)
-            except ValueError:
-                raise RuntimeError(f"Invalid decrypted JSON for {host} (output withheld)") from None
-    return validate_inventory(inventory, schema)
+        result = subprocess.run(["sops", "--decrypt", str(encrypted_file or repo / "secrets/hardware" / (host + ".json"))],
+                                stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                                **({'env': sops_env} if sops_env is not None else {}))
+        if result.returncode:
+            raise RuntimeError(f"Cannot decrypt hardware settings for {host}; configure a SOPS recipient key (output withheld)")
+        try:
+            inventory = json.loads(result.stdout)
+        except ValueError:
+            raise RuntimeError(f"Invalid decrypted JSON for {host} (output withheld)") from None
+    return select_host(inventory, schema, host) if host is not None else validate_inventory(inventory, schema)
 
 
 def verify_fixtures(repo, directory):
@@ -99,14 +114,20 @@ def verify_fixtures(repo, directory):
         raise ValueError("Fixture input contains unexpected files")
 
 
-def provision(repo, destination, inventory_file=None, fixtures=False):
+def provision(repo, destination, inventory_file=None, fixtures=False, *, host=None,
+              schema_file=None, encrypted_file=None, sops_env=None):
     repo = Path(repo).resolve()
     destination = Path(destination).absolute()
     if destination.is_symlink() or destination.resolve().is_relative_to(repo):
         raise ValueError("Hardware input must be outside the repository and not a symlink")
-    inventory = read_inventory(repo, inventory_file, fixtures)
+    inventory = read_inventory(repo, inventory_file, fixtures, host=host, schema_file=schema_file,
+                               encrypted_file=encrypted_file, sops_env=sops_env)
     metadata = {"version": 1, "fixture": fixtures}
-    if not fixtures and inventory == fixture_inventory(json.loads((repo / "lib/hardware-identities-schema.json").read_text())):
+    schema = json.loads(Path(schema_file or repo / "lib/hardware-identities-schema.json").read_text())
+    synthetic = fixture_inventory(schema)
+    if host is not None:
+        synthetic = select_host(synthetic, schema, host)
+    if not fixtures and inventory == synthetic:
         raise ValueError("Synthetic inventory cannot be provisioned as production")
     data = json.dumps(inventory, indent=2) + '\n'
     if destination.exists():
@@ -139,6 +160,7 @@ def provision(repo, destination, inventory_file=None, fixtures=False):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--repo', type=Path, default=Path.cwd())
+    parser.add_argument('--host', help='Export only this host; required outside fixture mode')
     parser.add_argument('--inventory', type=Path, help='Read existing local plaintext instead of decrypting SOPS')
     parser.add_argument('--fixtures', action='store_true', help='Generate synthetic data; never install these builds')
     parser.add_argument('--verify-fixtures', action='store_true', help='Verify an existing input for public publishing')
@@ -147,11 +169,11 @@ def main():
     os.umask(0o077)
     try:
         if args.verify_fixtures:
-            if args.inventory or args.fixtures:
+            if args.inventory or args.fixtures or args.host:
                 raise ValueError('Verification cannot generate or replace input data')
             verify_fixtures(args.repo, args.destination)
         else:
-            print(provision(args.repo, args.destination, args.inventory, args.fixtures))
+            print(provision(args.repo, args.destination, args.inventory, args.fixtures, host=args.host))
         return 0
     except (ValueError, OSError, RuntimeError, subprocess.CalledProcessError) as error:
         print(f'Hardware provisioning stopped: {error}', file=sys.stderr)

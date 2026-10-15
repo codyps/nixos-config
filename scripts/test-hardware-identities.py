@@ -32,7 +32,7 @@ class HardwareTests(unittest.TestCase):
         self.dest = self.root / 'source'
 
     def prepare(self):
-        return hardware.provision(self.repo, self.dest, self.local)
+        return hardware.provision(self.repo, self.dest, self.local, host='example')
 
     def test_exact_values_outside_git_with_private_permissions(self):
         self.prepare()
@@ -64,7 +64,7 @@ class HardwareTests(unittest.TestCase):
     def test_sops_decryption_used_for_git_source(self):
         result = subprocess.CompletedProcess([], 0, json.dumps(self.inventory["example"]).encode(), b'')
         with patch.object(hardware.subprocess, 'run', return_value=result) as run:
-            self.assertEqual(hardware.read_inventory(self.repo), self.inventory)
+            self.assertEqual(hardware.read_inventory(self.repo, host='example'), self.inventory)
         self.assertEqual(run.call_args.args[0], ['sops', '--decrypt', str(self.repo / 'secrets/hardware/example.json')])
 
     def test_manifest_in_git_checkout_rejected(self):
@@ -76,7 +76,7 @@ class HardwareTests(unittest.TestCase):
         result = subprocess.CompletedProcess([], 1, b'sensitive', b'sensitive')
         with patch.object(hardware.subprocess, 'run', return_value=result):
             with self.assertRaisesRegex(RuntimeError, 'output withheld') as error:
-                hardware.provision(self.repo, self.dest)
+                hardware.provision(self.repo, self.dest, host='example')
         self.assertNotIn('sensitive', str(error.exception))
         self.assertFalse(self.dest.exists())
 
@@ -181,9 +181,59 @@ class HardwareTests(unittest.TestCase):
 
     def test_cli_export_without_nix_or_repository_copy(self):
         result = subprocess.run(['python3', str(Path(hardware.__file__)), '--repo', str(self.repo),
-                                 '--inventory', str(self.local), str(self.dest)], capture_output=True, text=True)
+                                 '--host', 'example', '--inventory', str(self.local), str(self.dest)], capture_output=True, text=True)
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual({p.name for p in self.dest.iterdir()}, {hardware.INVENTORY, 'metadata.json'})
+
+    def add_other_host(self):
+        self.schema['other'] = {'value': 'string'}
+        (self.repo / 'lib/hardware-identities-schema.json').write_text(json.dumps(self.schema))
+
+    def test_only_selected_sops_file_is_decrypted(self):
+        self.add_other_host()
+        result = subprocess.CompletedProcess([], 0, json.dumps(self.inventory['example']).encode(), b'')
+        with patch.object(hardware.subprocess, 'run', return_value=result) as run:
+            self.assertEqual(hardware.read_inventory(self.repo, host='example'), self.inventory)
+        run.assert_called_once()
+        self.assertEqual(Path(run.call_args.args[0][-1]).name, 'example.json')
+
+    def test_legacy_combined_export_is_reduced_to_selected_host(self):
+        self.add_other_host()
+        self.local.write_text(json.dumps(dict(self.inventory, other={'value': 'private-other-host'})))
+        self.prepare()
+        self.assertEqual(json.loads((self.dest / hardware.INVENTORY).read_text()), self.inventory)
+        self.assertNotIn('private-other-host', (self.dest / hardware.INVENTORY).read_text())
+
+    def test_raw_host_file_is_supported(self):
+        self.local.write_text(json.dumps(self.inventory['example']))
+        self.prepare()
+        self.assertEqual(json.loads((self.dest / hardware.INVENTORY).read_text()), self.inventory)
+
+    def test_production_export_requires_a_host_without_decrypting(self):
+        with patch.object(hardware.subprocess, 'run') as run:
+            with self.assertRaisesRegex(ValueError, 'Select a host'):
+                hardware.read_inventory(self.repo)
+        run.assert_not_called()
+
+    def test_unknown_host_rejected_without_decrypting(self):
+        with patch.object(hardware.subprocess, 'run') as run:
+            with self.assertRaisesRegex(ValueError, 'Unknown hardware host'):
+                hardware.read_inventory(self.repo, host='../other')
+        run.assert_not_called()
+
+    def test_fixture_host_rejected_even_if_another_host_has_real_values(self):
+        self.add_other_host()
+        values = hardware.fixture_inventory(self.schema)
+        values['other']['value'] = 'private-other-host'
+        self.local.write_text(json.dumps(values))
+        with self.assertRaisesRegex(ValueError, 'Synthetic inventory'):
+            self.prepare()
+
+    def test_wrong_host_export_is_rejected(self):
+        self.add_other_host()
+        self.local.write_text(json.dumps({'other': {'value': 'private-other-host'}}))
+        with self.assertRaises(ValueError):
+            self.prepare()
 
 if __name__ == '__main__':
     unittest.main()

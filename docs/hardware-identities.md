@@ -29,34 +29,38 @@ inventory. Pulling source changes needs no separate provisioning or lock refresh
 
 ## One-time provisioning on a NixOS target
 
-Before the first installation or activation of this configuration, provision
-the target's inventory. Build the helper directly from the checkout:
+Before the first installation or activation, provision the target's inventory.
+The helper decrypts only `secrets/hardware/HOST.json` on that host, using its
+existing Ed25519 SSH host identity as an age key. The encrypted file and schema
+are part of the helper's build; no plaintext inventory is needed on a controller.
+Build and run it on the target:
 
 ```sh
 nix build .#nixosConfigurations.ward.config.system.build.hardwareProvisioner
-sudo ./result/bin/hardware-runtime provision --repo "$PWD" \
-  --inventory /PRIVATE/hardware-identities.json
+sudo ./result/bin/hardware-runtime provision
 ```
 
-Replace `ward` with the host. The plaintext inventory must be outside the checkout.
-It has the complete nested schema, preserving existing values. An existing
-inventory from the former local input/deployment can be imported with
-`--inventory /OLD/DEPLOYMENT/hardware-input/hardware-identities.json`.
+Replace `ward` with the host. Its host identity must already be an authorized
+recipient of its encrypted file. The helper uses the SSH key paths configured
+for SOPS, or the Ed25519 OpenSSH host key paths when SOPS is not configured.
+Key conversion happens locally; keys and decrypted values are never logged.
 
-Omit `--inventory` to decrypt the per-host SOPS files. The helper needs an
-authorized SOPS recipient for all files: an administrator GPG key or an age key
-configured using SOPS's normal environment. When using sudo, pass the intended
-key environment explicitly rather than assuming the root account has your key.
-Alternatively, export on a trusted controller and securely transfer the inventory:
+For recovery or a fresh installer without the target's host key, use an
+administrator SOPS identity, or supply `--inventory /PRIVATE/host.json`.
+The helper accepts the decrypted host file, a single-host export, or an older
+combined inventory; it validates and retains only the target host's entry.
+To export that single entry on a trusted controller:
 
 ```sh
 nix develop
-python3 scripts/hardware-identities.py /PRIVATE/hardware-export
+python3 scripts/hardware-identities.py --host ward /PRIVATE/ward-hardware
 ```
 
-This exporter creates `hardware-identities.json` and metadata with private
-permissions. It does not build a flake or modify Git. Transfer only through a
-trusted private channel; never print the file in CI or paste it into logs.
+The exporter requires `--host` for production data and decrypts only that file.
+It creates `hardware-identities.json` and metadata with private permissions.
+It does not build a flake or modify Git. Transfer only through a trusted private
+channel; never print the file in CI or paste it into logs. Existing recipient
+access is preserved; host-scoped provisioning does not change SOPS key policy.
 
 For a mounted installation, add `--root /mnt` to the provisioning command,
 **after mounting persistent storage and before nixos-install**. Crow and Robin
@@ -72,14 +76,18 @@ and activation. Do not run provisioning concurrently with rebuilding.
 After activation, the same operations are available as:
 
 ```sh
-sudo sys hardware-provision --repo "$PWD" --inventory /PRIVATE/hardware-identities.json
+sudo sys hardware-provision
 sudo sys hardware-verify
 sudo nixos-rebuild boot --flake .#ward
 ```
 
-Reprovision when identifiers change; ordinary source edits and pulls do not need
-it. Update the corresponding encrypted SOPS file as well. After verifying a
-successful rebuild, obsolete local deployment directories can be removed; they
+Use `--repo "$PWD"` to decrypt the host file from a newer checkout rather than
+the installed helper's encrypted snapshot. Reprovision when identifiers change;
+ordinary source edits and pulls do not need it. Update the corresponding
+encrypted SOPS file as well. Reprovisioning an old combined local inventory
+removes the other hosts' entries without changing this host's values.
+After verifying a successful rebuild, obsolete local deployment directories can
+be removed; they
 are no longer build entry points. Activation removes any previously managed Nix
 wrapper. A build alone does not change installed commands.
 
@@ -87,7 +95,7 @@ wrapper. A build alone does not change installed commands.
 
 State lives at `/persist/nixos-hardware` on hosts with a `/persist` filesystem,
 otherwise `/var/lib/nixos-hardware`. Its `input/` directory is mode 0700 and its
-inventory files are mode 0600. The `current` symlink selects generated runtime
+inventory files are mode 0600 and contain only that host. The `current` symlink selects generated runtime
 files; those files are readable by services that need them. Plaintext identifiers
 are acceptable on trusted systems.
 

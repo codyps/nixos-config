@@ -38,10 +38,11 @@ def get(value, path):
 def inventory(manifest, state):
     directory = state / 'input'
     meta = json.loads((directory / 'metadata.json').read_text())
-    values = json.loads((directory / hardware.INVENTORY).read_text())
     schema = json.loads(Path(manifest['schema']).read_text())
-    hardware.validate_inventory(values, schema)
-    fixtures = json.loads(Path(manifest['fixtures']).read_text())
+    host = manifest['host']
+    values = hardware.select_host(json.loads((directory / hardware.INVENTORY).read_text()), schema, host)
+    fixtures = hardware.select_host(json.loads(Path(manifest['fixtures']).read_text()), schema, host)
+    schema = {host: schema[host]}
     if meta != {'version': 1, 'fixture': False} or values == fixtures:
         if not manifest.get('allowFixtures', False) or meta != {'version': 1, 'fixture': True} or values != fixtures:
             raise ValueError('Provision production hardware state before installing or activating this system')
@@ -153,14 +154,37 @@ def device_links(manifest, values, schema, device_root):
         os.replace(pending, link)
 
 
-def provision(manifest, state, repo, source=None, fixtures=False, device_root=Path('/dev')):
+def decryption_environment(manifest, root=Path('/')):
+    """Derive age identities locally; never log private keys or tool output."""
+    environment = os.environ.copy()
+    keys = []
+    for name in manifest.get('sshKeyPaths', []):
+        path = root / name.lstrip('/')
+        if not path.is_file():
+            continue
+        result = subprocess.run(['ssh-to-age', '-private-key', '-i', str(path)],
+                                stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        if result.returncode:
+            raise RuntimeError('Cannot use the local SSH decryption identity (output withheld)')
+        keys.append(result.stdout.decode().strip())
+    if keys:
+        environment['SOPS_AGE_KEY'] = '\n'.join([environment.get('SOPS_AGE_KEY', ''), *keys])
+    return environment
+
+
+def provision(manifest, state, repo=None, source=None, fixtures=False, device_root=Path('/dev'), root=Path('/')):
     state.mkdir(parents=True, mode=0o700, exist_ok=True)
     if state.is_symlink() or state.stat().st_uid != os.getuid() or state.stat().st_mode & 0o022:
         raise ValueError('Hardware state must be owned and not group/world writable')
     state.chmod(0o755)
     with tempfile.TemporaryDirectory(prefix='.provision-', dir=state) as temporary:
         stage = Path(temporary)
-        hardware.provision(repo, stage / 'input', source, fixtures)
+        schema = Path(manifest['schema'])
+        encrypted = Path(repo) / 'secrets/hardware' / (manifest['host'] + '.json') if repo else manifest.get('encryptedInventory')
+        environment = decryption_environment(manifest, root) if source is None and not fixtures else None
+        hardware.provision(repo or schema.parent.parent, stage / 'input', source, fixtures,
+                           host=manifest['host'], schema_file=schema, encrypted_file=encrypted,
+                           sops_env=environment)
         values, schema = render(manifest, stage)
         by_id = values[manifest['host']].get('storage', {}).get('installationDisk', {}).get('byId')
         link = state / 'installation-disk'
@@ -228,7 +252,7 @@ def main():
     parser.add_argument('--manifest', type=Path, required=True)
     parser.add_argument('action', choices=['provision', 'verify', 'render', 'append'])
     parser.add_argument('initrd', type=Path, nargs='?')
-    parser.add_argument('--repo', type=Path, default=Path.cwd())
+    parser.add_argument('--repo', type=Path, help='Use this checkout\'s encrypted host file instead of the installed one')
     parser.add_argument('--inventory', type=Path)
     parser.add_argument('--root', type=Path, default=Path('/'))
     parser.add_argument('--fixtures', action='store_true')
@@ -238,7 +262,7 @@ def main():
         manifest = json.loads(args.manifest.read_text())
         state = args.root / manifest['stateDirectory'].lstrip('/')
         if args.action == 'provision':
-            provision(manifest, state, args.repo, args.inventory, args.fixtures)
+            provision(manifest, state, args.repo, args.inventory, args.fixtures, root=args.root)
         elif args.action == 'verify':
             inventory(manifest, state)
         elif args.action == 'render':

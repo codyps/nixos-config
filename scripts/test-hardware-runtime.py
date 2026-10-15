@@ -4,6 +4,7 @@ import copy
 import importlib.util
 import json
 import os
+import subprocess
 from pathlib import Path
 import tempfile
 import unittest
@@ -185,6 +186,53 @@ class RuntimeTests(unittest.TestCase):
         self.manifest['initrdTemplates']['etc/systemd/network'] = str(directory)
         outputs = runtime.files(self.manifest, self.values, self.fixtures, self.schema, initrd=True)
         self.assertEqual(outputs['etc/systemd/network/10-lan.network'], b'[Match]\nName=eno1\n')
+
+    def test_combined_inventory_migration_preserves_only_target_host(self):
+        self.schema['other'] = {'value': 'string'}
+        Path(self.manifest['schema']).write_text(json.dumps(self.schema))
+        Path(self.manifest['fixtures']).write_text(json.dumps(runtime.hardware.fixture_inventory(self.schema)))
+        self.source.write_text(json.dumps(dict(self.values, other={'value': 'private-other-host'})))
+        self.provision()
+        self.assertEqual(json.loads((self.state / 'input/hardware-identities.json').read_text()), self.values)
+        values, fixtures, schema = runtime.inventory(self.manifest, self.state)
+        self.assertEqual(set(values), {'example'})
+        self.assertEqual(set(fixtures), {'example'})
+        self.assertEqual(set(schema), {'example'})
+
+    def test_legacy_combined_state_remains_readable(self):
+        self.provision()
+        self.schema['other'] = {'value': 'string'}
+        Path(self.manifest['schema']).write_text(json.dumps(self.schema))
+        Path(self.manifest['fixtures']).write_text(json.dumps(runtime.hardware.fixture_inventory(self.schema)))
+        (self.state / 'input/hardware-identities.json').write_text(json.dumps(dict(self.values, other={'value': 'private-other-host'})))
+        self.assertEqual(runtime.inventory(self.manifest, self.state)[0], self.values)
+
+    def test_host_ssh_key_is_converted_locally_and_passed_only_in_environment(self):
+        key = self.root / 'persist/ssh/ssh_host_ed25519_key'
+        key.parent.mkdir(parents=True)
+        key.write_text('private-test-placeholder')
+        self.manifest['sshKeyPaths'] = ['/persist/ssh/ssh_host_ed25519_key']
+        self.manifest['encryptedInventory'] = str(self.repo / 'secrets/hardware/example.json')
+        results = [subprocess.CompletedProcess([], 0, b'private-age-test-placeholder\n', b''),
+                   subprocess.CompletedProcess([], 0, json.dumps(self.values['example']).encode(), b'')]
+        with patch.object(runtime.subprocess, 'run', side_effect=results) as run:
+            runtime.provision(self.manifest, self.state, device_root=self.devices, root=self.root)
+        self.assertEqual(run.call_args_list[0].args[0], ['ssh-to-age', '-private-key', '-i', str(key)])
+        self.assertEqual(run.call_args_list[1].args[0], ['sops', '--decrypt', self.manifest['encryptedInventory']])
+        self.assertIn('private-age-test-placeholder', run.call_args_list[1].kwargs['env']['SOPS_AGE_KEY'])
+        self.assertEqual(json.loads((self.state / 'input/hardware-identities.json').read_text()), self.values)
+
+    def test_bad_host_key_does_not_change_existing_state_or_log_private_output(self):
+        self.provision()
+        before = (self.state / 'input/hardware-identities.json').read_bytes()
+        key = self.root / 'host-key'
+        key.write_text('private-test-placeholder')
+        self.manifest['sshKeyPaths'] = ['/host-key']
+        with patch.object(runtime.subprocess, 'run', return_value=subprocess.CompletedProcess([], 1, b'private', b'private')):
+            with self.assertRaisesRegex(RuntimeError, 'output withheld') as error:
+                runtime.provision(self.manifest, self.state, device_root=self.devices, root=self.root)
+        self.assertNotIn('private', str(error.exception))
+        self.assertEqual((self.state / 'input/hardware-identities.json').read_bytes(), before)
 
 
 if __name__ == '__main__':

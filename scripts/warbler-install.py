@@ -209,7 +209,7 @@ def source_archive():
             if not source.is_file():
                 raise RuntimeError("Only regular source files may be transferred")
             archive.add(source, arcname=str(relative), recursive=False)
-        for name, value in (("hardware-input/" + hardware.INVENTORY, hardware.read_inventory(REPO)),
+        for name, value in (("hardware-input/" + hardware.INVENTORY, hardware.read_inventory(REPO, host="warbler")),
                             ("hardware-input/metadata.json", {"version": 1, "fixture": False})):
             data = (json.dumps(value, indent=2) + "\n").encode()
             entry = tarfile.TarInfo(name)

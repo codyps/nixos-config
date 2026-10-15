@@ -6,12 +6,16 @@ let
   isNixos = options ? boot.initrd.systemd;
   hasZfs = schema.${host}.storage ? zfs;
   secure = isNixos && (config.boot.secureUnlock.enable or false);
+  sopsSshKeyPaths = lib.attrByPath [ "sops" "age" "sshKeyPaths" ] [ ] config;
   templates = lib.mapAttrs (name: value: pkgs.writeText "hardware-${baseNameOf name}" value.text) cfg.templates;
   manifest = pkgs.writeText "hardware-runtime.json" (builtins.toJSON {
     inherit host templates;
     inherit (cfg) stateDirectory allowFixtures;
     schema = ../lib/hardware-identities-schema.json;
     fixtures = ../config/hardware-fixtures/hardware-identities.json;
+    encryptedInventory = ../secrets/hardware + "/${host}.json";
+    sshKeyPaths = if sopsSshKeyPaths != [ ] then sopsSshKeyPaths else
+    map (key: key.path) (builtins.filter (key: key.type == "ed25519") config.services.openssh.hostKeys);
     byteOrder = if pkgs.stdenv.hostPlatform.isBigEndian then "big" else "little";
     mapper = if secure then config.boot.secureUnlock.mapperName else null;
     initrdTemplates = lib.optionalAttrs (config.boot.initrd.systemd.contents ? "/etc/crypttab")
@@ -30,7 +34,7 @@ let
   '';
   helper = pkgs.writeShellApplication {
     name = "hardware-runtime";
-    runtimeInputs = [ pkgs.python3 pkgs.sops pkgs.gnupg ];
+    runtimeInputs = [ pkgs.python3 pkgs.sops pkgs.gnupg pkgs.ssh-to-age ];
     text = ''exec python3 ${scripts}/hardware-runtime.py --manifest ${manifest} "$@"'';
   };
   run = "${helper}/bin/hardware-runtime";

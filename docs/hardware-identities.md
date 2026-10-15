@@ -86,6 +86,9 @@ the installed helper's encrypted snapshot. Reprovision when identifiers change;
 ordinary source edits and pulls do not need it. Update the corresponding
 encrypted SOPS file as well. Reprovisioning an old combined local inventory
 removes the other hosts' entries without changing this host's values.
+The new runtime can also read existing combined state. Keep that state until
+rollback generations using the old full-inventory validator have been retired;
+reprovisioning it with only one host makes those older generations incompatible.
 After verifying a successful rebuild, obsolete local deployment directories can
 be removed; they
 are no longer build entry points. Activation removes any previously managed Nix
@@ -101,6 +104,9 @@ are acceptable on trusted systems.
 
 Repository configurations refer to semantic `/dev/disk/by-hardware/...` aliases.
 Local UUID mapping files supply these aliases through udev in both boot stages.
+Live activation reloads the installed udev rules and replays block-device events
+before restarting mounts. This registers the aliases with systemd; merely
+creating filesystem symlinks does not satisfy `.device` dependencies.
 Activation renders network drop-ins, USBGuard rules and the ZFS host ID from the
 same inventory. Container network identities come from a read-only local bind
 mount. After changing a container identity, restart that container during an

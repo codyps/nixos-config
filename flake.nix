@@ -205,6 +205,7 @@
               touch "$out"
             '';
           } // pkgs.lib.optionalAttrs (system == "x86_64-linux") {
+            hardware-live-aliases = import ./modules/hardware-identities-test.nix { inherit pkgs; };
             codex-service = pkgs.runCommand "test-codex-service" { nativeBuildInputs = [ pkgs.python3 pkgs.bash ]; } ''
               CODEX_SERVICE_SCRIPT=${./hosts/warbler/codex-service.sh} CODEX_UPDATE_SCRIPT=${./hosts/warbler/codex-update.sh} python3 ${./scripts/test-codex-service.py}
               touch "$out"

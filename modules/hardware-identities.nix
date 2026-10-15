@@ -87,6 +87,18 @@ in
       '';
     };
     system.activationScripts.etc.deps = [ "hardware-identities" ];
+    system.activationScripts.hardware-identities-udev = {
+      deps = [ "etc" ];
+      text = ''
+        # A filesystem symlink alone does not activate a systemd .device unit.
+        # Publish the aliases through udev before switch-to-configuration starts
+        # mounts using the new device names. At boot, udev enumerates them later.
+        if ${config.systemd.package}/bin/systemctl is-active --quiet systemd-udevd.service 2>/dev/null; then
+          ${config.systemd.package}/bin/udevadm control --reload-rules
+          ${config.systemd.package}/bin/udevadm trigger --action=change --subsystem-match=block --settle
+        fi
+      '';
+    };
     environment.etc = {
       "nixos-hardware".source = "${cfg.stateDirectory}/current/etc/nixos-hardware";
     } // lib.optionalAttrs hasZfs {

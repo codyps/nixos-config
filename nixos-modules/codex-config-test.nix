@@ -8,8 +8,8 @@ pkgs.testers.runNixOSTest {
     environment.systemPackages = [ pkgs.python3 ];
   };
   nodes.updater = {
-    # Both Warbler AI environments import this same module.
-    imports = [ ../hosts/warbler/ai-user-config.nix ];
+    # The AI containers and legacy host harness import this same module.
+    imports = [ ./ai-container/ai-user-config.nix ];
     users.groups.cody-ai = { };
     users.users.cody-ai = { isNormalUser = true; group = "cody-ai"; };
     environment.systemPackages = [ pkgs.python3 ];

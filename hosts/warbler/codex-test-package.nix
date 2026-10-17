@@ -1,6 +1,6 @@
 { pkgs }:
 let
-  bubblewrap = pkgs.callPackage ./ai-bubblewrap.nix { };
+  bubblewrap = pkgs.callPackage ../../nixos-modules/ai-container/ai-bubblewrap.nix { };
 in
 pkgs.runCommand "codex-test-package" { } ''
   mkdir -p "$out/bin" "$out/codex-path" "$out/codex-resources"

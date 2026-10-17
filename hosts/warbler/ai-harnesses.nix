@@ -35,7 +35,7 @@ let
       mainProgram = "vp";
     };
   };
-  aiBubblewrap = pkgs.callPackage ./ai-bubblewrap.nix { };
+  aiBubblewrap = pkgs.callPackage ../../nixos-modules/ai-container/ai-bubblewrap.nix { };
   codingTools = with pkgs; [ git gh gcc gnumake cmake pkg-config unzip zip aiBubblewrap bazelisk (writeShellScriptBin "bazel" ''exec ${bazelisk}/bin/bazelisk "$@"'') rustup mbx nodejs bun uv pnpm vitePlus python3 ripgrep jq ];
   localBinPaths = map (path: "${home}/${path}") [
     ".local/share/python-default/bin"
@@ -134,7 +134,7 @@ let
   supervisor = pkgs.writeShellScript "codex-ai-service" (''
     set -e
     source ${shellEnvironment}
-  '' + builtins.readFile ./codex-service.sh);
+  '' + builtins.readFile ../../nixos-modules/ai-container/codex-service.sh);
   codexRemote = pkgs.writeShellScriptBin "codex" ''
     export CODEX_HOME=${home}/.codex
     current="$CODEX_HOME/packages/standalone/current"
@@ -202,7 +202,7 @@ let
   '';
 in
 {
-  imports = [ ./ai-user-config.nix ./ai-git.nix ./ai-rust.nix ../../nixos-modules/git-gh-credentials.nix ];
+  imports = [ ../../nixos-modules/ai-container/ai-user-config.nix ../../nixos-modules/ai-container/ai-git.nix ../../nixos-modules/ai-container/ai-rust.nix ../../nixos-modules/git-gh-credentials.nix ];
 
   options.services.codex-ai.stdioForwarder.enable = lib.mkEnableOption
     "the custom JSON-lines stdio compatibility adapter for Codex";

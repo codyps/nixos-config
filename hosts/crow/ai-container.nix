@@ -39,9 +39,9 @@
     localAddress = "10.80.0.2";
     hostAddress = "10.80.0.1";
     config = {
-      imports = [ ../warbler/ai-container-guest.nix ];
-      networking.hostName = lib.mkForce "crow-ai";
-      systemd.network.networks."10-lan".enable = false;
+      imports = [ ../../nixos-modules/ai-container ];
+      networking.hostName = "crow-ai";
+      environment.etc."systemd/network/10-lan.network.d/90-hardware.conf".source = "/run/hardware-identities/90-hardware.conf";
       systemd.network.networks."10-ai" = {
         matchConfig.Name = "eth0";
         address = [ "10.80.0.2/24" ];

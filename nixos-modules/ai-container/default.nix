@@ -73,22 +73,13 @@ in
   programs.adminCommands.commands.install-hermes = [ "${installHermes}/bin/install-hermes" ];
   programs.adminCommands.commands.update-codex = [ "${pkgs.systemd}/bin/systemctl" "--user" "start" "codex-ai-update.service" ];
   programs.adminCommands.commands.restart-codex = [ "${pkgs.systemd}/bin/systemctl" "--user" "reload" "codex-ai.service" ];
-  networking.hostName = "warbler-ai";
-  imports = [ ../../modules/terminfo.nix ./ai-user-config.nix ./ai-git.nix ./ai-rust.nix ../../nixos-modules/git-gh-credentials.nix ];
+  imports = [ ../../modules/admin-commands.nix ../../modules/terminfo.nix ./ai-user-config.nix ./ai-git.nix ./ai-rust.nix ../git-gh-credentials.nix ];
   system.stateVersion = "26.05";
   time.timeZone = "America/New_York";
   documentation.enable = false;
   networking.useHostResolvConf = false;
   networking.useDHCP = false;
-  systemd.network = {
-    enable = true;
-    networks."10-lan" = {
-      matchConfig.Name = "mv-eno1";
-      networkConfig = { DHCP = "yes"; IPv6AcceptRA = true; };
-      dhcpV4Config = { ClientIdentifier = "mac"; SendHostname = true; };
-    };
-  };
-  environment.etc."systemd/network/10-lan.network.d/90-hardware.conf".source = "/run/hardware-identities/90-hardware.conf";
+  systemd.network.enable = true;
   services.resolved.enable = true;
   services.avahi = {
     enable = true;

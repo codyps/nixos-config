@@ -9,7 +9,7 @@ import time
 import unittest
 
 
-SCRIPT = Path(os.environ.get("CODEX_SERVICE_SCRIPT", Path(__file__).resolve().parents[1] / "hosts/warbler/codex-service.sh"))
+SCRIPT = Path(os.environ.get("CODEX_SERVICE_SCRIPT", Path(__file__).resolve().parents[1] / "nixos-modules/ai-container/codex-service.sh"))
 UPDATE = Path(os.environ.get("CODEX_UPDATE_SCRIPT", SCRIPT.with_name("codex-update.sh")))
 
 

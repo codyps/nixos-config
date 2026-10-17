@@ -41,7 +41,17 @@
     # changing the guest's LAN default route or depending on its DHCP lease.
     extraVeths.ai-ssh = { };
     config = {
-      imports = [ ./ai-container-guest.nix ];
+      imports = [ ../../nixos-modules/ai-container ];
+      networking.hostName = "warbler-ai";
+      systemd.network = {
+        enable = true;
+        networks."10-lan" = {
+          matchConfig.Name = "mv-eno1";
+          networkConfig = { DHCP = "yes"; IPv6AcceptRA = true; };
+          dhcpV4Config = { ClientIdentifier = "mac"; SendHostname = true; };
+        };
+      };
+      environment.etc."systemd/network/10-lan.network.d/90-hardware.conf".source = "/run/hardware-identities/90-hardware.conf";
       nixpkgs.pkgs = pkgs;
       networking.interfaces.ai-ssh.ipv4.addresses = [{ address = "10.79.0.2"; prefixLength = 24; }];
       # Allow all ports on the private link used by Tailscale's subnet route.

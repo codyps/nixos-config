@@ -4,7 +4,7 @@ let
   home = config.users.users.${user}.home;
 in
 {
-  imports = [ ../../nixos-modules/codex-config.nix ];
+  imports = [ ../codex-config.nix ];
 
   # These accounts use NixOS activation rather than Home Manager.
   programs.codex-config = {

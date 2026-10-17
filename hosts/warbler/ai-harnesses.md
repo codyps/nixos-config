@@ -11,7 +11,7 @@ Warbler defines `cody-ai` for Cody's AI tools, independently of the administrati
 no private keys, Git credentials, or Codex login tokens are copied from Cody.
 
 The host account and the `warbler-ai` container share
-[`ai-user-config.nix`](ai-user-config.nix). Each receives Cody's
+[`ai-user-config.nix`](../../nixos-modules/ai-container/ai-user-config.nix). Each receives Cody's
 [`~/.tmux.conf`](../../config/.tmux.conf), including the `Ctrl-z` prefix and
 one-based window numbering, on boot and system activation. NixOS activation
 also runs `codex-configure` for each account, updating existing mutable configs

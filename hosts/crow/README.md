@@ -67,7 +67,8 @@ for the Secure Boot/PCR 7 sealing prerequisites.
 
 ## AI container
 
-`crow-ai` reuses Warbler's AI guest tools, user services, persistent home, and
+`crow-ai` and `warbler-ai` share [the AI container module](../../nixos-modules/ai-container),
+including guest tools, user services, persistent home, and
 unprivileged `cody-ai` user. Crow has no host-level `cody-ai` account or legacy
 sandbox service. The container uses veth addresses `10.80.0.1` (host) and
 `10.80.0.2` (guest), with NAT through Wi-Fi. It does not depend on an Ethernet

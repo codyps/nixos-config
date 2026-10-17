@@ -75,8 +75,10 @@ sandbox service. The container uses veth addresses `10.80.0.1` (host) and
 macvlan or a separate LAN DHCP lease. Container DNS uses 1.1.1.1 and 9.9.9.9.
 
 After authenticating Crow to Tailscale, access the guest with
-`ssh -p 2223 cody-ai@crow`. The SSH proxy only listens on the Tailscale
-interface. The host also advertises `10.80.0.2/32`; accessing that route needs
+`ssh -p 2223 cody-ai@crow`. On the local Wi-Fi network, use
+`ssh -p 2223 cody-ai@<crow-lan-ip>`. The firewall allows the SSH proxy on
+Crow's Wi-Fi and Tailscale interfaces. The host also advertises
+`10.80.0.2/32`; accessing that route needs
 approval in the tailnet. This configuration does not register a `crow-ai`
 Tailscale node or create DNS records. From Crow itself, use
 `ssh cody-ai@10.80.0.2`.

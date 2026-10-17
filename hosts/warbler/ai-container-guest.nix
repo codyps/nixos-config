@@ -240,6 +240,8 @@ in
     # Hermes-generated units may omit the Nix profile from their PATH.
     "L+ /usr/local/bin - - - - /run/current-system/sw/bin"
     "L+ /bin/bash - - - - ${pkgs.bashInteractive}/bin/bash"
+    # The desktop file viewer streams Unix files through this absolute path.
+    "L+ /bin/cat - - - - ${pkgs.coreutils}/bin/cat"
     "L+ /bin/kill - - - - ${pkgs.coreutils}/bin/kill"
   ] ++ map (command: "L+ /usr/bin/${command} - - - - /run/current-system/sw/bin/${command}") [
     "bash"

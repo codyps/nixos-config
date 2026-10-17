@@ -160,6 +160,10 @@ Open a new shell after activation to pick up the hooks.
 
 ### Agent services
 
+The desktop Files pane streams remote Unix files through `/bin/cat`. The
+container provides that compatibility link through tmpfiles; having `cat`
+only on `PATH` is insufficient and causes “Could not open file” in the app.
+
 Codex runs in the foreground as a **user** service. Systemd tracks the actual
 app-server process; there is no detached-daemon PID-file watchdog or native
 updater. This prevents updater failures from terminating healthy sessions.

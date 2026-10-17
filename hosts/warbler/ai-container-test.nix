@@ -124,6 +124,8 @@ pkgs.testers.runNixOSTest {
     host.succeed(inside + "ip -4 route show default | grep mv-eth1")
     host.fail(inside + "ip -4 route show default | grep ai-ssh")
     client.succeed(ssh + shlex.quote("set -e; test $(hostname) = warbler-ai; test $(id -un) = cody-ai; test ! -e /home/cody-ai/host-only; test ! -e /persist/host-only; /bin/bash -c 'echo bash-ok'; /bin/kill -0 $$; /usr/bin/env bash -c true; systemctl --user is-active codex-ai; test $(loginctl show-user cody-ai -p Linger --value) = yes; nix store ping --store daemon"))
+    # The desktop Files pane streams Unix files with /bin/cat, ignoring PATH.
+    assert client.succeed(ssh + "/bin/cat /etc/hostname").strip() == "warbler-ai"
     # Legacy and flake commands resolve the system's pinned nixpkgs without channels.
     assert client.succeed(ssh + "nix-instantiate --find-file nixpkgs").strip() == "${builtins.path { path = pkgs.path; name = "source"; }}"
     assert client.succeed(ssh + shlex.quote("nix-shell -p hello --run hello")).strip() == "Hello, world!"

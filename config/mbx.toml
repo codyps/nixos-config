@@ -1,0 +1,11 @@
+# Shared by Home Manager and the AI accounts. These are collection targets,
+# not quotas: active builds can temporarily exceed them.
+[gc]
+auto = true
+max_size = "10GiB"
+max_total_size = "20GiB"
+
+[target]
+views = true
+max_size = "20GiB"
+max_age = "14d"

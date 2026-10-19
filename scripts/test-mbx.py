@@ -1,4 +1,4 @@
-"""Smoke-test a Home Manager generation: python3 scripts/test-mbx.py GENERATION."""
+"""Smoke-test a generation: python3 scripts/test-mbx.py GENERATION [SOURCE_HOME]."""
 import json, os, pathlib, shutil, subprocess, sys, tempfile
 generation = pathlib.Path(sys.argv[1])
 profile = generation / "home-path"
@@ -9,15 +9,21 @@ with tempfile.TemporaryDirectory(prefix='mbx-nix-', dir='/tmp') as tmp:
     for key in ['CARGO', 'CARGO_TARGET_DIR', 'RUSTC_WRAPPER', 'RUSTC_WORKSPACE_WRAPPER', 'MBX_SOCKET', 'MBX_DISABLE', 'MBX_CARGO_SHIM_MODE', 'MBX_CARGO_SHIM_PATH']:
         env.pop(key, None)
     original_home = pathlib.Path.home()
+    source_home = pathlib.Path(sys.argv[2]) if len(sys.argv) > 2 else original_home
     test_home = root / 'home'
     relative_data = pathlib.Path('Library/Application Support' if sys.platform == 'darwin' else '.local/share')
     relative_shim = relative_data / 'mbx/bin'
+    relative_config = relative_data if sys.platform == 'darwin' else pathlib.Path('.config')
     shim = test_home / relative_shim
     shim.mkdir(parents=True)
     for name in ['cargo', 'mbx-target']:
         shutil.copyfile(generation / 'home-files' / relative_shim / name, shim / name)
     (shim / 'cargo').chmod(0o755)
+    config_file = relative_config / 'mbx/config.toml'
+    (test_home / config_file).parent.mkdir(parents=True, exist_ok=True)
+    shutil.copyfile(generation / 'home-files' / config_file, test_home / config_file)
     env.update(HOME=str(test_home), XDG_DATA_HOME=str(test_home / relative_data),
+               XDG_CONFIG_HOME=str(test_home / relative_config),
                CARGO_HOME=env.get('CARGO_HOME', str(original_home / '.cargo')),
                RUSTUP_HOME=env.get('RUSTUP_HOME', str(original_home / '.rustup')),
                PATH=str(profile / 'bin') + ':' + env['PATH'],
@@ -25,7 +31,7 @@ with tempfile.TemporaryDirectory(prefix='mbx-nix-', dir='/tmp') as tmp:
     env.pop('__HM_SESS_VARS_SOURCED', None)
     # Exercise the generated PATH setup, relocating only this user's home.
     session = (profile / 'etc/profile.d/hm-session-vars.sh').read_text()
-    session = session.replace(str(original_home), str(test_home))
+    session = session.replace(str(source_home), str(test_home))
     exported = subprocess.check_output(['bash', '-c', session + '\nenv -0'], env=env)
     env = dict(item.decode().split('=', 1) for item in exported.split(b'\0') if item)
     assert pathlib.Path(shutil.which('cargo', path=env['PATH'])) == shim / 'cargo'
@@ -62,5 +68,8 @@ with tempfile.TemporaryDirectory(prefix='mbx-nix-', dir='/tmp') as tmp:
     report = json.loads(run(['mbx', 'doctor', '--json']).stdout)
     setup = next(check for check in report['checks'] if check['name'] == 'setup')
     assert setup['severity'] == 'pass', setup
+    configuration = next(check for check in report['checks'] if check['name'] == 'config')
+    assert configuration['severity'] == 'pass', configuration
+    assert '10.0 GiB budget, automatic gc enabled, managed targets enabled' in configuration['detail'], configuration
     print(setup['detail'])
     print('PASS: doctor setup, passthrough, cached cargo, explicit mbx, toolchain selection, nested cargo, PATH, and MBX_DISABLE')

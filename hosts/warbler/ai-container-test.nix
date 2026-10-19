@@ -74,6 +74,7 @@ pkgs.testers.runNixOSTest {
     mbx_check = "test $(command -v cargo) = /home/cody-ai/.local/share/mbx/bin/cargo; mbx doctor --json | jq -e '.checks[] | select(.name == \"setup\") | .severity == \"pass\"'"
     client.succeed(ssh + shlex.quote("set -e; " + mbx_check))
     client.succeed(ssh + shlex.quote("systemd-run --user --wait --pipe bash -ec " + shlex.quote(mbx_check)))
+    client.succeed(ssh + shlex.quote("cmp ~/.config/mbx/config.toml ${../../config/mbx.toml}; command -v ncdu; mbx doctor --json | jq -e '.checks[] | select(.name == \"config\") | .severity == \"pass\" and (.detail | startswith(\"10.0 GiB budget, automatic gc enabled, managed targets enabled\"))'"))
     # Exercise permissions as the actual unprivileged SSH user. Software perf
     # events work without a hardware PMU in the nested test VM.
     client.succeed(ssh + shlex.quote("set -e; command -v perf valgrind heaptrack heaptrack_print gdb strace pidstat iostat mpstat htop smem time hyperfine flamegraph.pl; perf stat -e task-clock -- sleep 0.1"))

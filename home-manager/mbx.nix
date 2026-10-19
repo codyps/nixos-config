@@ -7,7 +7,8 @@ let
     else
       config.xdg.dataHome;
   shimDirectory = "${dataHome}/mbx/bin";
-  cargoShim = import ../nixpkgs/mbx-cargo-shim.nix { inherit pkgs; package = cfg.package; };
+  mbx = import ../lib/mbx.nix { inherit pkgs shimDirectory; package = cfg.package; };
+  configHome = if pkgs.stdenv.hostPlatform.isDarwin then dataHome else config.xdg.configHome;
 in
 {
   options.programs.mbx = {
@@ -19,27 +20,14 @@ in
   };
 
   config = lib.mkIf cfg.enable {
-    home.file."${shimDirectory}/cargo".source = cargoShim;
-    home.file."${shimDirectory}/mbx-target".text = "${cfg.package}/bin/mbx\n";
+    home.file."${shimDirectory}/cargo".source = mbx.cargoShim;
+    home.file."${shimDirectory}/mbx-target".source = mbx.target;
+    home.file."${configHome}/mbx/config.toml".source = mbx.configFile;
     # Upstream removes this dedicated directory before finding real Cargo.
     # Keep Rustup and other tools in the shared profile, outside that directory.
     home.sessionPath = [ shimDirectory ];
     home.packages = [ cfg.package cfg.cargoPackage ];
 
-    programs.direnv.stdlib = lib.mkAfter ''
-      # direnvrc runs before .envrc, so restore shim priority at export time.
-      # This mirrors direnv's internal EXIT trap, including its dump fd/status.
-      _mbx_direnv_exit() {
-        local status=$?
-        local shim=${lib.escapeShellArg shimDirectory}
-        if [[ -x "$shim/cargo" && ":$PATH:" == *":$shim:"* ]]; then
-          PATH_add "$shim"
-        fi
-        "$direnv" dump json "" >&3
-        trap - EXIT
-        exit "$status"
-      }
-      trap _mbx_direnv_exit EXIT
-    '';
+    programs.direnv.stdlib = lib.mkAfter mbx.direnv;
   };
 }

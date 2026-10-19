@@ -301,3 +301,8 @@ before Rustup on PATH. Rustup still selects the underlying toolchain.
 `mbx doctor` should report a passing setup check; `MBX_DISABLE=1 cargo ...`
 bypasses caching. Existing agent processes pick up the new service PATH when
 they next start.
+
+Home Manager and both AI accounts share [the same configuration](../../config/mbx.toml),
+shim source, and direnv handling. Automatic collection targets a 10 GiB action
+store and 20 GiB combined store and managed targets. These are collection targets,
+not hard quotas. See [disk space](storage.md) for inspection and recovery.

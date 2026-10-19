@@ -10,7 +10,6 @@
 
   config.home.packages = [
     #pkgs.cargo-outdated
-    #pkgs.ncdu
     pkgs.nixd
     pkgs.bazelisk
     pkgs.cargo-generate

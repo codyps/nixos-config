@@ -107,9 +107,28 @@ in
       useRoutingFeatures = "server";
       extraSetFlags = [ "--advertise-exit-node" ];
     };
-    environment.systemPackages = (with pkgs; [ sbctl cryptsetup tpm2-tools neovim htop tmux ghostty.terminfo ]) ++ [
+    environment.systemPackages = (with pkgs; [ sbctl cryptsetup tpm2-tools neovim htop ncdu tmux ghostty.terminfo ]) ++ [
       (pkgs.callPackage ./secure-boot-backup.nix { })
     ];
+
+    # Collect before a large build consumes the last working space. This can
+    # reclaim unrooted store paths, but cannot evict project data or GC roots.
+    nix.settings = {
+      min-free = 20 * 1024 * 1024 * 1024;
+      max-free = 40 * 1024 * 1024 * 1024;
+    };
+    nix.gc = {
+      dates = lib.mkForce "daily";
+      options = lib.mkForce "--delete-older-than 14d";
+    };
+    services.journald.settings.Journal = {
+      SystemMaxUse = "1G";
+      SystemKeepFree = "4G";
+    };
+    containers.ai.config.services.journald.settings.Journal = {
+      SystemMaxUse = "512M";
+      SystemKeepFree = "4G";
+    };
 
     system.autoUpgrade.enable = lib.mkForce false;
     p.nix.buildMachines.ward.enable = lib.mkForce false;

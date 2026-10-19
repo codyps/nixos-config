@@ -62,6 +62,12 @@ and other harnesses. It provides its own LAN DHCP address and user systemd;
 The [legacy host AI account](ai-harnesses.md) and its home are retained for
 recovery. Its Codex service is disabled.
 
+## Disk space
+
+See [disk usage and recovery](storage.md) for measured consumers, read-only ncdu
+commands, cleanup policy, and capacity recommendations. All persistent workloads
+share the encrypted SSD; subvolumes do not isolate free space.
+
 ## Hardware and firmware references
 
 User-supplied `lshw` identifies an **HP EliteDesk 805 G8 Desktop Mini PC**,

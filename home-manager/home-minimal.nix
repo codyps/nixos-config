@@ -84,6 +84,7 @@ in
     pkgs.git-crypt
     pkgs.gnupg
     pkgs.htop
+    pkgs.ncdu
     pkgs.ripgrep
     pkgs.rsync
     pkgs.socat

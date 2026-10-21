@@ -160,7 +160,7 @@ in
     wants = [ "network-online.target" ];
     after = [ "incus-preseed.service" "network-online.target" ];
     path = [ pkgs.cacert ];
-    environment.SSL_CERT_FILE = "${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt";
+    environment = config.programs.caTrust.environment;
     preStart = ''
       ${pkgs.python3}/bin/python3 ${./garm-secrets.py} ${controllerConfig}
     '';

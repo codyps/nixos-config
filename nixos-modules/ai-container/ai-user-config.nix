@@ -5,7 +5,7 @@ let
   mbx = import ../../lib/mbx.nix { inherit pkgs; shimDirectory = "${home}/.local/share/mbx/bin"; };
 in
 {
-  imports = [ ../codex-config.nix ];
+  imports = [ ../ca-trust.nix ../codex-config.nix ];
 
   # These accounts use NixOS activation rather than Home Manager.
   programs.codex-config = {

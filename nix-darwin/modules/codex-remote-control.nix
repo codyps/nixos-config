@@ -48,7 +48,7 @@ let
   '';
 in
 {
-  imports = [ ../../modules/admin-commands.nix ];
+  imports = [ ./ca-trust.nix ../../modules/admin-commands.nix ];
 
   options.services.codex-remote-control = {
     enable = lib.mkEnableOption "boot-time Codex remote control through launchd";
@@ -69,10 +69,9 @@ in
       path = [ "${home}/.local/bin" "${home}/.nix-profile/bin" "/etc/profiles/per-user/${cfg.user}/bin" "/run/current-system/sw/bin" ]
         ++ map (package: "${package}/bin") [ pkgs.coreutils pkgs.curl pkgs.gnutar pkgs.gzip pkgs.git pkgs.openssh ]
         ++ [ "/usr/bin" "/bin" "/usr/sbin" "/sbin" ];
-      environment = {
+      environment = config.programs.caTrust.environment // {
         HOME = home;
         CODEX_HOME = "${home}/.codex";
-        SSL_CERT_FILE = "${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt";
       };
       serviceConfig = {
         UserName = cfg.user;

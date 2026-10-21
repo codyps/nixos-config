@@ -26,7 +26,7 @@ let
     "/usr/bin"
     "/bin"
   ]);
-  codingEnvironment = {
+  codingEnvironment = config.programs.caTrust.environment // {
     # nspawn assembles /sys from bind mounts. perf's mount autodetection picks
     # /sys/block as the root otherwise, hiding all hardware/software events.
     SYSFS_PATH = "/sys";
@@ -198,7 +198,7 @@ in
   '';
   # User services (including Hermes-generated units) must work without a login.
   environment.etc."environment.d/60-ai.conf".text =
-    lib.concatStringsSep "\n" (lib.mapAttrsToList (name: value: "${name}=${value}")
+    lib.concatStringsSep "\n" (lib.mapAttrsToList (name: value: "${name}=${builtins.toJSON (toString value)}")
       (codingEnvironment // {
         PATH = toolPath;
         inherit (config.environment.variables) ATUIN_CONFIG_DIR DIRENV_CONFIG;

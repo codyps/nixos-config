@@ -6,13 +6,7 @@ let
   nonnative_linux = "${nonnative_processor}-linux";
 in
 {
-  imports = [ ../modules/wren-builder-client.nix ./modules/gpg-agent-forwarding.nix ];
-  
-  # emudhra.we-have-a-problem.com
-  security.pki.caCertificateBlacklist = [
-    "Comodo AAA Services root"
-    "emSign ECC Root CA - G3"
-  ];
+  imports = [ ./modules/ca-trust.nix ../modules/wren-builder-client.nix ./modules/gpg-agent-forwarding.nix ];
 
   # List packages installed in system profile. To search by name, run:
   # $ nix-env -qaP | grep wget

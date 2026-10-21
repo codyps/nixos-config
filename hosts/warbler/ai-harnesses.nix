@@ -56,7 +56,7 @@ let
     ".nix-profile/bin"
     ".local/state/nix/profile/bin"
   ];
-  codingEnvironment = {
+  codingEnvironment = config.programs.caTrust.environment // {
     NPM_CONFIG_PREFIX = "${home}/.npm-global";
     GEM_HOME = "${home}/.gem";
     BUN_INSTALL = "${home}/.bun";
@@ -272,7 +272,6 @@ in
       environment = codingEnvironment // {
         HOME = home;
         CODEX_HOME = "${home}/.codex";
-        SSL_CERT_FILE = "${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt";
       };
       serviceConfig = {
         Type = "simple";

@@ -183,6 +183,18 @@
         in
         {
           checks = {
+            ca-trust =
+              let trust = import ./lib/ca-trust.nix { inherit pkgs; };
+              in pkgs.runCommand "test-ca-trust"
+                {
+                  nativeBuildInputs = [ pkgs.python3 pkgs.openssl ];
+                  CA_BUNDLE = trust.bundle;
+                  TRUST_RULES_CA_BUNDLE = "${trust.certificates}/etc/ssl/certs/ca-bundle.crt";
+                } ''
+                python3 ${./scripts/test-ca-trust.py}
+                CA_BUNDLE="$TRUST_RULES_CA_BUNDLE" python3 ${./scripts/test-ca-trust.py}
+                touch "$out"
+              '';
             hardware-identities = pkgs.runCommand "test-hardware-identities" { nativeBuildInputs = [ pkgs.python3 pkgs.git ]; } ''
               cp ${./scripts/hardware-identities.py} hardware-identities.py
               cp ${./scripts/test-hardware-identities.py} test-hardware-identities.py
@@ -311,7 +323,7 @@
           } // pkgs.lib.optionalAttrs (system == "x86_64-linux") {
             actions-vm-image = pkgs.callPackage ./nixpkgs/actions-vm-image.nix { };
           };
-          devShells.default = pkgs.mkShell {
+          devShells.default = pkgs.mkShell ((import ./lib/ca-trust.nix { inherit pkgs; }).environment // {
             nativeBuildInputs = with pkgs; [
               python3
               git
@@ -322,7 +334,7 @@
               sops
             ];
 
-          };
+          });
           formatter = pkgs.nixpkgs-fmt;
         }
       ) // {
@@ -332,7 +344,7 @@
     (
       let
         nixosSystem = args: withCommonModules nixpkgs.lib.nixosSystem (args // {
-          modules = [ ./nixos-modules/gpg-agent-forwarding.nix ] ++ args.modules;
+          modules = [ ./nixos-modules/ca-trust.nix ./nixos-modules/gpg-agent-forwarding.nix ] ++ args.modules;
         });
       in
       {
@@ -600,6 +612,7 @@
           specialArgs = { inherit self; };
           modules = [
             ({ ... }: {
+              system.primaryUser = "x";
               users.users.x = {
                 name = "x";
                 home = "/Users/x";

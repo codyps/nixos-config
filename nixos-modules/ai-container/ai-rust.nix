@@ -1,5 +1,6 @@
-{ pkgs, ... }:
+{ config, pkgs, ... }:
 {
+  imports = [ ../ca-trust.nix ];
   # Bootstrap once, outside activation and without delaying the AI services.
   # Existing defaults and repository-specific rust-toolchain.toml files win.
   systemd.services.ai-rust = {
@@ -8,9 +9,8 @@
     wants = [ "network-online.target" ];
     after = [ "network-online.target" "systemd-tmpfiles-setup.service" ];
     unitConfig.RequiresMountsFor = [ "/home/cody-ai" ];
-    environment = {
+    environment = config.programs.caTrust.environment // {
       HOME = "/home/cody-ai";
-      SSL_CERT_FILE = "${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt";
     };
     serviceConfig = {
       Type = "oneshot";

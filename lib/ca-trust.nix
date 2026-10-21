@@ -9,9 +9,19 @@ let
   emptyDirectory = pkgs.runCommand "empty-ca-directory" { } ''mkdir -p "$out"'';
   # ERTS parses these as command-line arguments, including the Erlang string term.
   beamFlags = "-public_key cacerts_path ${pkgs.lib.escapeShellArg (builtins.toJSON caBundle)}";
+  # buildcatrust emits ordinary PEM entries for server-trusted CAs, alongside
+  # AUX-bearing TRUSTED entries which must never be blindly imported into Java.
+  javaCertificates = pkgs.runCommand "java-ca-truststore"
+    { nativeBuildInputs = [ pkgs.jdk ]; } ''
+    cp ${../scripts/BuildJavaTrustStore.java} BuildJavaTrustStore.java
+    javac BuildJavaTrustStore.java
+    mkdir -p "$out"
+    java BuildJavaTrustStore ${pkgs.lib.escapeShellArg caBundle} "$out/truststore.p12"
+  '';
+  javaTrustStore = "${javaCertificates}/truststore.p12";
 in
 {
-  inherit blacklist certificates;
+  inherit blacklist certificates javaTrustStore;
   bundle = caBundle;
   environment = {
     SSL_CERT_FILE = caBundle;
@@ -25,6 +35,9 @@ in
     AWS_CA_BUNDLE = caBundle;
     GRPC_DEFAULT_SSL_ROOTS_FILE_PATH = caBundle;
     HEX_CACERTS_PATH = caBundle;
+    # Replace the default JSSE roots, including for embedded/JNI-launched JVMs.
+    # The integrity password is public; this store contains no private keys.
+    JAVA_TOOL_OPTIONS = "-Djavax.net.ssl.trustStore=${javaTrustStore} -Djavax.net.ssl.trustStoreType=PKCS12 -Djavax.net.ssl.trustStorePassword=changeit";
     # public_key:cacerts_get/0 honors this on OTP 27.2 and newer.
     ERL_AFLAGS = beamFlags;
     ERL_ZFLAGS = beamFlags;

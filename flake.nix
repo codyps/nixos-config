@@ -195,6 +195,33 @@
                 CA_BUNDLE="$TRUST_RULES_CA_BUNDLE" python3 ${./scripts/test-ca-trust.py}
                 touch "$out"
               '';
+            java-ca-trust =
+              let
+                trust = import ./lib/ca-trust.nix { inherit pkgs; };
+                extraCA = pkgs.path + "/pkgs/by-name/ca/cacert/test-cert-file.crt";
+                extraCertificates = pkgs.cacert.override {
+                  blacklist = trust.blacklist;
+                  extraCertificateFiles = [ extraCA ];
+                };
+                extraTrust = import ./lib/ca-trust.nix {
+                  inherit pkgs;
+                  bundle = "${extraCertificates}/etc/ssl/certs/ca-bundle.crt";
+                };
+              in
+              pkgs.runCommand "test-java-ca-trust"
+                {
+                  nativeBuildInputs = [ pkgs.python3 pkgs.jdk ];
+                  CA_BUNDLE = trust.bundle;
+                  EXTRA_CA = extraCA;
+                  EXTRA_CA_BUNDLE = extraTrust.bundle;
+                  JAVA_OPTIONS = trust.environment.JAVA_TOOL_OPTIONS;
+                  EXTRA_JAVA_OPTIONS = extraTrust.environment.JAVA_TOOL_OPTIONS;
+                  JAVA_TEST_SOURCE = ./scripts/TestJavaTrustStore.java;
+                  JAVA_BUILD_SOURCE = ./scripts/BuildJavaTrustStore.java;
+                } ''
+                python3 ${./scripts/test-java-ca-trust.py}
+                touch "$out"
+              '';
             hardware-identities = pkgs.runCommand "test-hardware-identities" { nativeBuildInputs = [ pkgs.python3 pkgs.git ]; } ''
               cp ${./scripts/hardware-identities.py} hardware-identities.py
               cp ${./scripts/test-hardware-identities.py} test-hardware-identities.py

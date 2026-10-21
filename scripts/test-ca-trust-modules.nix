@@ -33,6 +33,7 @@ let
     assert c.environment.variables.SSL_CERT_FILE == toString c.programs.caTrust.bundle;
     assert c.environment.variables.NODE_OPTIONS == "--use-openssl-ca";
     assert c.environment.variables.HEX_CACERTS_PATH == toString c.programs.caTrust.bundle;
+    assert c.environment.variables.JAVA_TOOL_OPTIONS == "-Djavax.net.ssl.trustStore=${toString c.programs.caTrust.javaTrustStore} -Djavax.net.ssl.trustStoreType=PKCS12 -Djavax.net.ssl.trustStorePassword=changeit";
     assert c.environment.variables.ERL_AFLAGS == c.environment.variables.ERL_ZFLAGS;
     assert builtins.match ".*cacerts_path.*" c.environment.variables.ERL_AFLAGS != null;
     assert builtins.elem extraCA c.security.pki.certificateFiles;
@@ -51,6 +52,10 @@ assert linux.systemd.globalEnvironment.ERL_ZFLAGS == linux.environment.variables
 assert !(flake.inputs.nixpkgs.lib.hasInfix "ERL_AFLAGS" linux.environment.etc."pam/environment".text);
 assert !(flake.inputs.nixpkgs.lib.hasInfix "ERL_ZFLAGS" linux.environment.etc."pam/environment".text);
 assert !(intel.launchd.user.envVariables ? NODE_OPTIONS);
+assert linux.systemd.globalEnvironment.JAVA_TOOL_OPTIONS == linux.environment.variables.JAVA_TOOL_OPTIONS;
+assert intel.launchd.user.envVariables.JAVA_TOOL_OPTIONS == intel.environment.variables.JAVA_TOOL_OPTIONS;
+assert arm.launchd.user.envVariables.JAVA_TOOL_OPTIONS == arm.environment.variables.JAVA_TOOL_OPTIONS;
+assert builtins.toJSON home.home.sessionVariables.JAVA_TOOL_OPTIONS == home.systemd.user.sessionVariables.JAVA_TOOL_OPTIONS;
 assert builtins.toJSON home.home.sessionVariables.SSL_CERT_FILE == home.systemd.user.sessionVariables.SSL_CERT_FILE;
 assert !(home.systemd.user.sessionVariables ? NODE_OPTIONS);
 {
@@ -59,4 +64,6 @@ assert !(home.systemd.user.sessionVariables ? NODE_OPTIONS);
   intelBundle = toString intel.programs.caTrust.bundle;
   armBundle = toString arm.programs.caTrust.bundle;
   standaloneHomeBundle = home.home.sessionVariables.SSL_CERT_FILE;
+  intelJavaTrustStore = toString intel.programs.caTrust.javaTrustStore;
+  intelJavaOptions = intel.launchd.user.envVariables.JAVA_TOOL_OPTIONS;
 }

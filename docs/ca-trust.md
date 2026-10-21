@@ -31,11 +31,28 @@ Mix home/runtime. Applications that pass explicit `cacerts`/`cacertfile` TLS
 options, use Certifi directly, or replace application configuration can bypass
 the BEAM default. In particular, this does not configure Rebar3's separate store.
 
+Java receives `JAVA_TOOL_OPTIONS` selecting a generated PKCS#12 truststore with
+`javax.net.ssl.trustStore`, `trustStoreType`, and `trustStorePassword`. This
+replaces the default JSSE roots for Java commands and embedded JVMs that inherit
+the environment, including separately installed JDKs. The public `changeit`
+password protects store integrity; the store contains only public certificates.
+`programs.caTrust.javaTrustStore` exposes its immutable path to services that
+need explicit configuration. See [Oracle's JAVA_TOOL_OPTIONS documentation](https://docs.oracle.com/en/java/javase/17/troubleshoot/environment-variables-and-system-properties.html).
+
+The Java store includes custom CAs from the shared system bundle. Conversion
+imports ordinary `CERTIFICATE` entries only: Nix emits these for server-trusted
+CAs, whereas `TRUSTED CERTIFICATE` entries may carry rejection flags. An override
+of `programs.caTrust.bundle` must use Nix-generated or compatible PEM with only
+server-trusted CAs in its ordinary entries; trusted-only inputs are unsupported.
+Applications that explicitly choose another truststore, replace trust managers,
+clear `JAVA_TOOL_OPTIONS`, or override its properties need separate settings.
+Preserve these three properties when adding other `JAVA_TOOL_OPTIONS` settings.
+
 Managed coding services explicitly inherit `programs.caTrust.environment`.
 Linux system and Home Manager user services and Darwin launchd user jobs receive
 the CA-file variables, while Node CLI flags are kept in shells and managed coding
 services because packaged Electron apps may reject those flags. Applications
-with private CA stores, Java keystores, or explicit application TLS settings
+with private CA stores or explicit application TLS settings
 still need their own updates; this does not rewrite
 installed application bundles or macOS Keychains.
 An Electron app launched from a shell may need `env -u NODE_OPTIONS`.
@@ -56,6 +73,7 @@ Validation:
 ```sh
 nix eval --impure --json --file scripts/test-ca-trust-modules.nix
 nix build .#checks.x86_64-darwin.ca-trust --no-link
+nix build .#checks.x86_64-darwin.java-ca-trust --no-link
 nix build .#darwinConfigurations.u3.system --no-link
 ```
 

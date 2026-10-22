@@ -15,6 +15,11 @@ in
     ../warbler/account-passwords.nix
   ];
   networking.hostName = "crow";
+  home-manager.users.cody.programs.git.signing = {
+    format = lib.mkForce "ssh";
+    key = lib.mkForce "~/.ssh/id_ed25519";
+    signByDefault = lib.mkForce true;
+  };
   time.timeZone = "America/New_York";
   system.stateVersion = "26.05";
   boot.secureUnlock = {

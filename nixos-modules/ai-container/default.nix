@@ -80,8 +80,10 @@ in
   services.resolved.enable = true;
   services.avahi = {
     enable = true;
-    publish.enable = true;
-    publish.addresses = true;
+    settings.publish = {
+      disable-publishing = false;
+      publish-addresses = true;
+    };
     openFirewall = true;
   };
   networking.firewall.enable = true;

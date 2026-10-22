@@ -81,9 +81,20 @@ in
       deps = [ "specialfs" ];
       text = ''
         ${run} render || exit 1
-        mkdir -p /run/nixos
-        ${lib.optionalString config.systemd.network.enable ''echo systemd-networkd.service >> /run/nixos/activation-reload-list''}
-        ${lib.optionalString (config.services.usbguard.enable or false) ''echo usbguard.service >> /run/nixos/activation-restart-list''}
+      '';
+    };
+    # Rendered files live outside the store and can change on every activation.
+    # Refresh their consumers through systemd's reactivation target instead of
+    # the deprecated activation-reload-list / activation-restart-list files.
+    systemd.services.hardware-identities-reactivation = {
+      description = "Refresh consumers of local hardware identities";
+      requiredBy = [ "sysinit-reactivation.target" ];
+      before = [ "sysinit-reactivation.target" ];
+      unitConfig.DefaultDependencies = false;
+      serviceConfig.Type = "oneshot";
+      script = ''
+        ${lib.optionalString config.systemd.network.enable ''${config.systemd.package}/bin/systemctl --no-block try-reload-or-restart systemd-networkd.service''}
+        ${lib.optionalString (config.services.usbguard.enable or false) ''${config.systemd.package}/bin/systemctl --no-block try-restart usbguard.service''}
       '';
     };
     system.activationScripts.etc.deps = [ "hardware-identities" ];

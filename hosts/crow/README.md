@@ -71,8 +71,15 @@ for the Secure Boot/PCR 7 sealing prerequisites.
 including guest tools, user services, persistent home, and
 unprivileged `cody-ai` user. Crow has no host-level `cody-ai` account or legacy
 sandbox service. The container uses veth addresses `10.80.0.1` (host) and
-`10.80.0.2` (guest), with NAT through Wi-Fi. It does not depend on an Ethernet
-macvlan or a separate LAN DHCP lease. Container DNS uses 1.1.1.1 and 9.9.9.9.
+`10.80.0.2` (guest) for management. An L2 ipvlan on Wi-Fi provides a separate
+LAN DHCP lease, broadcast/multicast access, and no NAT. It shares Crow's station
+MAC; the guest uses a DUID DHCP client identifier to distinguish its lease.
+DNS and the default route come from the LAN.
+
+Applying this boundary change requires restarting `container@ai`, interrupting
+guest sessions. Verify a distinct LAN lease on `iv-wlp6s0`, the LAN default
+route, DNS, and broadcast/multicast exchange with another LAN machine after
+activation. Wi-Fi/AP and DHCP compatibility require live testing on Crow.
 
 After authenticating Crow to Tailscale, access the guest with
 `ssh -p 2223 cody-ai@crow`. On the local Wi-Fi network, use

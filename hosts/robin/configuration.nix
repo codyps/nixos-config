@@ -54,8 +54,6 @@ in
     after = [ "dev-robin\\x2dvg-zfs.device" ];
   };
 
-  # https://discourse.nixos.org/t/zfs-rollback-not-working-using-boot-initrd-systemd/37195/3
-
   p.zfs.root-impermenance = {
     enable = true;
     rollback-target = "robin/root@blank";

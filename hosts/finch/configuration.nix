@@ -28,8 +28,6 @@ in
   boot.loader.grub.device = lib.mkForce "/dev/xvda";
   boot.zfs.devNodes = "/dev/disk/by-partuuid";
 
-  # https://discourse.nixos.org/t/zfs-rollback-not-working-using-boot-initrd-systemd/37195/3
-
   p.zfs.root-impermenance = {
     enable = true;
     rollback-target = "rpool/local/root@blank";

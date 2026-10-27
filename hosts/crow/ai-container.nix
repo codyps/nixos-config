@@ -7,6 +7,8 @@
     "kernel.perf_event_paranoid" = 1;
     "kernel.yama.ptrace_scope" = 0;
   };
+  # The guest cannot load the host kernel modules needed by nested Docker.
+  boot.kernelModules = [ "overlay" "bridge" "veth" "br_netfilter" "xt_nat" "ip_tables" "iptable_nat" ];
 
   # Primary AI environment; no AI account or sandbox is created on the host.
   # /var/lib is persisted on Crow's encrypted /persist filesystem.
@@ -22,6 +24,8 @@
     autoStart = true;
     restartIfChanged = false;
     ephemeral = false;
+    # RootlessKit uses a TUN interface inside its user/network namespace.
+    enableTun = true;
     # nspawn otherwise filters perf_event_open; explicitly permit debugging
     # syscalls too, without granting cody-ai capabilities or sudo access.
     extraFlags = [
@@ -42,6 +46,14 @@
     config = {
       imports = [ ../../nixos-modules/ai-container ];
       networking.hostName = "crow-ai";
+      virtualisation.docker.rootless = {
+        enable = true;
+        setSocketVariable = true;
+      };
+      # Also expose the socket to lingering user services, including Codex.
+      environment.etc."environment.d/61-docker.conf".text = ''
+        DOCKER_HOST=unix:///run/user/1001/docker.sock
+      '';
       environment.etc."systemd/network/10-lan.network.d/90-hardware.conf".source = "/run/hardware-identities/90-hardware.conf";
       # L2 ipvlan shares the Wi-Fi station MAC and receives LAN broadcasts.
       systemd.network.networks."10-lan" = {

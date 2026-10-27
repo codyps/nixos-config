@@ -28,6 +28,13 @@ assert c.boot.initrd.systemd.services.crow-reset-root.after == [ "dev-mapper-cro
 assert !c.users.users ? cody-ai;
 assert guest.networking.hostName == "crow-ai";
 assert guest.users.users.cody-ai.linger;
+assert guest.virtualisation.docker.rootless.enable;
+assert guest.virtualisation.docker.rootless.setSocketVariable;
+assert !guest.virtualisation.docker.enable;
+assert c.containers.ai.enableTun;
+assert guest.users.users.cody-ai.autoSubUidGidRange;
+assert guest.systemd.user.services.docker.serviceConfig.Delegate;
+assert lib.hasInfix "DOCKER_HOST=unix:///run/user/1001/docker.sock" guest.environment.etc."environment.d/61-docker.conf".text;
 assert !guest.security.sudo.enable;
 assert c.containers.ai.macvlans == [ ];
 assert !c.networking.nat.enable;
@@ -60,6 +67,7 @@ assert recovery.boot.initrd.systemd.network.networks."20-wifi".networkConfig.DHC
   encryptedLvm = true;
   separateSwap = true;
   noHostAiAccount = true;
+  rootlessDocker = true;
   routedContainer = true;
   sopsIwd = true;
   sealedIwdRecovery = true;

@@ -94,6 +94,15 @@ Authenticate AI providers within the new container. No existing Warbler
 account, provider credentials, or working files are copied. Manage Codex with
 `sys update-codex` and `sys restart-codex` as the guest user.
 
+Rootless Docker runs as `cody-ai` through the lingering `docker.service` user
+unit. Shells and user services use `/run/user/1001/docker.sock`; images and
+volumes persist under `/home/cody-ai/.local/share/docker`. After rebuilding,
+restart `container@ai` on Crow to apply the TUN device access (interrupting guest
+sessions). In the guest, verify `systemctl --user status docker`, `docker info`,
+and `docker run --rm hello-world`. Docker info should list `rootless` under
+Security Options. Existing user services may need restarting to pick up
+`DOCKER_HOST`.
+
 ## Installation checkpoints
 
 The Crow configuration exposes `sudo sys setup-secure-boot`. After backing up

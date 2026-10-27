@@ -174,6 +174,17 @@ updater. This prevents updater failures from terminating healthy sessions.
 The server uses the dedicated `~/.codex/packages/app-server-daemon/current`
 package when installed, falling back to the standalone CLI for initial setup.
 
+`codex-ai-remote-control.timer` re-enables remote control through the running
+server's private socket every minute. In Codex 0.163.0 the startup
+`--remote-control` flag is ephemeral, and authentication-session invalidation
+can disable remote control while the server remains alive (see the upstream
+[session transition](https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/app-server-transport/src/transport/remote_control/controller.rs)). The check uses the
+same ephemeral enable RPC as the native command, without restarting active
+turns, starting a detached daemon, or changing account preferences. Failures
+(including a signed-out account) appear in `journalctl --user -u
+codex-ai-remote-control`; the next timer tick retries. This service intentionally
+keeps remote control enabled; stop its timer before temporarily disabling it.
+
 The `codex-ai-update.timer` checks hourly (with a short randomized delay), updates
 both the CLI and daemon packages through the standalone installer, and requests
 a reload when the selected server differs from the running executable. Installer

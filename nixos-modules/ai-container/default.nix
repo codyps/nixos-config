@@ -271,6 +271,28 @@ in
       TimeoutStartSec = "30min";
     };
   };
+  # Codex invalidates remote control when its authenticated session changes.
+  # --remote-control only covers startup; reconcile via RPC without touching
+  # the server lifecycle or introducing a native detached daemon/updater.
+  systemd.user.services.codex-ai-remote-control = {
+    description = "Restore Codex remote control on the running server";
+    after = [ "codex-ai.service" ];
+    unitConfig.ConditionUser = user;
+    serviceConfig = {
+      Type = "oneshot";
+      ExecStart = "${pkgs.python3.withPackages (p: [ p.websockets ])}/bin/python3 ${./codex-remote-control.py} ${home}/.codex/app-server-control/app-server-control.sock";
+      TimeoutStartSec = "45s";
+      UMask = "0077";
+    };
+  };
+  systemd.user.timers.codex-ai-remote-control = {
+    wantedBy = [ "timers.target" ];
+    timerConfig = {
+      OnStartupSec = "30s";
+      OnUnitActiveSec = "1min";
+      AccuracySec = "5s";
+    };
+  };
   systemd.user.timers.codex-ai-update = {
     wantedBy = [ "timers.target" ];
     timerConfig = {

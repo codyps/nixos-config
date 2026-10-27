@@ -9,7 +9,7 @@ description = "GitHub Actions scale sets backed by disposable QEMU VMs"
 [dependencies]
 anyhow = "1"
 fs2 = "0.4"
-jsonwebtoken = "9"
+jsonwebtoken = "10"
 libc = "0.2"
 reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
 serde = { version = "1", features = ["derive"] }

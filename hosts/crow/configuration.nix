@@ -10,6 +10,7 @@ in
     ./reset-root.nix
     ./wifi.nix
     ./ai-container.nix
+    ./hindsight.nix
     ./secure-boot.nix
     ../../nixos-modules/secure-unlock
     ../warbler/account-passwords.nix

@@ -48,6 +48,11 @@ creation_rules:
     - *admin_cody
     age:
     - *host_warbler
+  # The published admin PGP encryption key is expired; Crow's existing SSH
+  # host age identity can decrypt this service secret through an admin session.
+  - path_regex: hosts/crow/hindsight-secrets\.json$
+    age:
+    - *host_crow
   - path_regex: hosts/crow/secrets\.yaml$
     pgp:
     - *admin_cody

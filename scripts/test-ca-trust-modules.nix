@@ -1,6 +1,16 @@
 # nix eval --impure --json --file scripts/test-ca-trust-modules.nix
 let
   flake = builtins.getFlake ("path:" + toString ../.);
+  blacklist = version: import ../lib/ca-blacklist.nix {
+    inherit version;
+    inherit (flake.inputs.nixpkgs) lib;
+  };
+  legacyBlacklist = [
+    "Comodo AAA Services root"
+    "emSign ECC Root CA - G3"
+    "emSign Root CA - C1"
+    "emSign ECC Root CA - C3"
+  ];
   extraCA = flake.inputs.nixpkgs + "/pkgs/by-name/ca/cacert/test-cert-file.crt";
   linux = (flake.inputs.nixpkgs.lib.nixosSystem {
     system = "x86_64-linux";
@@ -29,7 +39,7 @@ let
       { home.username = "test"; home.homeDirectory = "/home/test"; home.stateVersion = "23.05"; }
     ];
   }).config;
-  checkSystem = c:
+  checkSystem = version: c:
     assert c.environment.variables.SSL_CERT_FILE == toString c.programs.caTrust.bundle;
     assert c.environment.variables.NODE_OPTIONS == "--use-openssl-ca";
     assert c.environment.variables.HEX_CACERTS_PATH == toString c.programs.caTrust.bundle;
@@ -37,12 +47,16 @@ let
     assert c.environment.variables.ERL_AFLAGS == c.environment.variables.ERL_ZFLAGS;
     assert builtins.match ".*cacerts_path.*" c.environment.variables.ERL_AFLAGS != null;
     assert builtins.elem extraCA c.security.pki.certificateFiles;
-    assert builtins.elem "emSign ECC Root CA - G3" c.security.pki.caCertificateBlacklist;
+    assert c.security.pki.caCertificateBlacklist == blacklist version;
     true;
 in
-assert checkSystem linux;
-assert checkSystem intel;
-assert checkSystem arm;
+assert blacklist "3.126" == legacyBlacklist;
+assert blacklist "3.131" == legacyBlacklist;
+assert blacklist "3.131.1" == [ "Comodo AAA Services root" ];
+assert blacklist "3.132" == [ "Comodo AAA Services root" ];
+assert checkSystem flake.inputs.nixpkgs.legacyPackages.x86_64-linux.cacert.version linux;
+assert checkSystem flake.inputs.nixpkgs-darwin.legacyPackages.x86_64-darwin.cacert.version intel;
+assert checkSystem flake.inputs.nixpkgs.legacyPackages.aarch64-darwin.cacert.version arm;
 assert linux.systemd.globalEnvironment.SSL_CERT_FILE == toString linux.programs.caTrust.bundle;
 assert !(linux.systemd.globalEnvironment ? NODE_OPTIONS);
 assert !(linux.environment.sessionVariables ? ERL_AFLAGS);

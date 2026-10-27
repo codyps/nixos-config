@@ -9,6 +9,11 @@ by the pinned NixOS mitigation, including when an older package set is used on
 Intel macOS. The blacklist lives in `lib/ca-blacklist.nix`. OpenSSL bundles may
 retain a root with explicit rejection flags; certificate presence alone does
 not establish TLS trust.
+NSS 3.131.1 and newer already omit the three emSign roots, so those package
+sets explicitly block only the remaining AAA root. Older pins retain all four
+exclusions. This avoids passing missing certificate labels to `buildcatrust`,
+which treats them as a build error. The CA trust checks exercise both the
+current package set and the older Intel Darwin pin's root data.
 Integrated Home Manager users share the host's generated bundle, including
 `security.pki.certificates` and `security.pki.certificateFiles`. Standalone
 homes and development shells use a filtered bundle from their own package set.
@@ -72,6 +77,7 @@ Validation:
 
 ```sh
 nix eval --impure --json --file scripts/test-ca-trust-modules.nix
+nix build .#checks.x86_64-linux.ca-trust .#checks.x86_64-linux.ca-trust-legacy --no-link
 nix build .#checks.x86_64-darwin.ca-trust --no-link
 nix build .#checks.x86_64-darwin.java-ca-trust --no-link
 nix build .#darwinConfigurations.u3.system --no-link

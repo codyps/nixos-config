@@ -2,6 +2,9 @@
 {
   imports = [ ../../nixos-modules/actions-vm-scaler.nix ];
 
+  # Discovery maintains one listener per repository granted to the App.
+  systemd.services.actions-vm-scaler.serviceConfig.LimitNOFILE = "65536:524288";
+
   services.actions-vm-scaler = {
     enable = true;
     capacity = 1;

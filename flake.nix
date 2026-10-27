@@ -180,21 +180,27 @@
             overlays = mkOverlays nixpkgsSource;
             config.allowDeprecatedx86_64Darwin = "force";
           };
+          legacyCaPkgs = import nixpkgs-darwin {
+            inherit system;
+            config.allowDeprecatedx86_64Darwin = "force";
+          };
+          caTrustCheck = name: caPkgs:
+            let trust = import ./lib/ca-trust.nix { pkgs = caPkgs; };
+            in pkgs.runCommand name
+              {
+                nativeBuildInputs = [ pkgs.python3 pkgs.openssl ];
+                CA_BUNDLE = trust.bundle;
+                TRUST_RULES_CA_BUNDLE = "${trust.certificates}/etc/ssl/certs/ca-bundle.crt";
+              } ''
+              python3 ${./scripts/test-ca-trust.py}
+              CA_BUNDLE="$TRUST_RULES_CA_BUNDLE" python3 ${./scripts/test-ca-trust.py}
+              touch "$out"
+            '';
         in
         {
           checks = {
-            ca-trust =
-              let trust = import ./lib/ca-trust.nix { inherit pkgs; };
-              in pkgs.runCommand "test-ca-trust"
-                {
-                  nativeBuildInputs = [ pkgs.python3 pkgs.openssl ];
-                  CA_BUNDLE = trust.bundle;
-                  TRUST_RULES_CA_BUNDLE = "${trust.certificates}/etc/ssl/certs/ca-bundle.crt";
-                } ''
-                python3 ${./scripts/test-ca-trust.py}
-                CA_BUNDLE="$TRUST_RULES_CA_BUNDLE" python3 ${./scripts/test-ca-trust.py}
-                touch "$out"
-              '';
+            ca-trust = caTrustCheck "test-ca-trust" pkgs;
+            ca-trust-legacy = caTrustCheck "test-ca-trust-legacy" legacyCaPkgs;
             java-ca-trust =
               let
                 trust = import ./lib/ca-trust.nix { inherit pkgs; };

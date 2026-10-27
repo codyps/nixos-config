@@ -60,7 +60,12 @@
         matchConfig.Name = "iv-wlp6s0";
         networkConfig = { DHCP = "yes"; IPv6AcceptRA = true; };
         # Distinguish the guest's lease from the host despite their shared MAC.
-        dhcpV4Config = { ClientIdentifier = "duid"; SendHostname = true; };
+        dhcpV4Config = {
+          ClientIdentifier = "duid";
+          SendHostname = true;
+          # The ipvlan cannot receive unicast offers before it has an address.
+          RequestBroadcast = true;
+        };
         linkConfig.RequiredForOnline = "routable";
       };
       systemd.network.networks."10-ai" = {

@@ -25,6 +25,7 @@
     # nspawn otherwise filters perf_event_open; explicitly permit debugging
     # syscalls too, without granting cody-ai capabilities or sudo access.
     extraFlags = [
+      "--network-ipvlan=wlp6s0"
       "--system-call-filter=perf_event_open"
       "--system-call-filter=ptrace"
       "--system-call-filter=process_vm_readv"
@@ -42,13 +43,20 @@
       imports = [ ../../nixos-modules/ai-container ];
       networking.hostName = "crow-ai";
       environment.etc."systemd/network/10-lan.network.d/90-hardware.conf".source = "/run/hardware-identities/90-hardware.conf";
+      # L2 ipvlan shares the Wi-Fi station MAC and receives LAN broadcasts.
+      systemd.network.networks."10-lan" = {
+        matchConfig.Name = "iv-wlp6s0";
+        networkConfig = { DHCP = "yes"; IPv6AcceptRA = true; };
+        # Distinguish the guest's lease from the host despite their shared MAC.
+        dhcpV4Config = { ClientIdentifier = "duid"; SendHostname = true; };
+        linkConfig.RequiredForOnline = "routable";
+      };
       systemd.network.networks."10-ai" = {
         matchConfig.Name = "eth0";
         address = [ "10.80.0.2/24" ];
-        networkConfig = { DHCP = "no"; Gateway = "10.80.0.1"; IPv6AcceptRA = false; LinkLocalAddressing = "no"; };
-        linkConfig.RequiredForOnline = "routable";
+        networkConfig = { DHCP = "no"; IPv6AcceptRA = false; LinkLocalAddressing = "no"; };
+        linkConfig.RequiredForOnline = false;
       };
-      networking.nameservers = [ "1.1.1.1" "9.9.9.9" ];
       nixpkgs.pkgs = pkgs;
       # Allow all ports on the private link used by Tailscale's subnet route.
       networking.firewall.trustedInterfaces = [ "eth0" ];
@@ -68,11 +76,6 @@
         ${pkgs.e2fsprogs}/bin/chattr +C /var/lib/crow-ai/tmp
       fi
     '';
-  };
-  networking.nat = {
-    enable = true;
-    externalInterface = "wlp6s0";
-    internalInterfaces = [ "ve-ai" ];
   };
   # Override systemd's 80-container-ve.network, which otherwise replaces
   # hostAddress with an automatically selected DHCP-server subnet.

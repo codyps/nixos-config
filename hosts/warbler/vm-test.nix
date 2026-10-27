@@ -107,6 +107,9 @@ pkgs.testers.runNixOSTest {
         initrd = true;
         text = "HARDWARE_LINKS=disk/by-hardware/test-root\n";
       };
+      # The public test ciphertext is built, so evaluation cannot read/hash it.
+      # The VM verifies real decryption and the probe value after both boots.
+      sops.validateSopsFiles = false;
       sops.secrets.vm-probe = {
         sopsFile = "${testSecrets}";
         format = "json";

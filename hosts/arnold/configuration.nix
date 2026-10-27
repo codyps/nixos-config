@@ -113,7 +113,6 @@ in
   ];
 
   boot.initrd = {
-    systemd.enable = true;
     systemd.network = config.systemd.network;
 
     network = {

@@ -52,7 +52,6 @@ in
     calvin-crypt = {
       device = "/dev/disk/by-hardware/${hardwareIdentities "calvin" [ "storage" "luks" "calvin-crypt" "uuid" ]}";
       allowDiscards = true;
-      preLVM = true;
       bypassWorkqueues = true;
     };
   };

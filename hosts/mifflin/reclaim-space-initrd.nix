@@ -9,7 +9,6 @@ let
 in
 {
   system.nixos.tags = [ "reclaim-space" ];
-  boot.initrd.systemd.enable = true;
   boot.resumeDevice = lib.mkForce "";
   boot.kernelParams = [ "noresume" ];
 

@@ -29,7 +29,6 @@ in
   boot.zfs.devNodes = "/dev/disk/by-partuuid";
 
   # https://discourse.nixos.org/t/zfs-rollback-not-working-using-boot-initrd-systemd/37195/3
-  boot.initrd.systemd.enable = lib.mkDefault true;
 
   p.zfs.root-impermenance = {
     enable = true;

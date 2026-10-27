@@ -110,7 +110,6 @@ in
     };
     security.tpm2.enable = true;
     boot.initrd = {
-      systemd.enable = true;
       systemd.tpm2.enable = true;
       luks.devices.${cfg.mapperName}.crypttabExtraOpts =
         lib.optional (cfg.rootVolumeKeyId != null) "fixate-volume-key=${cfg.rootVolumeKeyId}"

@@ -55,7 +55,6 @@ in
   };
 
   # https://discourse.nixos.org/t/zfs-rollback-not-working-using-boot-initrd-systemd/37195/3
-  boot.initrd.systemd.enable = true;
 
   p.zfs.root-impermenance = {
     enable = true;

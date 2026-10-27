@@ -8,7 +8,6 @@ pkgs.testers.runNixOSTest {
   name = "hardware-live-aliases";
   nodes.machine = { lib, ... }: {
     networking.hostName = "mifflin";
-    boot.initrd.systemd.enable = true;
     # This test switches userspace; its VM boots directly without a bootloader.
     boot.loader.supportsInitrdSecrets = lib.mkOverride 5 true;
     environment.systemPackages = [ pkgs.e2fsprogs pkgs.util-linux ];

@@ -62,7 +62,6 @@ in
 
     (lib.mkIf cfg.root-impermenance.enable
       {
-        boot.initrd.systemd.enable = lib.mkDefault true;
         boot.initrd.systemd.services.rollback =
           let
             pool = builtins.elemAt (lib.splitString "/" cfg.root-impermenance.rollback-target) 0;

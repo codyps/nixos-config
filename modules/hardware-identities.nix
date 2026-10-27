@@ -68,7 +68,8 @@ in
   };
   config = lib.optionalAttrs isNixos (lib.mkIf cfg.enable (lib.mkMerge [{
     assertions = [
-      { assertion = config.boot.initrd.systemd.enable; message = "Local hardware provisioning requires the systemd initrd."; }
+      # The pinned Nixpkgs always uses systemd; the old toggle was removed.
+      { assertion = config.boot.initrd.enable; message = "Local hardware provisioning requires the systemd initrd."; }
       { assertion = config.boot.loader.supportsInitrdSecrets; message = "Local hardware provisioning requires a bootloader with initrd append support."; }
     ];
     programs.adminCommands.commands = {

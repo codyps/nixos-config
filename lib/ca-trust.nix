@@ -1,7 +1,10 @@
 { pkgs, bundle ? null }:
 let
   # Keep older package sets aligned with NixOS's eMudhra mitigation.
-  blacklist = import ./ca-blacklist.nix;
+  blacklist = import ./ca-blacklist.nix {
+    inherit (pkgs) lib;
+    inherit (pkgs.cacert) version;
+  };
   certificates = pkgs.cacert.override { inherit blacklist; };
   caBundle = if bundle != null then toString bundle else
   "${certificates}/etc/ssl/certs/ca-no-trust-rules-bundle.crt";

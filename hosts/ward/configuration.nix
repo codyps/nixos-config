@@ -56,7 +56,6 @@ in
   };
 
   boot.initrd = {
-    systemd.enable = true;
     # Do not start the ZFS import timeout while LUKS is still asking for a
     # passphrase. The pool lives on an LV inside the encrypted mapping.
     systemd.services.zfs-import-ward = {

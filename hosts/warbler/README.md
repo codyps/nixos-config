@@ -64,8 +64,8 @@ recovery. Its Codex service is disabled.
 
 ## Disk space
 
-See [disk usage and recovery](storage.md) for measured consumers, read-only ncdu
-commands, cleanup policy, and capacity recommendations. All persistent workloads
+See [disk usage and recovery](storage.md) for read-only inspection commands,
+cleanup policy, and capacity recommendations. All persistent workloads
 share the encrypted SSD; subvolumes do not isolate free space.
 
 ## Hardware and firmware references

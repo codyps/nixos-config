@@ -145,8 +145,8 @@ normal bootloader workflow rather than weakening PCR coverage.
 Machine-local hardware aliases, the root-volume pin, network templates and any
 actual initrd secrets must be appended before image signing. They may change
 without changing a Nix generation, so the store path alone cannot validate an
-installed initrd. The hardware appender now offers a read-only comparison of the
-base initrd plus deterministic overlay against the complete installed image.
+installed initrd. The hardware appender performs a read-only comparison of the base initrd plus
+deterministic overlay against the complete installed image.
 Unchanged content skips copying, appending, image assembly, signing and rewriting
 the generation's measurement. The comparison still reads and hashes the images;
 it does not cache plaintext or trust only file timestamps. Changed inputs rebuild

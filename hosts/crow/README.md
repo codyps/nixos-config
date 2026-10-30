@@ -140,8 +140,7 @@ and check `sudo sbctl status`. The command does not clear firmware keys,
 create replacement signing keys, enable Secure Boot in firmware, or enroll
 the LUKS TPM token.
 
-Older installed generations may lack these helpers; rebuild `.#crow` to update
-them. The same configuration works before Secure Boot enrollment. The command
+The same configuration works before Secure Boot enrollment. The command
 `sys setup-luks-tpm-unlock` is present but refuses enrollment until its
 Secure Boot, pin, current-generation and policy prerequisites are satisfied.
 

@@ -89,10 +89,8 @@ removes the other hosts' entries without changing this host's values.
 The new runtime can also read existing combined state. Keep that state until
 rollback generations using the old full-inventory validator have been retired;
 reprovisioning it with only one host makes those older generations incompatible.
-After verifying a successful rebuild, obsolete local deployment directories can
-be removed; they
-are no longer build entry points. Activation removes any previously managed Nix
-wrapper. A build alone does not change installed commands.
+A build alone does not change installed commands; activate the configuration
+to install the current helpers.
 
 ## What happens locally
 
@@ -111,7 +109,6 @@ Activation renders network drop-ins, USBGuard rules and the ZFS host ID from the
 same inventory. Container network identities come from a read-only local bind
 mount. After changing a container identity, restart that container during an
 appropriate maintenance window so its bind mount selects the new generation.
-The first migration to this design also needs that container restart.
 Installation disk selectors remain under local state.
 
 The bootloader's late initrd appender adds the actual crypttab pin, device

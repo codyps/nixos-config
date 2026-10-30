@@ -348,7 +348,7 @@ def recovery_slots(metadata):
 def enroll_disk(config, work):
     require(config["diskUnlock"], "Enable boot.secureUnlock.tpmUnlock.enable, rebuild boot files, then reboot first.")
     require(run(config["pcrlock"], "is-supported").strip() == b"yes", "pcrlock is unsupported.")
-    require(Path(config["policy"]).is_file(), "No pcrlock policy; finish the measured-boot setup first.")
+    require(Path(config["policy"]).is_file(), "No pcrlock policy. Run sudo sys setup-luks-tpm-unlock --prepare-boot, reboot, then rerun enrollment.")
     disk = config["disk"]
     metadata = json.loads(run("cryptsetup", "luksDump", "--dump-json-metadata", disk))
     slots = recovery_slots(metadata)
@@ -381,6 +381,52 @@ def enroll_disk(config, work):
     print("TPM enrolled; recovery slots preserved. Test a reboot with console access available.")
 
 
+def status(config):
+    """Check each stage independently without modifying state."""
+    ready = True
+
+    def check(label, action, hint):
+        nonlocal ready
+        try:
+            require(action(), hint)
+            print(f"OK    {label}")
+        except (OSError, RuntimeError, ValueError, subprocess.CalledProcessError):
+            ready = False
+            print(f"TODO  {label}: {hint}")
+
+    check("Installed host", lambda: os.uname().nodename == config["hostName"], "Run on the installed host.")
+    check("Local volume pin", lambda: config.get("rootVolumeKeyId") is not None, "Provision this host's pinned hardware inventory.")
+    check("Secure Boot", secure_boot_ready, "Enable Secure Boot, leave Setup Mode and reboot.")
+    check("TPM device", lambda: Path("/dev/tpmrm0").exists(), "TPM resource manager unavailable.")
+    check("Current generation booted", lambda: Path("/run/booted-system").resolve() == Path("/run/current-system").resolve(), "Reboot into the current generation.")
+    check("Encrypted state backing", lambda: verify_state_backing(config) is None, "State must be on the configured encrypted root; run with sudo.")
+    check("TPM unlock configured", lambda: config["diskUnlock"], "Enable tpmUnlock, rebuild and reboot.")
+    check("pcrlock support", lambda: run(config["pcrlock"], "is-supported").strip() == b"yes", "Check TPM support and root access.")
+    check("Provisioning record", lambda: (Path(config["stateDirectory"]) / "provisioning-ready").is_file(), "Run sys setup-luks-tpm-unlock --prepare-boot.")
+    check("Measured boot policy", lambda: Path(config["policy"]).is_file(), "Prepare boot files and reboot before enrollment.")
+    for name, enabled in (("ssh-host-key", config.get("remoteUnlock")), ("wifi", config.get("wifi")), ("tailscale-state", config.get("tailscale"))):
+        if enabled:
+            check(f"Recovery credential {name}", lambda name=name: (STORE / name).is_file(), "Provision recovery credentials, then prepare boot files; optional for TPM unlock.")
+            if config.get("esp"):
+                check(f"Published recovery credential {name}",
+                      lambda name=name: (STORE / name).read_bytes() == (Path(config["esp"]) / "loader/credentials" / f"{name}.cred").read_bytes(),
+                      "Prepare boot files to publish the current sealed credential.")
+    def metadata():
+        return json.loads(run("cryptsetup", "luksDump", "--dump-json-metadata", config["disk"]))
+    check("Recovery passphrase slot", lambda: bool(recovery_slots(metadata())), "No token-free recovery slot, or metadata inaccessible; run with sudo.")
+    check("TPM pcrlock token", lambda: any(t.get("type") == "systemd-tpm2" and t.get("tpm2_pcrlock") for t in metadata()["tokens"].values()), "Run sys setup-luks-tpm-unlock after boot preparation and reboot.")
+    print("Test an unattended cold boot separately; token presence does not prove automatic unlock.")
+    return ready
+
+
+def prepare_boot(config):
+    require(config["diskUnlock"], "Enable tpmUnlock and install that generation first.")
+    preflight(config)
+    # The existing hook handles credential staging, UKI signing and PCR policy.
+    subprocess.run(["/run/current-system/bin/switch-to-configuration", "boot"], check=True)
+    print("Boot files prepared. Reboot, then rerun sys setup-luks-tpm-unlock.")
+
+
 def resolve_volume_pin(config):
     if config.get("rootVolumeKeyIdFile"):
         pin = json.loads(Path(config["rootVolumeKeyIdFile"]).read_text())
@@ -399,14 +445,23 @@ def main():
     commands.add_parser("prepare-install", help="Provision available credentials when Secure Boot is ready, otherwise stage console-only boot")
     publish_cmd = commands.add_parser("publish-credentials", help="Install staged encrypted EFI companion credentials")
     publish_cmd.add_argument("--esp", type=Path, required=True)
-    commands.add_parser("enroll-disk", help="Verify recovery passphrase and add a TPM LUKS token")
+    commands.add_parser("status", help="Report all unlock provisioning stages without changes")
+    disk_cmd = commands.add_parser("enroll-disk", help="Verify recovery passphrase and add a TPM LUKS token")
+    disk_options = disk_cmd.add_mutually_exclusive_group()
+    disk_options.add_argument("--status", action="store_true")
+    disk_options.add_argument("--prepare-boot", action="store_true", help="Provision credentials and install signed measured boot files, then reboot before enrollment")
     commands.add_parser("enroll-tailscale", help="Register and seal a separate non-expiring initrd Tailscale node")
     args = parser.parse_args()
     os.umask(0o077)
     require(not (args.command == "credentials" and args.ssh_only and args.wifi_file),
             "--ssh-only cannot be combined with --wifi-file.")
     config = json.loads(args.config.read_text())
-    resolve_volume_pin(config)
+    try:
+        resolve_volume_pin(config)
+    except (OSError, ValueError, RuntimeError):
+        if args.command != "status" and not getattr(args, "status", False):
+            raise
+        config["rootVolumeKeyId"] = None
 
     if args.command == "credentials" and not config["wifi"]:
         require(not args.wifi_file, "Enable Wi-Fi in the host configuration before supplying credentials.")
@@ -417,6 +472,11 @@ def main():
     if args.command == "credentials":
         args.tailscale = config.get("tailscale", False) and credential_available("tailscale-state")
         args.ssh_only = args.ssh_only or (not args.wifi_file and not credential_available("wifi"))
+    if args.command == "status" or getattr(args, "status", False):
+        sys.exit(0 if status(config) else 1)
+    if getattr(args, "prepare_boot", False):
+        prepare_boot(config)
+        return
     require(os.geteuid() == 0, "Run with sudo on the installed host.")
     if args.command not in ("prepare-install", "publish-credentials"):
         require(config.get("rootVolumeKeyId") is not None, "Pin the root volume identity and reboot before provisioning unlock state.")
@@ -443,6 +503,6 @@ if __name__ == "__main__":
         main()
     except (OSError, RuntimeError, subprocess.CalledProcessError) as error:
         # Do not echo subprocess stdout/stderr, which may contain secret material.
-        message = "A provisioning tool failed; no secret output was printed." if isinstance(
+        message = f"{Path(error.cmd[0]).name} failed (exit {error.returncode}); secret output suppressed. Run sudo sys unlock-status." if isinstance(
             error, subprocess.CalledProcessError) else str(error)
         sys.exit(message)

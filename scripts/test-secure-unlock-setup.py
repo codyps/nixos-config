@@ -47,6 +47,30 @@ class ProvisioningTests(unittest.TestCase):
         stdout.__enter__()
         self.addCleanup(stdout.__exit__, None, None, None)
 
+    def test_status_continues_after_failed_prerequisites(self):
+        self.config.update(rootVolumeKeyId=None)
+        with patch.object(setup, "secure_boot_ready", return_value=False), \
+                patch.object(setup, "verify_state_backing", side_effect=RuntimeError("unavailable")), \
+                contextlib.redirect_stdout(io.StringIO()) as output:
+            self.assertFalse(setup.status(self.config))
+        self.assertIn("TODO  Local volume pin", output.getvalue())
+        self.assertIn("TODO  Secure Boot", output.getvalue())
+        self.assertIn("TPM pcrlock token", output.getvalue())
+        self.assertFalse(self.enrolled)
+
+    def test_prepare_boot_uses_installed_hook_and_never_enrolls(self):
+        with patch.object(setup, "preflight") as preflight, patch.object(setup.subprocess, "run") as run:
+            setup.prepare_boot(self.config)
+        preflight.assert_called_once_with(self.config)
+        run.assert_called_once_with(["/run/current-system/bin/switch-to-configuration", "boot"], check=True)
+        self.assertFalse(self.enrolled)
+
+    def test_prepare_boot_refuses_before_install_when_preflight_fails(self):
+        with patch.object(setup, "preflight", side_effect=RuntimeError("reboot")), patch.object(setup.subprocess, "run") as run:
+            with self.assertRaisesRegex(RuntimeError, "reboot"):
+                setup.prepare_boot(self.config)
+        run.assert_not_called()
+
     def test_local_pin_overrides_public_template_and_allows_attended_null(self):
         local = self.root / "pin.json"
         config = {"rootVolumeKeyId": "b" * 64, "rootVolumeKeyIdFile": str(local)}
@@ -481,8 +505,8 @@ class ProvisioningTests(unittest.TestCase):
                 patch.object(setup, "run", return_value=b"/dev/test-backing[/state]\n") as findmnt:
             self.assertEqual(setup.preflight(self.config, require_current_generation=False), self.config)
             findmnt.assert_called_with("findmnt", "--evaluate", "-n", "-o", "SOURCE", "--target", "/state")
-            with patch.object(setup.os, "stat", side_effect=lambda p: SimpleNamespace(
-                    st_rdev=123 if str(p) == "/dev/mapper/system-root" else 456)):
+            with patch.object(setup.os, "stat", side_effect=lambda p, *a, **kw: SimpleNamespace(
+                    st_rdev=123 if str(p) == "/dev/mapper/system-root" else 456) if str(p) in ("/dev/mapper/system-root", "/dev/test-backing") else stat(p, *a, **kw)):
                 with self.assertRaisesRegex(RuntimeError, "configured encrypted root"):
                     setup.preflight(self.config, require_current_generation=False)
             with self.assertRaisesRegex(RuntimeError, "Reboot into the current generation"):

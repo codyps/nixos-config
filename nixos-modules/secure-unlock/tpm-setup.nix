@@ -10,6 +10,7 @@ let
     tailscale = cfg.remoteUnlock.enable && cfg.remoteUnlock.tailscale.enable;
     tailscaleHostName = cfg.remoteUnlock.tailscale.hostName;
     policy = config.boot.lanzaboote.measuredBoot.pcrlockPolicy;
+    esp = config.boot.loader.efi.efiSysMountPoint;
     diskUnlock = config.boot.secureUnlock.tpmUnlock.enable;
     pcrlock = "${config.systemd.package}/lib/systemd/systemd-pcrlock";
   });
@@ -30,6 +31,7 @@ in
     environment.systemPackages = [ setup ];
     boot.secureUnlock.provisioningPackage = setup;
     programs.adminCommands.commands = {
+      unlock-status = [ "${setup}/bin/secure-unlock-setup" "status" ];
       setup-unlock-credentials = [ "${setup}/bin/secure-unlock-setup" "credentials" ];
     } // lib.optionalAttrs cfg.tpmUnlock.enable {
       setup-luks-tpm-unlock = [ "${setup}/bin/secure-unlock-setup" "enroll-disk" ];

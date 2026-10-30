@@ -104,6 +104,24 @@ inventory refresh.
    access available and retain the recovery passphrase. Enabling the option
    prepares PCRs 0, 4 and 7; neither a rebuild nor the boot service enrolls LUKS.
 
+Inspect every provisioning stage with `sudo sys unlock-status` (also available as
+`sudo sys setup-luks-tpm-unlock --status`). This read-only report continues after
+failed checks and exits nonzero when any stage needs attention. Optional recovery
+credentials are reported separately from TPM enrollment. No status check proves an
+unattended boot; test that with console access available.
+
+To prepare missing credentials and measured policy without rebuilding source, run
+`sudo sys setup-luks-tpm-unlock --prepare-boot`. This invokes the installed current
+generation's boot installation hook, including credential provisioning, signing
+and policy generation. It requires a pinned installed host, Secure Boot and TPM,
+and the current generation already booted. It does not enroll firmware keys,
+change the hardware inventory, retire old boot generations, register optional
+Tailscale credentials, or reboot. Complete those attended steps as described above.
+After preparation, reboot and run `sudo sys setup-luks-tpm-unlock` to verify the
+recovery passphrase and enroll LUKS. Use `sys setup-unlock-tailscale` for the separate
+Tailscale login and `sys setup-unlock-credentials --wifi-file /PRIVATE/PROFILE` for
+Wi-Fi; prepare boot files again after adding credentials.
+
 Provisioning records the pinned identity and credentials in
 `stateDirectory/provisioning-ready`. Existing sealed deployments are adopted
 without rotating their identities. After provisioning, disabled Secure Boot,

@@ -13,9 +13,11 @@ in
     ./hindsight.nix
     ./secure-boot.nix
     ../../nixos-modules/secure-unlock
+    ../../nixos-modules/ms-a2-power-led
     ../warbler/account-passwords.nix
   ];
   networking.hostName = "crow";
+  hardware.msA2.powerLed.enable = true;
   home-manager.users.cody.programs.git.signing = {
     format = lib.mkForce "ssh";
     key = lib.mkForce "~/.ssh/id_ed25519";

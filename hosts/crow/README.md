@@ -9,6 +9,31 @@ Crow is an x86_64 AMD machine with 64 GB RAM, UEFI, and TPM 2.0.
 Wi-Fi is `wlp6s0` (`mt7921e`). The installation disk is a WD_BLACK SN850X
 4000GB; its exact device selector is configured in `disko.nix`.
 
+## Power LED
+
+`sudo sys power-led-brightness 10` changes the power button LED immediately;
+values range from 0 to 255. This changes live brightness without saving a BIOS
+default. `sudo sys power-led-brightness --probe` reads controller status, not
+the current brightness. The command is installed after rebuilding and activating
+Crow's configuration.
+
+To apply a separate value during Linux startup, set
+`hardware.msA2.powerLed.bootBrightness = 10;` in the host configuration. The
+default is `null`, which leaves the BIOS-selected brightness in place. A boot
+value takes effect after the encrypted root is unlocked; POST and the recovery
+initrd retain the BIOS setting. Changing the live brightness does not change
+this startup value.
+
+The tested MS-A2 BIOS 1.03 (2026-04-01, Ryzen 9000) passes `Setup[0x72]` to
+the embedded controller: wait for input-buffer bit 1 to clear on port `0x6c`,
+write command `0xdf` there, wait again, then write the PWM byte to port `0x68`.
+This sequence comes from the `OemECHwMonitor` PEI module in the
+[official vendor firmware](https://support.minisforum.com/pages/product-info).
+The helper serializes its invocations and aborts on readiness timeouts. No
+brightness readback command is established. The BIOS `Setup` variable is absent
+from Linux's runtime EFI variable interface on this machine, so changing the
+saved firmware default directly from Linux is not supported by this helper.
+
 ## Storage and boot
 
 `disko.nix` defines a 2 GiB ESP and a LUKS2 `cryptroot` partition containing

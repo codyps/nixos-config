@@ -131,11 +131,10 @@
                 package = nixpkgsSource + "/pkgs/by-name/au/audiobookshelf/package.nix";
                 args = builtins.functionArgs (import package);
               in
-              prev.callPackage package (
-                if args ? ffmpeg_8-full
-                then { ffmpeg_8-full = prev.ffmpeg_8-headless; }
-                else { ffmpeg-full = prev.ffmpeg-headless; }
-              );
+              prev.callPackage package (builtins.intersectAttrs args {
+                ffmpeg_8-full = prev.ffmpeg_8-headless;
+                ffmpeg-full = prev.ffmpeg-headless;
+              });
           })
         (import ./nixpkgs/overlays/overlay.nix)
         #ethereum-nix.overlays.default

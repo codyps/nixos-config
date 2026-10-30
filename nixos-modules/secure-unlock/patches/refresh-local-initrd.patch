@@ -1,12 +1,147 @@
 --- a/systemd/src/install.rs
 +++ b/systemd/src/install.rs
-@@ -260,3 +260,8 @@
-         // If the generation is already properly installed, don't overwrite it.
--        if self.register_installed_generation(generation)? {
-+        // Machine-local initrd inputs can change without changing the store path.
-+        // Reassemble before signing/measuring; content-addressed boot files retain
-+        // the previous contents until successful installation and pruning.
-+        if generation.spec.bootspec.bootspec.initrd_secrets.is_none()
-+            && self.register_installed_generation(generation)?
-+        {
-             return Ok(());
+@@ -3,6 +3,7 @@
+ use std::fs::{self, File};
+ use std::os::unix::prelude::{OsStrExt, PermissionsExt};
+ use std::path::{Path, PathBuf};
++use std::process::Command;
+ use std::string::ToString;
+
+ use anyhow::{Context, Result, anyhow};
+@@ -74,6 +75,13 @@
+         let pcrlock_paths = self.pcrlock_directory.map(PcrlockPaths::new);
+         if let Some(pcrlock_paths) = &pcrlock_paths {
+             gc_roots.extend(pcrlock_paths.iter());
++            // The hook retains only a previously approved measurement matching
++            // this boot. Keep it while refreshed generation definitions replace
++            // their old contents; never manufacture approval from the event log.
++            let booted = pcrlock_paths.lanzaboote_measurement("booted");
++            if booted.exists() {
++                gc_roots.extend([&booted]);
++            }
+         };
+
+         Installer {
+@@ -377,6 +385,33 @@
+         if let Ok((stub_target, kernel_path, initrd_path)) = self.read_installed_generation(regex) {
+             self.gc_roots
+                 .extend([&stub_target, &kernel_path, &initrd_path]);
++            // This repository's appender supports a read-only content check. A
++            // changed overlay requires reinstalling, not every initrd-secrets hook.
++            if let Some(appender) = &generation.spec.bootspec.bootspec.initrd_secrets {
++                if !fs::read_to_string(appender)?.contains("supports-initrd-content-check-v1") {
++                    // Old generations lack the read-only interface. Rebuild them
++                    // safely during migration instead of calling an unknown CLI.
++                    return Ok(false);
++                }
++                let base = generation
++                    .spec
++                    .bootspec
++                    .bootspec
++                    .initrd
++                    .as_ref()
++                    .context("Missing base initrd for personalization check")?;
++                let status = Command::new(appender)
++                    .arg(&initrd_path)
++                    .arg("--check-base")
++                    .arg(base)
++                    .status()
++                    .context("Failed to check personalized initrd")?;
++                match status.code() {
++                    Some(0) => (),
++                    Some(3) => return Ok(false),
++                    _ => anyhow::bail!("Personalized initrd check failed"),
++                }
++            }
+             // Do not return yet, we still need to check the existence of the pcrlock measurements.
+         } else {
+             return Ok(false);
+--- a/shared/src/pe.rs
++++ b/shared/src/pe.rs
+@@ -142,6 +142,9 @@
+         .for_each(|a| args.push(a.into()));
+
+     let status = Command::new("objcopy")
++        // The timestamp is measured by firmware. Identical input must produce
++        // identical PE bytes, including across ESPs and repeated installation.
++        .env("SOURCE_DATE_EPOCH", "1")
+         .args(&args)
+         .status()
+         .context("Failed to run objcopy. Most likely, the binary is not on PATH.")?;
+--- a/systemd/tests/integration/install.rs
++++ b/systemd/tests/integration/install.rs
+@@ -121,3 +121,74 @@
+
+     Ok(())
+ }
++
++#[test]
++fn reuse_personalized_initrd_until_inputs_change() -> Result<()> {
++    use std::os::unix::fs::PermissionsExt;
++    let esp = tempdir()?;
++    let tmpdir = tempdir()?;
++    let profiles = tempdir()?;
++    let toplevel = common::setup_toplevel(tmpdir.path())?;
++    let generation = setup_generation_link_from_toplevel(&toplevel, profiles.path(), 1)?;
++    let appender = tmpdir.path().join("appender");
++    let overlay = tmpdir.path().join("overlay");
++    let counter = tmpdir.path().join("appends");
++    std::fs::write(&overlay, b"first overlay")?;
++    let shell = String::from_utf8(
++        std::process::Command::new("sh")
++            .args(["-c", "command -v sh"])
++            .output()?
++            .stdout,
++    )?;
++    let script = format!(
++        "#!{}\n# supports-initrd-content-check-v1\nif test \"${{2:-}}\" = --check-base; then\n  cat \"$3\" '{}' | cmp -s - \"$1\" && exit 0\n  exit 3\nfi\ncat '{}' >> \"$1\"\necho append >> '{}'\n",
++        shell.trim(),
++        overlay.display(),
++        overlay.display(),
++        counter.display()
++    );
++    std::fs::write(&appender, script)?;
++    std::fs::set_permissions(&appender, std::fs::Permissions::from_mode(0o700))?;
++    let bootspec_path = generation.join("boot.json");
++    let mut spec: serde_json::Value = serde_json::from_slice(&std::fs::read(&bootspec_path)?)?;
++    spec["org.nixos.bootspec.v1"]["initrdSecrets"] = serde_json::json!(appender);
++    std::fs::write(&bootspec_path, serde_json::to_vec(&spec)?)?;
++    let install = || common::lanzaboote_install(1, esp.path(), vec![generation.clone()]);
++    assert!(install()?.status.success());
++    let image = common::image_path(&esp, 1, &toplevel)?;
++    let initial = std::fs::read(&image)?;
++    let unsigned_hash = || -> Result<sha2::digest::Output<sha2::Sha256>> {
++        let copy = tmpdir.path().join("unsigned.efi");
++        std::fs::copy(&image, &copy)?;
++        remove_signature(&copy)?;
++        Ok(hash_file(&copy))
++    };
++    let initial_unsigned = unsigned_hash()?;
++    let modified = std::fs::metadata(&image)?.modified()?;
++    assert_eq!(std::fs::read_to_string(&counter)?.lines().count(), 1);
++    assert!(install()?.status.success());
++    assert_eq!(std::fs::read(&image)?, initial);
++    assert_eq!(std::fs::metadata(&image)?.modified()?, modified);
++    assert_eq!(std::fs::read_to_string(&counter)?.lines().count(), 1);
++    // Signing timestamps are outside the measured PE content. Compare stripped
++    // images after forcing assembly across a wall-clock second boundary.
++    std::fs::remove_file(&image)?;
++    std::thread::sleep(std::time::Duration::from_millis(1100));
++    assert!(install()?.status.success());
++    assert_eq!(unsigned_hash()?, initial_unsigned);
++    assert_eq!(std::fs::read_to_string(&counter)?.lines().count(), 2);
++    std::fs::write(&overlay, b"second overlay")?;
++    assert!(install()?.status.success());
++    assert_ne!(std::fs::read(&image)?, initial);
++    assert_eq!(std::fs::read_to_string(&counter)?.lines().count(), 3);
++    std::fs::write(
++        &appender,
++        format!(
++            "#!{}\n# supports-initrd-content-check-v1\nexit 1\n",
++            shell.trim()
++        ),
++    )?;
++    assert!(!install()?.status.success());
++    assert_eq!(std::fs::read_to_string(&counter)?.lines().count(), 3);
++    Ok(())
++}

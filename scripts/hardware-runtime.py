@@ -234,6 +234,28 @@ def cpio(outputs):
     return bytes(data)
 
 
+def check_initrd(manifest, state, installed, base):
+    """Compare complete expected content without constructing another initrd."""
+    values, fixtures, schema = inventory(manifest, state)
+    overlay = cpio(files(manifest, values, fixtures, schema, initrd=True))
+    expected = hashlib.sha256()
+    length = 0
+    with Path(base).open('rb') as source:
+        for block in iter(lambda: source.read(1024 * 1024), b''):
+            expected.update(block)
+            length += len(block)
+    padding = b'\0' * (-length % 4)
+    expected.update(padding)
+    expected.update(overlay)
+    if Path(installed).stat().st_size != length + len(padding) + len(overlay):
+        return False
+    observed = hashlib.sha256()
+    with Path(installed).open('rb') as source:
+        for block in iter(lambda: source.read(1024 * 1024), b''):
+            observed.update(block)
+    return expected.digest() == observed.digest()
+
+
 def append(manifest, state, initrd):
     values, fixtures, schema = inventory(manifest, state)
     overlay = cpio(files(manifest, values, fixtures, schema, initrd=True))
@@ -256,6 +278,7 @@ def main():
     parser.add_argument('--inventory', type=Path)
     parser.add_argument('--root', type=Path, default=Path('/'))
     parser.add_argument('--fixtures', action='store_true')
+    parser.add_argument('--check-base', type=Path, help='Read-only append comparison: 0 unchanged, 3 changed, 1 invalid input')
     args = parser.parse_args()
     os.umask(0o077)
     try:
@@ -269,6 +292,8 @@ def main():
             values, schema = render(manifest, state)
             device_links(manifest, values, schema, Path('/dev'))
         elif args.action == 'append' and args.initrd:
+            if args.check_base:
+                return 0 if check_initrd(manifest, state, args.initrd, args.check_base) else 3
             append(manifest, state, args.initrd)
         else:
             parser.error('append requires an initrd file')

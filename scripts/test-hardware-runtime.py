@@ -117,6 +117,44 @@ class RuntimeTests(unittest.TestCase):
             self.assertEqual(initrd.read_bytes()[length:offset], b'\0' * (offset - length))
             self.assertIn('etc/crypttab', unpack(initrd.read_bytes()[offset:]))
 
+    def test_initrd_check_reuses_unchanged_and_detects_every_input_change(self):
+        self.provision()
+        base = self.root / 'base-initrd'
+        installed = self.root / 'installed-initrd'
+        base.write_bytes(b'base-compressed-image')
+        installed.write_bytes(base.read_bytes())
+        runtime.append(self.manifest, self.state, installed)
+        original = installed.read_bytes()
+        stamp = installed.stat().st_mtime_ns
+        self.assertTrue(runtime.check_initrd(self.manifest, self.state, installed, base))
+        self.assertEqual(installed.stat().st_mtime_ns, stamp)
+        base.write_bytes(b'new-compressed-image')
+        self.assertFalse(runtime.check_initrd(self.manifest, self.state, installed, base))
+        base.write_bytes(b'base-compressed-image')
+        template = Path(self.manifest['initrdTemplates']['etc/crypttab'])
+        template.write_text(template.read_text() + '# changed template\n')
+        self.assertFalse(runtime.check_initrd(self.manifest, self.state, installed, base))
+        self.assertEqual(installed.read_bytes(), original)
+
+    def test_initrd_check_detects_secret_changes_and_corrupt_installed_content(self):
+        self.provision()
+        secret = self.root / 'secret'
+        secret.write_bytes(b'synthetic-secret')
+        self.manifest['secrets'] = {'test': str(secret)}
+        base = self.root / 'base-initrd'
+        installed = self.root / 'installed-initrd'
+        base.write_bytes(b'base')
+        installed.write_bytes(base.read_bytes())
+        runtime.append(self.manifest, self.state, installed)
+        self.assertTrue(runtime.check_initrd(self.manifest, self.state, installed, base))
+        secret.write_bytes(b'changed-secret')
+        self.assertFalse(runtime.check_initrd(self.manifest, self.state, installed, base))
+        secret.write_bytes(b'synthetic-secret')
+        data = bytearray(installed.read_bytes())
+        data[0] ^= 1
+        installed.write_bytes(data)
+        self.assertFalse(runtime.check_initrd(self.manifest, self.state, installed, base))
+
     def test_null_pin_disables_only_tpm_options_for_fresh_install(self):
         self.values['example']['storage']['luks']['root']['volumeKeyId'] = None
         self.source.write_text(json.dumps(self.values))

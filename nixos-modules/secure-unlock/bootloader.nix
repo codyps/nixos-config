@@ -4,19 +4,7 @@ let
   lz = config.boot.lanzaboote;
   measured = lz.measuredBoot;
   ready = "${cfg.stateDirectory}/provisioning-ready";
-  makePolicy = lib.escapeShellArgs (
-    [
-      "${config.systemd.package}/lib/systemd/systemd-pcrlock"
-      "make-policy"
-      "--components=${config.environment.etc.pcrlock.source}"
-      "--components=${measured.pcrlockDirectory}"
-      # Firmware measurement units write here, even when UKI measurements use
-      # a host-specific persistent directory (notably Ward).
-      "--components=/var/lib/pcrlock.d"
-      "--policy=${measured.pcrlockPolicy}"
-      "--location=770"
-    ] ++ map (pcr: "--pcr=${toString pcr}") measured.pcrs
-  );
+  makePolicy = "${cfg.provisioningPackage}/bin/secure-unlock-setup update-policy";
   # Keep Lanzaboote's installer, signing and generation pruning. Only the timing
   # of measured-boot operations differs from its unconditional install hook.
   install = esp: ''
@@ -45,6 +33,7 @@ in
       measurement_args=()
       ${lib.optionalString (measured.enable && builtins.elem 4 measured.pcrs) ''
         if test -e ${lib.escapeShellArg ready}; then
+          ${cfg.provisioningPackage}/bin/secure-unlock-setup retain-booted-measurement
           measurement_args+=(--pcrlock-directory=${lib.escapeShellArg measured.pcrlockDirectory})
         fi
       ''}

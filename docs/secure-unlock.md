@@ -122,6 +122,42 @@ recovery passphrase and enroll LUKS. Use `sys setup-unlock-tailscale` for the se
 Tailscale login and `sys setup-unlock-credentials --wifi-file /PRIVATE/PROFILE` for
 Wi-Fi; prepare boot files again after adding credentials.
 
+## PCR coverage and stable boot images
+
+The configured PCRs (normally 0, 4 and 7) are mandatory. Policy generation first
+checks the current event log against approved definitions, then uses
+`systemd-pcrlock predict --strict=yes` and `make-policy --strict=yes`. Status shows
+actual versus required PCR coverage, and enrollment rejects an incomplete policy.
+A first installation with unmatched measurements may install boot files and defer
+policy creation until reboot. An already enrolled disk instead fails the policy
+update and retains its existing policy; an unknown boot is never automatically
+approved from its event log.
+
+Before reinstalling images, the hook retains an existing approved Lanzaboote
+measurement that matches the verified current boot as the local
+`635-lanzaboote.pcrlock.d/booted.pcrlock` variant. This bridges a genuine image
+change while the old image is still running. On a later installation it is
+replaced by an approval matching the new boot, or removed if none matches.
+Normal generation pruning removes other retired definitions. Strict prediction
+also catches excessive variant counts; retire unnecessary generations through the
+normal bootloader workflow rather than weakening PCR coverage.
+
+Machine-local hardware aliases, the root-volume pin, network templates and any
+actual initrd secrets must be appended before image signing. They may change
+without changing a Nix generation, so the store path alone cannot validate an
+installed initrd. The hardware appender now offers a read-only comparison of the
+base initrd plus deterministic overlay against the complete installed image.
+Unchanged content skips copying, appending, image assembly, signing and rewriting
+the generation's measurement. The comparison still reads and hashes the images;
+it does not cache plaintext or trust only file timestamps. Changed inputs rebuild
+the image. Older appenders without the comparison interface rebuild during
+migration; their behavior improves after those generations are replaced.
+
+Lanzaboote's PE assembly fixes `SOURCE_DATE_EPOCH=1` for `objcopy`, so repeated
+assembly of identical inputs produces the same measured timestamp. SSH, Wi-Fi and
+Tailscale recovery credentials remain separate sealed EFI companion files; changing
+these credentials alone does not require reassembling the initrd.
+
 Provisioning records the pinned identity and credentials in
 `stateDirectory/provisioning-ready`. Existing sealed deployments are adopted
 without rotating their identities. After provisioning, disabled Secure Boot,

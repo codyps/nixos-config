@@ -34,7 +34,9 @@ class ProvisioningTests(unittest.TestCase):
         self.wifi.chmod(0o600)
         self.calls = []
         self.args = SimpleNamespace(wifi_file=self.wifi, ssh_key_file=None, ssh_only=False)
-        self.config = {"hostName": "other-host", "mapperName": "system-root", "stateDirectory": "/state", "diskUnlock": True, "disk": "/dev/test", "policy": str(self.wifi), "pcrlock": "pcrlock"}
+        self.policy = self.root / "policy.json"
+        self.policy.write_text(json.dumps({"pcrValues": [{"pcr": p} for p in (0, 4, 7)]}))
+        self.config = {"rootVolumeKeyId": "a" * 64, "pcrs": [0, 4, 7], "predictionArgs": ["--pcr=0", "--pcr=4", "--pcr=7"], "pcrlockDirectory": str(self.root / "pcrlock.d"), "hostName": "other-host", "mapperName": "system-root", "stateDirectory": "/state", "diskUnlock": True, "disk": "/dev/test", "policy": str(self.policy), "pcrlock": "pcrlock"}
         self.metadata = {"keyslots": {"0": {"type": "luks2"}}, "tokens": {}}
         self.enrolled = False
         self.fail = None
@@ -46,6 +48,62 @@ class ProvisioningTests(unittest.TestCase):
         stdout = contextlib.redirect_stdout(io.StringIO())
         stdout.__enter__()
         self.addCleanup(stdout.__exit__, None, None, None)
+
+    def test_missing_pcr_refuses_enrollment_before_password_prompt(self):
+        self.policy.write_text(json.dumps({"pcrValues": [{"pcr": 0}, {"pcr": 7}]}))
+        with patch.object(setup.getpass, "getpass") as password:
+            with self.assertRaisesRegex(RuntimeError, "expected"):
+                setup.enroll_disk(self.config, self.work)
+        password.assert_not_called()
+        self.assertFalse(self.enrolled)
+
+    def test_policy_prediction_failure_never_updates_tpm(self):
+        self.fail = lambda a: a[:2] == ("pcrlock", "predict")
+        with self.assertRaises(subprocess.CalledProcessError):
+            setup.update_policy(self.config)
+        self.assertFalse(any(a[:2] == ("pcrlock", "make-policy") for a in self.calls))
+
+    def test_policy_update_checks_all_pcrs_and_uses_strict_mode(self):
+        setup.update_policy(self.config)
+        verbs = [a[1] for a in self.calls if a[0] == "pcrlock"]
+        self.assertEqual(verbs, ["log", "predict", "make-policy"])
+
+    def test_unmatched_first_boot_defers_without_creating_reduced_policy(self):
+        original = self.policy.read_bytes()
+        with patch.object(setup, "measurements_ready", return_value=False):
+            setup.update_policy(self.config)
+        self.assertEqual(self.policy.read_bytes(), original)
+        self.assertFalse(any(a[0] == "pcrlock" for a in self.calls))
+
+    def test_unmatched_enrolled_disk_fails_without_changing_policy(self):
+        self.metadata["tokens"]["0"] = {"type": "systemd-tpm2"}
+        with patch.object(setup, "measurements_ready", return_value=False):
+            with self.assertRaisesRegex(RuntimeError, "enrolled disk"):
+                setup.update_policy(self.config)
+        self.assertFalse(any(a[0] == "pcrlock" for a in self.calls))
+
+    def test_retention_requires_existing_approval_and_prunes_after_boot_change(self):
+        directory = Path(self.config["pcrlockDirectory"]) / "635-lanzaboote.pcrlock.d"
+        directory.mkdir(parents=True)
+        record = {"records": [{"pcr": 4, "digests": [{"hashAlg": "sha256", "digest": "a" * 64}]}]}
+        source = directory / "1.pcrlock"
+        source.write_text(json.dumps(record))
+        log = {"log": [{"pcr": 4, "sha256": "a" * 64}], "pcrs": [{"pcr": 4, "hashMatchesEventLog": True}]}
+        with patch.object(setup, "prediction_log", return_value=log):
+            setup.retain_booted_measurement(self.config, self.work)
+            self.assertEqual((directory / "booted.pcrlock").read_bytes(), source.read_bytes())
+            source.unlink()
+            setup.retain_booted_measurement(self.config, self.work)
+            self.assertTrue((directory / "booted.pcrlock").exists())
+            log["log"][0]["sha256"] = "b" * 64
+            setup.retain_booted_measurement(self.config, self.work)
+            self.assertFalse((directory / "booted.pcrlock").exists())
+
+    def test_unverified_event_log_cannot_retain_measurements(self):
+        with patch.object(setup, "prediction_log", return_value={"log": [], "pcrs": [{"pcr": 4, "hashMatchesEventLog": False}]}):
+            with self.assertRaisesRegex(RuntimeError, "does not match"):
+                setup.retain_booted_measurement(self.config, self.work)
+        self.assertFalse(Path(self.config["pcrlockDirectory"]).exists())
 
     def test_status_continues_after_failed_prerequisites(self):
         self.config.update(rootVolumeKeyId=None)
@@ -207,6 +265,12 @@ class ProvisioningTests(unittest.TestCase):
         elif args[:2] == ("ssh-keygen", "-lf"):
             return b"test fingerprint"
         elif args[0] == "pcrlock":
+            if args[1] == "log":
+                return json.dumps({"log": [], "pcrs": [{"pcr": p, "hashMatchesEventLog": True,
+                    "allEventsMatched": True, "noMissingComponents": True} for p in (0, 4, 7)]}).encode()
+            if args[1] in ("predict", "make-policy"):
+                self.assertIn("--strict=yes", args)
+                return b""
             return b"yes\n"
         elif args[:2] == ("cryptsetup", "luksDump"):
             result = json.loads(json.dumps(self.metadata))

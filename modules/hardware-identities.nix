@@ -125,6 +125,7 @@ in
     # present before systemd generators and udev start, not copied by a service.
     boot.initrd.secrets."hardware-inventory-marker" = "${cfg.stateDirectory}/input/metadata.json";
     system.build.initialRamdiskSecretAppender = lib.mkForce (pkgs.writeShellScriptBin "append-initrd-secrets" ''
+      # supports-initrd-content-check-v1
       exec ${run} append "$@"
     '');
   }

@@ -10,6 +10,14 @@ let
     tailscale = cfg.remoteUnlock.enable && cfg.remoteUnlock.tailscale.enable;
     tailscaleHostName = cfg.remoteUnlock.tailscale.hostName;
     policy = config.boot.lanzaboote.measuredBoot.pcrlockPolicy;
+    pcrs = config.boot.lanzaboote.measuredBoot.pcrs;
+    pcrlockDirectory = config.boot.lanzaboote.measuredBoot.pcrlockDirectory;
+    predictionArgs = [
+      "--components=${config.environment.etc.pcrlock.source}"
+      "--components=${config.boot.lanzaboote.measuredBoot.pcrlockDirectory}"
+      "--components=/var/lib/pcrlock.d"
+      "--location=770"
+    ] ++ map (pcr: "--pcr=${toString pcr}") config.boot.lanzaboote.measuredBoot.pcrs;
     esp = config.boot.loader.efi.efiSysMountPoint;
     diskUnlock = config.boot.secureUnlock.tpmUnlock.enable;
     pcrlock = "${config.systemd.package}/lib/systemd/systemd-pcrlock";

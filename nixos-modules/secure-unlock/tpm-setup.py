@@ -345,10 +345,80 @@ def recovery_slots(metadata):
     return sorted(set(metadata["keyslots"]) - token_slots)
 
 
+def policy_pcrs(config):
+    try:
+        policy = json.loads(Path(config["policy"]).read_text())
+        return {item["pcr"] for item in policy["pcrValues"]}
+    except (ValueError, KeyError, TypeError) as error:
+        raise RuntimeError("Invalid measured policy metadata; rebuild a complete policy before enrollment.") from error
+
+
+def verify_policy(config):
+    expected = set(config["pcrs"])
+    actual = policy_pcrs(config)
+    require(expected <= actual,
+            f"Measured policy covers PCRs {sorted(actual)}, expected {sorted(expected)}. Prepare boot files and reboot before enrollment.")
+
+
+def prediction_log(config):
+    return json.loads(run(config["pcrlock"], "log", "--json=short", *config["predictionArgs"]))
+
+
+def measurements_ready(config):
+    pcrs = {entry["pcr"]: entry for entry in prediction_log(config)["pcrs"]}
+    return all(pcr in pcrs and all(pcrs[pcr].get(flag) is True for flag in
+               ("hashMatchesEventLog", "allEventsMatched", "noMissingComponents")) for pcr in config["pcrs"])
+
+
+def retain_booted_measurement(config, work):
+    """Retain existing approval only when it explains the verified current boot."""
+    if 4 not in config["pcrs"]:
+        return
+    log = prediction_log(config)
+    require(any(p["pcr"] == 4 and p.get("hashMatchesEventLog") is True for p in log["pcrs"]),
+            "PCR 4 does not match its event log; refusing measurement retention.")
+    hashes = {e["sha256"] for e in log["log"] if e["pcr"] == 4 and "sha256" in e}
+    directory = Path(config["pcrlockDirectory"]) / "635-lanzaboote.pcrlock.d"
+    directory.mkdir(parents=True, exist_ok=True)
+    target = directory / "booted.pcrlock"
+    selected = None
+    for source in sorted(directory.glob("*.pcrlock")):
+        records = json.loads(source.read_text())["records"]
+        # Lanzaboote defines one PCR 4 PE measurement per variant. Never create
+        # new approval by copying an unknown hash out of the current event log.
+        if len(records) == 1 and records[0]["pcr"] == 4 and any(
+                d["hashAlg"] == "sha256" and d["digest"] in hashes for d in records[0]["digests"]):
+            selected = source.read_bytes()
+            break
+    if selected is None:
+        target.unlink(missing_ok=True)
+        print("No existing approved UKI measurement matches this boot; policy preparation may require a reboot.")
+    else:
+        staged = work / "booted.pcrlock"
+        staged.write_bytes(selected)
+        publish(staged, target)
+
+
+def update_policy(config):
+    if not measurements_ready(config):
+        metadata = json.loads(run("cryptsetup", "luksDump", "--dump-json-metadata", config["disk"]))
+        require(not any(t.get("type") == "systemd-tpm2" for t in metadata["tokens"].values()),
+                "An enrolled disk has unmatched boot measurements; policy left unchanged. Recover approved measurements before updating.")
+        print("Measured policy deferred: boot files installed, but this boot is not fully recognized. Reboot and rerun sudo sys setup-luks-tpm-unlock --prepare-boot. No reduced policy was created.")
+        return
+    # Validate before touching the TPM; make-policy repeats the same strict check.
+    run(config["pcrlock"], "predict", "--strict=yes", *config["predictionArgs"])
+    run(config["pcrlock"], "make-policy", "--strict=yes", *config["predictionArgs"], f"--policy={config['policy']}")
+    verify_policy(config)
+    print("Measured policy updated with every configured PCR.")
+
+
 def enroll_disk(config, work):
     require(config["diskUnlock"], "Enable boot.secureUnlock.tpmUnlock.enable, rebuild boot files, then reboot first.")
     require(run(config["pcrlock"], "is-supported").strip() == b"yes", "pcrlock is unsupported.")
     require(Path(config["policy"]).is_file(), "No pcrlock policy. Run sudo sys setup-luks-tpm-unlock --prepare-boot, reboot, then rerun enrollment.")
+    verify_policy(config)
+    run(config["pcrlock"], "predict", "--strict=yes", *config["predictionArgs"])
     disk = config["disk"]
     metadata = json.loads(run("cryptsetup", "luksDump", "--dump-json-metadata", disk))
     slots = recovery_slots(metadata)
@@ -390,7 +460,7 @@ def status(config):
         try:
             require(action(), hint)
             print(f"OK    {label}")
-        except (OSError, RuntimeError, ValueError, subprocess.CalledProcessError):
+        except (OSError, RuntimeError, ValueError, KeyError, TypeError, subprocess.CalledProcessError):
             ready = False
             print(f"TODO  {label}: {hint}")
 
@@ -404,6 +474,14 @@ def status(config):
     check("pcrlock support", lambda: run(config["pcrlock"], "is-supported").strip() == b"yes", "Check TPM support and root access.")
     check("Provisioning record", lambda: (Path(config["stateDirectory"]) / "provisioning-ready").is_file(), "Run sys setup-luks-tpm-unlock --prepare-boot.")
     check("Measured boot policy", lambda: Path(config["policy"]).is_file(), "Prepare boot files and reboot before enrollment.")
+    try:
+        print(f"INFO  Policy PCR coverage: actual {sorted(policy_pcrs(config))}; required {sorted(config['pcrs'])}")
+    except (OSError, ValueError, KeyError, TypeError, RuntimeError):
+        pass
+    check("Required policy PCR coverage", lambda: verify_policy(config) is None,
+          "Policy must include every configured PCR; prepare boot files and reboot.")
+    check("Current boot measurements", lambda: measurements_ready(config),
+          "Boot measurements do not fully match approved definitions; reboot or repair definitions.")
     for name, enabled in (("ssh-host-key", config.get("remoteUnlock")), ("wifi", config.get("wifi")), ("tailscale-state", config.get("tailscale"))):
         if enabled:
             check(f"Recovery credential {name}", lambda name=name: (STORE / name).is_file(), "Provision recovery credentials, then prepare boot files; optional for TPM unlock.")
@@ -421,6 +499,7 @@ def status(config):
 
 def prepare_boot(config):
     require(config["diskUnlock"], "Enable tpmUnlock and install that generation first.")
+    require(config.get("rootVolumeKeyId") is not None, "Provision the pinned volume identity before preparing boot files.")
     preflight(config)
     # The existing hook handles credential staging, UKI signing and PCR policy.
     subprocess.run(["/run/current-system/bin/switch-to-configuration", "boot"], check=True)
@@ -445,6 +524,8 @@ def main():
     commands.add_parser("prepare-install", help="Provision available credentials when Secure Boot is ready, otherwise stage console-only boot")
     publish_cmd = commands.add_parser("publish-credentials", help="Install staged encrypted EFI companion credentials")
     publish_cmd.add_argument("--esp", type=Path, required=True)
+    commands.add_parser("retain-booted-measurement", help="Retain an existing approved measurement matching this boot")
+    commands.add_parser("update-policy", help="Strictly update policy, or defer unenrolled first provisioning until reboot")
     commands.add_parser("status", help="Report all unlock provisioning stages without changes")
     disk_cmd = commands.add_parser("enroll-disk", help="Verify recovery passphrase and add a TPM LUKS token")
     disk_options = disk_cmd.add_mutually_exclusive_group()
@@ -478,14 +559,18 @@ def main():
         prepare_boot(config)
         return
     require(os.geteuid() == 0, "Run with sudo on the installed host.")
-    if args.command not in ("prepare-install", "publish-credentials"):
+    if args.command not in ("prepare-install", "publish-credentials", "retain-booted-measurement", "update-policy"):
         require(config.get("rootVolumeKeyId") is not None, "Pin the root volume identity and reboot before provisioning unlock state.")
         preflight(config, require_current_generation=args.command == "enroll-disk")
     with open("/run/secure-unlock-setup.lock", "w") as lock:
         fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
         with tempfile.TemporaryDirectory(prefix="secure-unlock-", dir="/run") as directory:
             work = Path(directory)
-            if args.command == "prepare-install":
+            if args.command == "retain-booted-measurement":
+                retain_booted_measurement(config, work)
+            elif args.command == "update-policy":
+                update_policy(config)
+            elif args.command == "prepare-install":
                 prepare_install(config, work)
             elif args.command == "publish-credentials":
                 prepare_install(config, work)

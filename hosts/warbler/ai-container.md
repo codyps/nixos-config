@@ -199,6 +199,21 @@ A stuck turn can therefore defer an update indefinitely. Clients reconnect after
 the drain; this is not a connection-preserving hot swap. Explicit force-kills,
 container termination, and host shutdown can still interrupt work.
 
+Codex startup waits while less than 2 GiB is available on the filesystem
+backing `~/.codex`. The check retries every 30 seconds and reports prolonged
+pressure at most every five minutes, instead of repeatedly starting SQLite on a
+full disk. Startup continues automatically when space returns. A running server
+is not stopped by the check. Updates are deferred below 10 GiB and retried by
+the hourly update timer.
+
+`codex-ai-storage.timer` checks for 40 GiB of headroom every minute. A low-space
+check fails visibly in `systemctl --user --failed` and the journal; a later
+successful check clears that failure. Run `sys codex-storage-status` for a manual
+check. These guards do not delete data, reserve space, send external alerts, or
+limit bulk writes. Backups, build output, and Codex still share capacity: use a
+separate filesystem or a reviewed quota layout to contain an unbounded writer.
+See [disk space](storage.md) for inspection and recovery.
+
 Routine NixOS switches do not restart this unit. New supervisor settings apply
 at its next start. Run inside the container, without administrator access:
 

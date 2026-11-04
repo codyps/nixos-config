@@ -128,6 +128,13 @@ and `docker run --rm hello-world`. Docker info should list `rootless` under
 Security Options. Existing user services may need restarting to pick up
 `DOCKER_HOST`.
 
+FUSE mounts are available to the guest user through `/dev/fuse` and the
+`fusermount3` helper. The host loads the FUSE kernel module and passes the
+device into the container. After rebuilding, restart `container@ai` on Crow
+to apply this device access (interrupting guest sessions). In the guest,
+verify `test -r /dev/fuse && test -w /dev/fuse` and `fusermount3 --version`,
+then test a mount with the intended FUSE application.
+
 ## Installation checkpoints
 
 The Crow configuration exposes `sudo sys setup-secure-boot`. After backing up

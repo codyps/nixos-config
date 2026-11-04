@@ -252,6 +252,7 @@
             hardware-live-aliases = import ./modules/hardware-identities-test.nix { inherit pkgs; };
             codex-service = pkgs.runCommand "test-codex-service" { nativeBuildInputs = [ (pkgs.python3.withPackages (p: [ p.websockets ])) pkgs.bash ]; } ''
               CODEX_SERVICE_SCRIPT=${./nixos-modules/ai-container/codex-service.sh} CODEX_UPDATE_SCRIPT=${./nixos-modules/ai-container/codex-update.sh} python3 ${./scripts/test-codex-service.py}
+              CODEX_STORAGE_SCRIPT=${./nixos-modules/ai-container/codex-storage.py} python3 ${./scripts/test-codex-storage.py}
               CODEX_REMOTE_CONTROL_SCRIPT=${./nixos-modules/ai-container/codex-remote-control.py} python3 ${./scripts/test-codex-remote-control.py}
               touch "$out"
             '';

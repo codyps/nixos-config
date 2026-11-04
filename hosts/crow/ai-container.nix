@@ -7,8 +7,8 @@
     "kernel.perf_event_paranoid" = 1;
     "kernel.yama.ptrace_scope" = 0;
   };
-  # The guest cannot load the host kernel modules needed by nested Docker.
-  boot.kernelModules = [ "overlay" "bridge" "veth" "br_netfilter" "xt_nat" "ip_tables" "iptable_nat" ];
+  # The guest cannot load the host kernel modules needed by nested Docker or FUSE.
+  boot.kernelModules = [ "overlay" "bridge" "veth" "br_netfilter" "xt_nat" "ip_tables" "iptable_nat" "fuse" ];
 
   # Primary AI environment; no AI account or sandbox is created on the host.
   # /var/lib is persisted on Crow's encrypted /persist filesystem.
@@ -26,6 +26,11 @@
     ephemeral = false;
     # RootlessKit uses a TUN interface inside its user/network namespace.
     enableTun = true;
+    allowedDevices = [{ node = "/dev/fuse"; modifier = "rw"; }];
+    bindMounts."/dev/fuse" = {
+      hostPath = "/dev/fuse";
+      isReadOnly = false;
+    };
     # nspawn otherwise filters perf_event_open; explicitly permit debugging
     # syscalls too, without granting cody-ai capabilities or sudo access.
     extraFlags = [
@@ -46,6 +51,7 @@
     config = {
       imports = [ ../../nixos-modules/ai-container ];
       networking.hostName = "crow-ai";
+      programs.fuse.enable = true;
       virtualisation.docker.rootless = {
         enable = true;
         setSocketVariable = true;

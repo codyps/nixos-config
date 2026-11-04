@@ -51,6 +51,7 @@ let
     export PATH=${lib.escapeShellArg toolPath}
     mkdir -p ${home}/workspaces
   '' + builtins.readFile ./codex-service.sh);
+  codexStorage = "${pkgs.python3}/bin/python3 ${./codex-storage.py} ${home}/.codex";
   updateCodex = pkgs.writeShellScript "ai-container-codex-update" (''
     export PATH=${lib.escapeShellArg toolPath}
   '' + builtins.readFile ./codex-update.sh);
@@ -68,6 +69,7 @@ let
 in
 {
   programs.adminCommands.commands.install-hermes = [ "${installHermes}/bin/install-hermes" ];
+  programs.adminCommands.commands.codex-storage-status = [ "${pkgs.python3}/bin/python3" "${./codex-storage.py}" "${home}/.codex" ];
   programs.adminCommands.commands.update-codex = [ "${pkgs.systemd}/bin/systemctl" "--user" "start" "codex-ai-update.service" ];
   programs.adminCommands.commands.restart-codex = [ "${pkgs.systemd}/bin/systemctl" "--user" "reload" "codex-ai.service" ];
   imports = [ ../../modules/admin-commands.nix ../../modules/terminfo.nix ./ai-user-config.nix ./ai-git.nix ./ai-rust.nix ../git-gh-credentials.nix ];
@@ -246,6 +248,10 @@ in
     unitConfig.ConditionUser = user;
     environment = codingEnvironment;
     serviceConfig = {
+      # Avoid repeatedly initializing SQLite on a full filesystem. Waiting here
+      # leaves the actual app-server process directly supervised by systemd.
+      ExecStartPre = "${codexStorage} --min-free-gib 2 --wait";
+      TimeoutStartSec = "infinity";
       ExecStart = "${supervisor} foreground";
       # SIGHUP is Codex's graceful-only drain: repeated requests never force
       # termination. New turns are rejected while existing turns finish.
@@ -266,6 +272,8 @@ in
     environment = codingEnvironment;
     serviceConfig = {
       Type = "oneshot";
+      # Exit 1 skips this update; the hourly timer retries after space returns.
+      ExecCondition = "${codexStorage} --min-free-gib 10";
       ExecStart = updateCodex;
       UMask = "0077";
       TimeoutStartSec = "30min";
@@ -286,6 +294,24 @@ in
     };
   };
   systemd.user.timers.codex-ai-remote-control = {
+    wantedBy = [ "timers.target" ];
+    timerConfig = {
+      OnStartupSec = "30s";
+      OnUnitActiveSec = "1min";
+      AccuracySec = "5s";
+    };
+  };
+  # This is an early warning, not a quota or automatic deletion policy.
+  systemd.user.services.codex-ai-storage = {
+    description = "Check Codex filesystem headroom";
+    unitConfig.ConditionUser = user;
+    serviceConfig = {
+      Type = "oneshot";
+      ExecStart = "${codexStorage} --min-free-gib 40";
+      UMask = "0077";
+    };
+  };
+  systemd.user.timers.codex-ai-storage = {
     wantedBy = [ "timers.target" ];
     timerConfig = {
       OnStartupSec = "30s";

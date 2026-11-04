@@ -1,5 +1,23 @@
 # Mutable Codex defaults
 
+On Crow and Warbler, the `cody` account's `codex-remote-control.timer`
+enables remote control on an existing app-server every minute, including
+servers started directly by desktop or SSH clients. It starts with the user
+manager at boot and skips checks until the socket exists. It does not launch,
+replace, or restart the app-server. Run `sys enable-codex-remote-control` as
+`cody` for an immediate check, then `codex remote-control pair` to pair a phone.
+Native `codex remote-control start` refuses directly launched servers with
+“app server is running but is not managed by codex app-server daemon”; the
+helper enables the running server through RPC instead.
+
+Crow AI and Warbler AI already start their systemd-owned app-servers with
+`--remote-control` and restore it every minute with
+`codex-ai-remote-control.timer`. These timers restore remote control after
+authentication changes; login is still required. Stop the appropriate timer
+before deliberately disabling remote control. Inspect failures with
+`systemctl --user status codex-remote-control` on a host, or
+`systemctl --user status codex-ai-remote-control` inside an AI container.
+
 Home Manager activation seeds `~/.codex/config.toml` if no file exists and leaves
 existing files untouched. Warbler's `cody-ai` accounts, on both the host and the
 AI container, apply the current defaults on every NixOS activation, including

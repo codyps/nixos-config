@@ -13,9 +13,10 @@ let
   };
 in
 {
-  imports = [ ./hardware-configuration.nix ./disko.nix ./reset-root.nix ../../nixos-modules/secure-unlock ./secrets.nix ./usbguard.nix ./account-passwords.nix ./ai-harnesses.nix ./ai-container.nix ./garm.nix ./zpl-proxy-api.nix ./hindsight.nix ./actions-vm-scaler.nix ../../nixos-modules/actions-vm-image.nix ];
+  imports = [ ../../nixos-modules/codex-remote-control.nix ./hardware-configuration.nix ./disko.nix ./reset-root.nix ../../nixos-modules/secure-unlock ./secrets.nix ./usbguard.nix ./account-passwords.nix ./ai-harnesses.nix ./ai-container.nix ./garm.nix ./zpl-proxy-api.nix ./hindsight.nix ./actions-vm-scaler.nix ../../nixos-modules/actions-vm-image.nix ];
 
   config = {
+    services.codex-remote-control.enable = true;
     # warbler-ai owns the primary Codex runtime. Retain the old account/home
     # for migration and recovery, without competing daemon supervision.
     systemd.services.codex-ai.enable = false;

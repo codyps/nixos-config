@@ -10,6 +10,7 @@ in
     ./reset-root.nix
     ./wifi.nix
     ./ai-container.nix
+    ../../nixos-modules/codex-remote-control.nix
     ./hindsight.nix
     ./secure-boot.nix
     ../../nixos-modules/secure-unlock
@@ -17,6 +18,7 @@ in
     ../warbler/account-passwords.nix
   ];
   networking.hostName = "crow";
+  services.codex-remote-control.enable = true;
   hardware.msA2.powerLed.enable = true;
   home-manager.users.cody.programs.git.signing = {
     format = lib.mkForce "ssh";

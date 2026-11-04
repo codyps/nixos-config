@@ -1,6 +1,10 @@
 {
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
+    dedupit = {
+      url = "git+ssh://git@github.com/codyps/dedupit.git?ref=main&rev=0e867d3ae9037561e83a28e051fa9b6724c830de";
+      flake = false;
+    };
     zpl.url = "github:codyps/zpl";
     zpl.inputs.nixpkgs.follows = "nixpkgs";
     zpl.inputs.nixpkgs-intel-darwin.follows = "nixpkgs-darwin";
@@ -56,7 +60,7 @@
     ];
   };
 
-  outputs = { self, zpl, atuin, nixpkgs, nixpkgs-darwin, flake-utils, nix-darwin, nix-darwin-26-05, home-manager, home-manager-26-05, nixos-wsl, nixos-vscode-server, impermanence, sops-nix, disko, lanzaboote, clipway }:
+  outputs = { self, dedupit, zpl, atuin, nixpkgs, nixpkgs-darwin, flake-utils, nix-darwin, nix-darwin-26-05, home-manager, home-manager-26-05, nixos-wsl, nixos-vscode-server, impermanence, sops-nix, disko, lanzaboote, clipway }:
     let
       hardwareSettings = import ./lib/hardware-identities.nix ./config/hardware-fixtures;
       withCommonModules = constructor: args: constructor (args // {
@@ -249,6 +253,16 @@
               touch "$out"
             '';
           } // pkgs.lib.optionalAttrs (system == "x86_64-linux") {
+            btrfs-balance = assert builtins.deepSeq
+              (import ./scripts/test-btrfs-balance.nix { inherit nixpkgs; })
+              true; pkgs.runCommand "test-btrfs-balance" { nativeBuildInputs = [ pkgs.python3 ]; } ''
+              BTRFS_BALANCE_SCRIPT=${./scripts/btrfs-balance.py} python3 ${./scripts/test-btrfs-balance.py}
+              touch "$out"
+            '';
+            dedupit-run = pkgs.runCommand "test-dedupit-run" { nativeBuildInputs = [ pkgs.python3 ]; } ''
+              DEDUPIT_RUN_SCRIPT=${./hosts/warbler/dedupit-run.py} python3 ${./scripts/test-dedupit-run.py}
+              touch "$out"
+            '';
             hardware-live-aliases = import ./modules/hardware-identities-test.nix { inherit pkgs; };
             codex-service = pkgs.runCommand "test-codex-service" { nativeBuildInputs = [ (pkgs.python3.withPackages (p: [ p.websockets ])) pkgs.bash ]; } ''
               CODEX_SERVICE_SCRIPT=${./nixos-modules/ai-container/codex-service.sh} CODEX_UPDATE_SCRIPT=${./nixos-modules/ai-container/codex-update.sh} python3 ${./scripts/test-codex-service.py}
@@ -343,6 +357,7 @@
           } // pkgs.lib.optionalAttrs pkgs.stdenv.hostPlatform.isDarwin {
             claude-quota-bar = pkgs.claude-quota-bar;
           } // pkgs.lib.optionalAttrs pkgs.stdenv.hostPlatform.isLinux {
+            dedupit = pkgs.callPackage ./nixpkgs/dedupit.nix { src = dedupit; };
             actions-vm-scaler = pkgs.callPackage ./nixpkgs/actions-vm-scaler.nix { };
             luks-volume-key-id = pkgs.callPackage ./scripts/luks-volume-key-id.nix { };
             # Refresh both platform-independent source bundles on Linux CI.
@@ -378,7 +393,7 @@
     (
       let
         nixosSystem = args: withCommonModules nixpkgs.lib.nixosSystem (args // {
-          modules = [ ./nixos-modules/ca-trust.nix ./nixos-modules/gpg-agent-forwarding.nix ] ++ args.modules;
+          modules = [ ./nixos-modules/ca-trust.nix ./nixos-modules/gpg-agent-forwarding.nix ./nixos-modules/btrfs-balance.nix ] ++ args.modules;
         });
       in
       {

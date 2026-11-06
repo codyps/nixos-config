@@ -60,19 +60,22 @@
       }
     },
     "dedupit": {
-      "flake": false,
+      "inputs": {
+        "nixpkgs": [
+          "nixpkgs"
+        ]
+      },
       "locked": {
-        "lastModified": 1793075284,
-        "narHash": "sha256-x+TzJiU5AsEpj/krFleeQ6sa4O9cY7h0qbLVRixVqq8=",
+        "lastModified": 1794004049,
+        "narHash": "sha256-vMlUXO7Z30Zwgi/XKsGmuuqErm3yqNfFksePnsZgxws=",
         "ref": "main",
-        "rev": "0e867d3ae9037561e83a28e051fa9b6724c830de",
-        "revCount": 21,
+        "rev": "e96b992e3ae398b1815e34a3c232da5c3091d146",
+        "revCount": 24,
         "type": "git",
         "url": "ssh://git@github.com/codyps/dedupit.git"
       },
       "original": {
         "ref": "main",
-        "rev": "0e867d3ae9037561e83a28e051fa9b6724c830de",
         "type": "git",
         "url": "ssh://git@github.com/codyps/dedupit.git"
       }

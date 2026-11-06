@@ -248,3 +248,23 @@ The private provisioning bundle on the installing machine is
 Keep these plaintext files outside Git and the Nix store. Crow stores account
 hashes in `/persist/shadow.d/{root,cody}`. Later `passwd` changes persist those
 hashes but do not update the saved initial passwords. SSH is key-only.
+
+### Whole-volume deduplication
+
+`dedupit.service` starts at boot and runs incremental deduplication hourly.
+The native Rust service privately mounts `/dev/mapper/crow-root` with
+`subvolid=5`, covering all Btrfs subvolumes, including root, Nix store, home,
+persistent data, and container storage. Its index and reports live in
+`/var/lib/dedupit` (persisted under `/persist`). Runs use idle I/O priority
+and pause when available space falls below 5 GiB.
+
+Use `sudo sys dedupit-stats` for current progress, the last complete report,
+and persistent cumulative totals; add `--json` for machine-readable output.
+Cumulative byte/file/job totals cover completed runs recorded by the native
+service. Bytes deduped are logical bytes accepted by the kernel, rather than
+measured physical savings. Logs are available with
+`sudo journalctl -u dedupit.service`.
+
+The service and NixOS module come from the dedupit flake, pinned to its
+`main` branch on GitHub. Fetching this private input requires GitHub
+SSH access when the source is not already cached.

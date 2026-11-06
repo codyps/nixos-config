@@ -78,16 +78,17 @@ not an alerting system.
 
 ## Incremental deduplication
 
-`dedupit.timer` starts 15–20 minutes after boot, then an hour (plus up to five
-minutes of jitter) after each run finishes. `dedupit.service` mounts cryptroot's
+`dedupit.service` starts at boot and waits an hour after each run finishes
+before retrying. The native Rust service mounts cryptroot's
 Btrfs top level privately and scans every subvolume, including `/nix`, `/home`,
 `/persist`, container files, and scratch data. The private writable view permits
 kernel-verified sharing in the Nix store without changing its normal read-only
 mount. Virtual filesystems and external mounts are outside this view. File names,
 inodes, contents, and independent write behavior are preserved.
 
-The package is pinned through the `dedupit` flake input. Fetching this private
-source requires GitHub SSH access when it is not already cached locally. It uses
+The package and NixOS module come from the `dedupit` flake input.
+The input is pinned to the `main` branch on GitHub. Fetching this
+private source requires GitHub SSH access when it is not already cached. It uses
 native generation-based discovery, whole-file and 1 MiB range sharing, and a
 persistent `/var/lib/dedupit/filesystem.sqlite` index. The previous container-only
 `ai.sqlite` index is retained; its roots differ and cannot be reused for this scan.
@@ -95,22 +96,22 @@ The new index requires additional disk space. Dedupit excludes its own active
 index and sidecar files by inode, including through the alternate mount path.
 
 Busy executables and other failed sharing jobs remain pending for the next run.
-Changed files are rescanned. Exit 2 means the scan finished with per-file errors;
-the timer retries later without a restart loop. Fatal failures remain visible as
-failed units and are also retried by the timer. Persistent unsupported/invalid
-requests can recur; inspect the saved error list if failures continue.
+Changed files are rescanned. Completed runs with per-file errors and fatal scan
+failures are recorded in the native service's status and retried after an hour.
+Process failures are restarted by systemd after five minutes. Persistent
+unsupported/invalid requests can recur; inspect the saved error list if failures continue.
 
 The service runs at idle I/O priority and nice 19 with a 2 GiB memory soft limit
-and 4 GiB hard limit. Its supervisor checks free space every 30 seconds and stops
-below 5 GiB, retaining committed progress. That polling guard is not a quota;
+and 4 GiB hard limit. The Rust process checks available space every 30 seconds
+and pauses below 5 GiB, retaining committed progress. That polling guard is not a quota;
 rapid allocation or Btrfs metadata exhaustion can still cause ENOSPC. A later
 run resumes the same index. Stopping the unit also leaves committed work reusable.
 
 ```sh
-systemctl status dedupit.service dedupit.timer
+systemctl status dedupit.service
 sudo journalctl -u dedupit.service
-sudo cat /var/lib/dedupit/filesystem-status.json
-sudo cat /var/lib/dedupit/filesystem-result.json
+sudo sys dedupit-stats
+sudo sys dedupit-stats --json
 sudo systemctl start dedupit.service
 sudo systemctl stop dedupit.service
 ```

@@ -7,6 +7,7 @@ in
   imports = [
     ./hardware-configuration.nix
     ./disko.nix
+    ../../nixos-modules/dedupit.nix
     ./reset-root.nix
     ./wifi.nix
     ./ai-container.nix
@@ -18,6 +19,8 @@ in
     ../warbler/account-passwords.nix
   ];
   networking.hostName = "crow";
+  services.dedupit.enable = true;
+  services.dedupit.device = "/dev/mapper/crow-root";
   systemd.network.networks."20-ethernet" = {
     matchConfig = {
       Name = "en* eth*";

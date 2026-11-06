@@ -260,8 +260,9 @@ and pause when available space falls below 5 GiB.
 
 Use `sudo sys dedupit-stats` for current progress, the last complete report,
 and persistent cumulative totals; add `--json` for machine-readable output.
-Cumulative byte/file/job totals cover completed runs recorded by the native
-service. Bytes deduped are logical bytes accepted by the kernel, rather than
+The `All recorded` column includes live and interrupted work retained across
+restarts. The service reports its scan phase; duplicate counts appear after
+summarization. Bytes deduped are logical bytes accepted by the kernel, rather than
 measured physical savings. Logs are available with
 `sudo journalctl -u dedupit.service`.
 

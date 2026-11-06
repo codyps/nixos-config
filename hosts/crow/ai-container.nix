@@ -35,6 +35,7 @@
     # syscalls too, without granting cody-ai capabilities or sudo access.
     extraFlags = [
       "--network-ipvlan=wlp6s0"
+      "--network-ipvlan=enp3s0"
       "--system-call-filter=perf_event_open"
       "--system-call-filter=ptrace"
       "--system-call-filter=process_vm_readv"
@@ -71,8 +72,23 @@
           SendHostname = true;
           # The ipvlan cannot receive unicast offers before it has an address.
           RequestBroadcast = true;
+          RouteMetric = 600;
         };
+        ipv6AcceptRAConfig.RouteMetric = 600;
         linkConfig.RequiredForOnline = "routable";
+      };
+      # Share the wired port without assigning a new hardware identity.
+      systemd.network.networks."10-ethernet" = {
+        matchConfig.Name = "iv-enp3s0";
+        networkConfig = { DHCP = "yes"; IPv6AcceptRA = true; };
+        dhcpV4Config = {
+          ClientIdentifier = "duid";
+          SendHostname = true;
+          RequestBroadcast = true;
+          RouteMetric = 100;
+        };
+        ipv6AcceptRAConfig.RouteMetric = 100;
+        linkConfig.RequiredForOnline = false;
       };
       systemd.network.networks."10-ai" = {
         matchConfig.Name = "eth0";
@@ -113,6 +129,7 @@
 
   networking.firewall.interfaces.${config.services.tailscale.interfaceName}.allowedTCPPorts = [ 2223 ];
   networking.firewall.interfaces.wlp6s0.allowedTCPPorts = [ 2223 ];
+  networking.firewall.interfaces.enp3s0.allowedTCPPorts = [ 2223 ];
   systemd.sockets.ai-container-ssh = {
     description = "AI container SSH over Crow LAN and Tailscale";
     # Listen independently of either interface; the firewall limits access.

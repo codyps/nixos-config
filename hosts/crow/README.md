@@ -62,7 +62,7 @@ Ethernet interfaces named `en*` or `eth*` use systemd-networkd for DHCP,
 IPv6 router advertisements, and DNS through resolved. Wired routes have metric
 100 and Wi-Fi routes have metric 600, so Ethernet is preferred while connected.
 An unplugged Ethernet cable does not hold up network-online. The AI container
-continues to use its separate Wi-Fi LAN connection.
+also prefers Ethernet and retains its separate Wi-Fi LAN connection as fallback.
 
 After activating the configuration on Crow, use `networkctl status` to verify
 the wired interface has an address, and `ip route` and `ip -6 route` to verify
@@ -108,20 +108,22 @@ for the Secure Boot/PCR 7 sealing prerequisites.
 including guest tools, user services, persistent home, and
 unprivileged `cody-ai` user. Crow has no host-level `cody-ai` account or legacy
 sandbox service. The container uses veth addresses `10.80.0.1` (host) and
-`10.80.0.2` (guest) for management. An L2 ipvlan on Wi-Fi provides a separate
-LAN DHCP lease, broadcast/multicast access, and no NAT. It shares Crow's station
-MAC; the guest uses a DUID DHCP client identifier to distinguish its lease.
+`10.80.0.2` (guest) for management. L2 ipvlans on Ethernet (`enp3s0`) and Wi-Fi
+provide separate LAN DHCP leases, broadcast/multicast access, and no NAT.
+Each shares its parent interface's MAC; the guest uses a DUID DHCP client
+identifier to distinguish its leases from the host. Ethernet routes have metric
+100 and Wi-Fi routes have metric 600.
 DNS and the default route come from the LAN.
 
 Applying this boundary change requires restarting `container@ai`, interrupting
-guest sessions. Verify a distinct LAN lease on `iv-wlp6s0`, the LAN default
+guest sessions. Verify distinct LAN leases on `iv-enp3s0` and `iv-wlp6s0`, the LAN default
 route, DNS, and broadcast/multicast exchange with another LAN machine after
 activation. Wi-Fi/AP and DHCP compatibility require live testing on Crow.
 
 After authenticating Crow to Tailscale, access the guest with
 `ssh -p 2223 cody-ai@crow`. On the local Wi-Fi network, use
 `ssh -p 2223 cody-ai@<crow-lan-ip>`. The firewall allows the SSH proxy on
-Crow's Wi-Fi and Tailscale interfaces. The host also advertises
+Crow's Ethernet, Wi-Fi, and Tailscale interfaces. The host also advertises
 `10.80.0.2/32`; accessing that route needs
 approval in the tailnet. This configuration does not register a `crow-ai`
 Tailscale node or create DNS records. From Crow itself, use

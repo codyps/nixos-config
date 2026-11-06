@@ -36,7 +36,8 @@
     networks."20-wifi" = {
       matchConfig.Name = "wlp6s0";
       networkConfig = { DHCP = "yes"; IPv6AcceptRA = true; };
-      dhcpV4Config.ClientIdentifier = "mac";
+      dhcpV4Config = { ClientIdentifier = "mac"; RouteMetric = 600; };
+      ipv6AcceptRAConfig.RouteMetric = 600;
       linkConfig.RequiredForOnline = "routable";
     };
   };

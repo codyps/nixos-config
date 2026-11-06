@@ -18,6 +18,16 @@ in
     ../warbler/account-passwords.nix
   ];
   networking.hostName = "crow";
+  systemd.network.networks."20-ethernet" = {
+    matchConfig = {
+      Name = "en* eth*";
+      Type = "ether";
+    };
+    networkConfig = { DHCP = "yes"; IPv6AcceptRA = true; };
+    dhcpV4Config = { ClientIdentifier = "mac"; RouteMetric = 100; };
+    ipv6AcceptRAConfig.RouteMetric = 100;
+    linkConfig.RequiredForOnline = false;
+  };
   services.codex-remote-control.enable = true;
   hardware.msA2.powerLed.enable = true;
   home-manager.users.cody.programs.git.signing = {

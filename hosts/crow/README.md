@@ -56,6 +56,18 @@ Signing keys must exist before boot-file installation. Neither the configuration
 nor a rebuild enrolls firmware keys or a TPM disk token. See the
 [shared staged workflow](../../docs/secure-unlock.md#staged-provisioning-with-one-configuration).
 
+## Ethernet
+
+Ethernet interfaces named `en*` or `eth*` use systemd-networkd for DHCP,
+IPv6 router advertisements, and DNS through resolved. Wired routes have metric
+100 and Wi-Fi routes have metric 600, so Ethernet is preferred while connected.
+An unplugged Ethernet cable does not hold up network-online. The AI container
+continues to use its separate Wi-Fi LAN connection.
+
+After activating the configuration on Crow, use `networkctl status` to verify
+the wired interface has an address, and `ip route` and `ip -6 route` to verify
+the preferred routes.
+
 ## Wi-Fi and SOPS
 
 The `billy` WPA3/SAE iwd profile is SOPS-encrypted in `secrets.yaml`. Its

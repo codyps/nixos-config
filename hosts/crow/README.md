@@ -263,7 +263,11 @@ and persistent cumulative totals; add `--json` for machine-readable output.
 The `All recorded` column includes live and interrupted work retained across
 restarts. The service reports its scan phase; duplicate counts appear after
 summarization. Bytes deduped are logical bytes accepted by the kernel, rather than
-measured physical savings. Logs are available with
+measured physical savings. `Est. space saved` uses compression-aware estimates
+of replaced, previously unshared physical allocations. `Unmeasured dedupe`
+includes older work and mappings that cannot be estimated reliably. Estimates
+exclude metadata and RAID replication and are cumulative, rather than net free
+space changes. Logs are available with
 `sudo journalctl -u dedupit.service`.
 
 The service and NixOS module come from the dedupit flake, pinned to its

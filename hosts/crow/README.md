@@ -258,17 +258,19 @@ persistent data, and container storage. Its index and reports live in
 `/var/lib/dedupit` (persisted under `/persist`). Runs use idle I/O priority
 and pause when available space falls below 5 GiB.
 
-Use `sudo sys dedupit-stats` for current progress, the last complete report,
-and persistent cumulative totals; add `--json` for machine-readable output.
-The `All recorded` column includes live and interrupted work retained across
-restarts. The service reports its scan phase; duplicate counts appear after
-summarization. Bytes deduped are logical bytes accepted by the kernel, rather than
-measured physical savings. `Saved (uncompressed)` always shows those logical
-savings. The optional `Physical estimate` row has an explicit `Estimate scanned`
-byte count and `Physical coverage` percentage. These estimates exclude metadata
-and RAID replication and are cumulative, rather than net free-space changes.
-Logs are available with
-`sudo journalctl -u dedupit.service`.
+Use `sudo sys dedupit-stats` for a current sharing estimate and scan activity;
+add `--json` for machine-readable output. `Current sharing estimate` is rebuilt
+from verified indexed extent mappings and current hardlink counts, including
+sharing created before dedupit. It shows its indexed-file coverage, data amount,
+age, and refresh progress. Until indexing catches up, this represents an indexed
+subset rather than a complete filesystem inventory. The indented `Coverage`
+amount and percentage apply only to the `Physical estimate` above them.
+
+`Dedupit activity history` and `Recorded work` are cumulative operation counters;
+repeated work can be counted again. `Dedupe accepted` is not a current total of
+space savings. The background inventory refreshes normally every five minutes
+and is saved as `/var/lib/dedupit/sharing-inventory.json`. Logs are available
+with `sudo journalctl -u dedupit.service`.
 
 The service and NixOS module come from the dedupit flake, pinned to its
 `main` branch on GitHub. Fetching this private input requires GitHub

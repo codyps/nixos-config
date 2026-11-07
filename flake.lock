@@ -66,11 +66,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1794008645,
-        "narHash": "sha256-ehv2q9Yxm6zOg5IK6DdR1evTKy28HwN18xaIDFtH8QM=",
+        "lastModified": 1794016115,
+        "narHash": "sha256-r7ftcxiGtgJIHSxbBD8PyC2JY+Sp+uKNydkNOHB3vNc=",
         "ref": "main",
-        "rev": "9b21e17b124393f1797dd7b70300db010e5ccbd6",
-        "revCount": 31,
+        "rev": "6bb781400c15a378ec41cdde52b6734fcefdf60f",
+        "revCount": 32,
         "type": "git",
         "url": "ssh://git@github.com/codyps/dedupit.git"
       },

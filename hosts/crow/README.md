@@ -259,7 +259,10 @@ persistent data, and container storage. Its index and reports live in
 and pause when available space falls below 5 GiB.
 
 Use `sudo sys dedupit-stats` for a current sharing estimate and scan activity;
-add `--json` for machine-readable output. `Current sharing estimate` is rebuilt
+add `--json` for machine-readable output. Normal text/JSON reads bounded,
+buffered summaries; `sudo sys dedupit-stats --errors` explicitly streams full
+file-error details. Error counts remain complete even though the default preview
+contains only ten examples. Read-only destinations are counted as skips. `Current sharing estimate` is rebuilt
 from verified indexed extent mappings and current hardlink counts, including
 sharing created before dedupit. It shows its indexed-file coverage, data amount,
 age, and refresh progress. Until indexing catches up, this represents an indexed

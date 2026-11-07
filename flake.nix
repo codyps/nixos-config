@@ -9,7 +9,7 @@
     zpl.inputs.nixpkgs.follows = "nixpkgs";
     zpl.inputs.nixpkgs-intel-darwin.follows = "nixpkgs-darwin";
     zpl.inputs.flake-utils.follows = "flake-utils";
-    atuin.url = "github:codyps/atuin/fuzzy-scoring-allocations-18.23.0";
+    atuin.url = "github:codyps/atuin/fuzzy-scoring-allocations-18.24.5";
     atuin.inputs.nixpkgs.follows = "nixpkgs";
     nix-darwin.url = "github:LnL7/nix-darwin";
     nix-darwin.inputs.nixpkgs.follows = "nixpkgs";
@@ -111,10 +111,14 @@
             inherit caddy;
             atuin = prev.callPackage (atuin + "/atuin.nix") {
               stdenv = compatStdenv;
-              rustPlatform = prev.makeRustPlatform {
-                cargo = atuinToolchain;
-                rustc = atuinToolchain;
-              };
+              # The fork's atuin.nix builds with crane; point crane at the
+              # toolchain Rust the fork requires.
+              craneLib = atuin.inputs.crane.mkLib (compatPkgs // {
+                rustPlatform = prev.makeRustPlatform {
+                  cargo = atuinToolchain;
+                  rustc = atuinToolchain;
+                };
+              });
             };
             caddyFull = caddy.withPlugins {
               plugins = [

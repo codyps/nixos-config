@@ -277,6 +277,16 @@ space savings. The background inventory refreshes normally every five minutes
 and is saved as `/var/lib/dedupit/sharing-inventory.json`. Logs are available
 with `sudo journalctl -u dedupit.service`.
 
+Crow uses NOCOW for its hot SQLite database and WAL to reduce random-write
+amplification. Directory IDs and filenames replace repeated full file paths;
+normal upgrades preserve hashes, pending/completed work, and scan cursors.
+For offline compaction, run `sudo systemctl stop dedupit.service`,
+`sudo sys dedupit-compact`, then `sudo systemctl start dedupit.service`.
+The native compactor refuses a running service and validates the replacement
+before an atomic swap. Keep enough free space for the replacement database.
+The WAL can grow during active snapshots but is limited to 64 MiB when reset;
+sharing-estimate verification and sorting release the main snapshot first.
+
 The service and NixOS module come from the dedupit flake, pinned to its
 `main` branch on GitHub. Fetching this private input requires GitHub
 SSH access when the source is not already cached.

@@ -4,6 +4,9 @@ Use `sys COMMAND [ARGUMENT ...]` for custom user-facing operations provided by
 this configuration. `sys help` (or `sys --list`) lists installed commands.
 `sudo sys dedupit-stats` shows current indexed sharing, deduplication progress,
 and activity history on Crow and Warbler; add `--json` for raw records.
+`sudo sys dedupit-compact` rebuilds the index using its configured storage policy
+while preserving scan progress. Stop `dedupit.service` first and restart it after
+compaction; the native command refuses a live service/index.
 
 For example, Warbler exposes `sudo sys setup-luks-tpm-unlock`; u3 exposes
 `sudo sys nix-maintenance`. Commands are available after rebuilding and activating

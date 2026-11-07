@@ -20,6 +20,7 @@ in
   ];
   networking.hostName = "crow";
   services.dedupit.enable = true;
+  services.dedupit.databaseStorage = "nocow";
   services.dedupit.device = "/dev/mapper/crow-root";
   systemd.network.networks."20-ethernet" = {
     matchConfig = {

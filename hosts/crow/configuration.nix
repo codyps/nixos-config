@@ -78,7 +78,10 @@ in
       enable = true;
       user = "cody";
       passwordFile = config.sops.secrets.opencode-password.path;
-      tailscaleServe.enable = true;
+      tailscaleServe = {
+        enable = true;
+        httpsPort = 443;
+      };
     };
   };
   hardware.msA2.powerLed.enable = true;

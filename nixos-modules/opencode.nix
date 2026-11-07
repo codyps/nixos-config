@@ -56,7 +56,15 @@ in
         port = lib.mkOption {
           type = lib.types.port;
           default = defaultPort;
-          description = "Tailnet port exposed by Tailscale Serve.";
+          description = "Tailnet TCP port exposed by Tailscale Serve.";
+        };
+        httpsPort = lib.mkOption {
+          type = lib.types.nullOr lib.types.port;
+          default = null;
+          description = ''
+            HTTPS port for a Tailscale Serve HTTPS proxy. Set to 443 to expose
+            the server as the node's standard HTTPS service.
+          '';
         };
       };
     };
@@ -112,6 +120,25 @@ in
           ExecStop = "${pkgs.tailscale}/bin/tailscale serve --tcp=${toString server.tailscaleServe.port} off";
         };
       };
+      systemd.services.opencode-tailscale-https = lib.mkIf
+        (
+          server.tailscaleServe.enable && server.tailscaleServe.httpsPort != null
+        )
+        {
+          description = "Expose the OpenCode server over Tailscale HTTPS";
+          wantedBy = [ "multi-user.target" ];
+          wants = [ "tailscaled.service" ];
+          after = [ "tailscaled.service" "opencode-server.service" ];
+          requires = [ "opencode-server.service" ];
+          serviceConfig = {
+            Type = "oneshot";
+            RemainAfterExit = true;
+            Restart = "on-failure";
+            RestartSec = 10;
+            ExecStart = "${pkgs.tailscale}/bin/tailscale serve --bg --https=${toString server.tailscaleServe.httpsPort} http://127.0.0.1:${toString server.port}";
+            ExecStop = "${pkgs.tailscale}/bin/tailscale serve --https=${toString server.tailscaleServe.httpsPort} off";
+          };
+        };
     })
   ];
 }

@@ -106,8 +106,9 @@ for the Secure Boot/PCR 7 sealing prerequisites.
 
 `opencode-server.service` runs `opencode serve` as `cody` on
 `127.0.0.1:49375`. Tailscale Serve exposes it at
-`https://crow.little-moth.ts.net/`, with `http://crow.little-moth.ts.net:49375`
-also available as a direct TCP endpoint. Neither needs a firewall change. The
+`https://crow.little-moth.ts.net:8443/` so the node's HTTPS port 443 stays
+available for other services. `http://crow.little-moth.ts.net:49375` remains
+available as a direct TCP endpoint. Neither needs a firewall change. The
 password is in `secrets.yaml`; read it with
 `sudo cat /run/secrets/opencode-password`. `restartUnits` restarts the daemon
 when either secret changes.
@@ -116,7 +117,7 @@ Connect a TUI or another OpenCode client with:
 
 ```sh
 OPENCODE_PASSWORD="$(sudo cat /run/secrets/opencode-password)" \
-  opencode --server https://crow.little-moth.ts.net
+  opencode --server https://crow.little-moth.ts.net:8443
 ```
 
 For a browser or app pairing link, keep the same server and add the public URL:
@@ -124,7 +125,7 @@ For a browser or app pairing link, keep the same server and add the public URL:
 ```sh
 OPENCODE_PASSWORD="$(sudo cat /run/secrets/opencode-password)" \
   opencode --server http://127.0.0.1:49375 \
-  pair --url https://crow.little-moth.ts.net
+  pair --url https://crow.little-moth.ts.net:8443
 ```
 
 OpenCode reads managed configuration from `/etc/opencode/opencode.json`

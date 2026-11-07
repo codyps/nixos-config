@@ -80,7 +80,7 @@ in
       passwordFile = config.sops.secrets.opencode-password.path;
       tailscaleServe = {
         enable = true;
-        httpsPort = 443;
+        httpsPort = 8443;
       };
     };
   };

@@ -283,7 +283,9 @@ normal upgrades preserve hashes, pending/completed work, and scan cursors.
 For offline compaction, run `sudo systemctl stop dedupit.service`,
 `sudo sys dedupit-compact`, then `sudo systemctl start dedupit.service`.
 The native compactor refuses a running service and validates the replacement
-before an atomic swap. Keep enough free space for the replacement database.
+before an atomic swap. Inline extent records retain a header and payload digest;
+candidate chunks share one hash record between reuse and deduplication.
+These migrations preserve existing hashes, jobs, and scan progress. Keep enough free space for the replacement database.
 The WAL can grow during active snapshots but is limited to 64 MiB when reset;
 sharing-estimate verification and sorting release the main snapshot first.
 

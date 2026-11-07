@@ -115,7 +115,14 @@ identifier to distinguish its leases from the host. Ethernet routes have metric
 100 and Wi-Fi routes have metric 600.
 DNS and the default route come from the LAN.
 
-Applying this boundary change requires restarting `container@ai`, interrupting
+The container is named `crow-ai`, not `ai`, because systemd-machined publishes
+every registered machine name as an authoritative DNS domain. A machine named
+`ai` makes lookups under the real `.ai` TLD, including `z.ai` and `api.z.ai`,
+return NXDOMAIN. The first switch from the old name stops `container@ai` via a
+unit conflict and migrates `/var/lib/nixos-containers/ai` to
+`/var/lib/nixos-containers/crow-ai` before the renamed container starts.
+
+Applying this boundary change requires restarting `container@crow-ai`, interrupting
 guest sessions. Verify distinct LAN leases on `iv-enp3s0` and `iv-wlp6s0`, the LAN default
 route, DNS, and broadcast/multicast exchange with another LAN machine after
 activation. Wi-Fi/AP and DHCP compatibility require live testing on Crow.
@@ -136,7 +143,7 @@ account, provider credentials, or working files are copied. Manage Codex with
 Rootless Docker runs as `cody-ai` through the lingering `docker.service` user
 unit. Shells and user services use `/run/user/1001/docker.sock`; images and
 volumes persist under `/home/cody-ai/.local/share/docker`. After rebuilding,
-restart `container@ai` on Crow to apply the TUN device access (interrupting guest
+restart `container@crow-ai` on Crow to apply the TUN device access (interrupting guest
 sessions). In the guest, verify `systemctl --user status docker`, `docker info`,
 and `docker run --rm hello-world`. Docker info should list `rootless` under
 Security Options. Existing user services may need restarting to pick up
@@ -144,7 +151,7 @@ Security Options. Existing user services may need restarting to pick up
 
 FUSE mounts are available to the guest user through `/dev/fuse` and the
 `fusermount3` helper. The host loads the FUSE kernel module and passes the
-device into the container. After rebuilding, restart `container@ai` on Crow
+device into the container. After rebuilding, restart `container@crow-ai` on Crow
 to apply this device access (interrupting guest sessions). In the guest,
 verify `test -r /dev/fuse && test -w /dev/fuse` and `fusermount3 --version`,
 then test a mount with the intended FUSE application.

@@ -126,7 +126,7 @@ in
       SystemMaxUse = "1G";
       SystemKeepFree = "4G";
     };
-    containers.ai.config.services.journald.settings.Journal = {
+    containers.warbler-ai.config.services.journald.settings.Journal = {
       SystemMaxUse = "512M";
       SystemKeepFree = "4G";
     };

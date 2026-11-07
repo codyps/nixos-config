@@ -14,7 +14,11 @@
     [Link]
     MACAddress=${hardwareIdentities "warbler" [ "network" "containers" "warbler-ai" "interfaces" "mv-eno1" "macAddress" ]}
   '';
-  containers.ai = {
+  # Do not name the container "ai": systemd-machined exposes every registered
+  # machine name as an authoritative DNS domain, so a machine named "ai" makes
+  # lookups such as z.ai and api.z.ai return NXDOMAIN. Keep the machine name
+  # distinct from every real TLD.
+  containers.warbler-ai = {
     bindMounts."/run/hardware-identities" = {
       hostPath = "${config.services.hardwareIdentities.stateDirectory}/current/containers/warbler-ai";
       isReadOnly = true;
@@ -58,11 +62,23 @@
       networking.firewall.trustedInterfaces = [ "ai-ssh" ];
     };
   };
-  systemd.services."container@ai" = {
+  systemd.services."container@warbler-ai" = {
     # Activate guest changes in place; container boundary changes need a restart.
     reloadIfChanged = true;
     unitConfig.RequiresMountsFor = [ "/var/lib/nixos-containers" ];
+    # Stop the old "ai" instance before the renamed unit starts so its state is
+    # no longer in use when preStart moves it.
+    conflicts = [ "container@ai.service" ];
     preStart = ''
+      # Preserve the old container state while renaming it away from the "ai"
+      # machine name. Refuse to start a second copy if the old unit is live.
+      if [ -d /var/lib/nixos-containers/ai ] && [ ! -e /var/lib/nixos-containers/warbler-ai ]; then
+        if ${pkgs.systemd}/bin/systemctl is-active --quiet container@ai.service; then
+          echo "container@ai.service is still running; stop it before migrating state" >&2
+          exit 1
+        fi
+        ${pkgs.coreutils}/bin/mv /var/lib/nixos-containers/ai /var/lib/nixos-containers/warbler-ai
+      fi
       # Keep the legacy host AI account out of the container's scratch files.
       ${pkgs.coreutils}/bin/install -d -m 0700 /var/lib/warbler-ai
       ${pkgs.coreutils}/bin/install -d -m 1777 /var/lib/warbler-ai/tmp
@@ -91,11 +107,11 @@
   };
   systemd.services.ai-container-ssh = {
     description = "Proxy Tailscale SSH connections to the AI container";
-    requires = [ "container@ai.service" ];
+    requires = [ "container@warbler-ai.service" ];
     # Drop the inherited listener before its bound interface/socket disappears.
     # Otherwise the old proxy prevents the replacement socket from starting.
     bindsTo = [ "ai-container-ssh.socket" ];
-    after = [ "container@ai.service" "ai-container-ssh.socket" ];
+    after = [ "container@warbler-ai.service" "ai-container-ssh.socket" ];
     serviceConfig = {
       ExecStart = "${pkgs.systemd}/lib/systemd/systemd-socket-proxyd 10.79.0.2:22";
       DynamicUser = true;

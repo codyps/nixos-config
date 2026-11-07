@@ -1,11 +1,19 @@
 # Primary AI environment
 
-`containers.ai` is the primary AI environment, a persistent NixOS system named
-`warbler-ai`. The legacy host `cody-ai` account and home remain for recovery;
-the host's `codex-ai.service` is disabled. The container's root, home, SSH host
-keys, and application state live under `/var/lib/nixos-containers/ai`, covered
+`containers.warbler-ai` is the primary AI environment, a persistent NixOS system
+named `warbler-ai`. The legacy host `cody-ai` account and home remain for
+recovery; the host's `codex-ai.service` is disabled. The container's root, home,
+SSH host keys, and application state live under
+`/var/lib/nixos-containers/warbler-ai`, covered
 by Warbler's encrypted `/var/lib` persistence. Do not destroy this directory
 when rebuilding. The host home is not mounted into the container.
+
+The machine is named `warbler-ai` rather than `ai` because systemd-machined
+publishes every registered machine name as an authoritative DNS domain. A
+machine named `ai` shadows the real `.ai` TLD, so lookups such as `z.ai` and
+`api.z.ai` return NXDOMAIN. The first switch from the old name stops
+`container@ai` via a unit conflict and migrates `/var/lib/nixos-containers/ai`
+to `/var/lib/nixos-containers/warbler-ai` before the renamed container starts.
 
 ## Network and login
 
@@ -81,8 +89,8 @@ Macvlan does not allow direct communication between the host and its own child
 interface. Administer locally through the container manager instead:
 
 ```sh
-ssh cody@warbler 'sudo nixos-container run ai -- ip -4 address show mv-eno1'
-ssh -t cody@warbler 'sudo nixos-container root-login ai'
+ssh cody@warbler 'sudo nixos-container run warbler-ai -- ip -4 address show mv-eno1'
+ssh -t cody@warbler 'sudo nixos-container root-login warbler-ai'
 ```
 
 GitHub HTTPS operations default to this account's own `gh` login through
@@ -118,9 +126,9 @@ container allows the perf and debugger syscalls but grants no additional user
 capabilities or sudo access. System-wide perf (`perf -a`), raw kernel tracing,
 and inspecting other users' processes remain privileged operations.
 
-After deploying this change, restart `container@ai.service` on Warbler during
-an idle window: the nspawn syscall filter cannot be updated by guest reload.
-This restart interrupts running container sessions and tasks.
+After deploying this change, restart `container@warbler-ai.service` on Warbler
+during an idle window: the nspawn syscall filter cannot be updated by guest
+reload. This restart interrupts running container sessions and tasks.
 
 The container runs its own systemd, D-Bus, and SSH server. Its `cody-ai` user
 has lingering enabled, so the user manager starts at boot and survives logout.
@@ -306,7 +314,7 @@ container boundary, such as macvlans, veths, bind mounts, or nspawn settings,
 require an explicit restart after the host switch:
 
 ```sh
-ssh cody@warbler 'sudo systemctl restart container@ai'
+ssh cody@warbler 'sudo systemctl restart container@warbler-ai'
 ```
 
 The offline two-machine VM test verifies a separate DHCP lease, SSH, unrestricted

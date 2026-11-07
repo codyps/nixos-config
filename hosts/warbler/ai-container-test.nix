@@ -5,7 +5,7 @@ pkgs.testers.runNixOSTest {
   nodes = {
     host = { lib, ... }: {
       imports = [ ../../modules/hardware-identities.nix ./ai-container.nix ];
-      containers.ai.bindMounts."/run/hardware-identities".hostPath = lib.mkForce (toString (pkgs.writeTextDir "90-hardware.conf" "[Link]\nMACAddress=${hardwareIdentities "warbler" [ "network" "containers" "warbler-ai" "interfaces" "mv-eno1" "macAddress" ]}\n"));
+      containers.warbler-ai.bindMounts."/run/hardware-identities".hostPath = lib.mkForce (toString (pkgs.writeTextDir "90-hardware.conf" "[Link]\nMACAddress=${hardwareIdentities "warbler" [ "network" "containers" "warbler-ai" "interfaces" "mv-eno1" "macAddress" ]}\n"));
       _module.args.hardwareIdentities = hardwareIdentities;
       # Model the trusted Tailscale interface separately from the other LAN.
       services.tailscale.interfaceName = "testvpn";
@@ -13,8 +13,8 @@ pkgs.testers.runNixOSTest {
       # Answer for the disposable interface only on its own MAC address.
       boot.kernel.sysctl."net.ipv4.conf.all.arp_ignore" = 1;
       virtualisation.vlans = [ 1 2 ];
-      containers.ai.macvlans = lib.mkForce [ "eth1" ];
-      containers.ai.config = {
+      containers.warbler-ai.macvlans = lib.mkForce [ "eth1" ];
+      containers.warbler-ai.config = {
         systemd.network.networks."10-lan".matchConfig.Name = lib.mkForce "mv-eth1";
         # Keep the test offline, exercising the foreground app server.
         nix.settings.flake-registry = "";
@@ -59,8 +59,8 @@ pkgs.testers.runNixOSTest {
 
     start_all()
     client.wait_for_unit("dnsmasq.service")
-    host.wait_for_unit("container@ai.service")
-    inside = "nixos-container run ai -- "
+    host.wait_for_unit("container@warbler-ai.service")
+    inside = "nixos-container run warbler-ai -- "
     host.wait_until_succeeds(inside + "test -S /run/user/1001/bus")
     host.wait_until_succeeds(inside + "test -S /home/cody-ai/.codex/app-server-control/app-server-control.sock")
     host.wait_until_succeeds(inside + "ip -4 address show mv-eth1 | grep 192.168.1.100")
@@ -110,7 +110,7 @@ pkgs.testers.runNixOSTest {
     proxy_ssh = "ssh -n -o ConnectTimeout=5 -o StrictHostKeyChecking=accept-new -i /root/ai-key -p 2223 cody-ai@192.168.3.200 "
     assert client.succeed(proxy_ssh + "hostname").strip() == "warbler-ai"
     client.fail("nc -z -w 3 " + host_address("eth2") + " 2223")
-    container_pid = host.succeed("systemctl show container@ai -p MainPID --value").strip()
+    container_pid = host.succeed("systemctl show container@warbler-ai -p MainPID --value").strip()
     for _ in range(2):
         host.wait_for_unit("ai-container-ssh.service")
         old_index = host.succeed("cat /sys/class/net/testvpn/ifindex").strip()
@@ -120,7 +120,7 @@ pkgs.testers.runNixOSTest {
         create_vpn()
         assert host.succeed("cat /sys/class/net/testvpn/ifindex").strip() != old_index
         client.wait_until_succeeds(proxy_ssh + "true")
-        assert host.succeed("systemctl show container@ai -p MainPID --value").strip() == container_pid
+        assert host.succeed("systemctl show container@warbler-ai -p MainPID --value").strip() == container_pid
     # The private link must not replace the macvlan DHCP default route.
     host.succeed(inside + "ip -4 route show default | grep mv-eth1")
     host.fail(inside + "ip -4 route show default | grep ai-ssh")
@@ -172,7 +172,7 @@ pkgs.testers.runNixOSTest {
     client.wait_until_succeeds(ssh + "codex app-server daemon version")
     host.succeed(inside + "test -f /home/cody-ai/workspaces/service-proof")
     host.fail("test -e /home/cody-ai/workspaces/service-proof")
-    host.succeed("systemctl restart container@ai")
+    host.succeed("systemctl restart container@warbler-ai")
     host.wait_until_succeeds(inside + "test -S /run/user/1001/bus")
     host.wait_until_succeeds(inside + "test -S /home/cody-ai/.codex/app-server-control/app-server-control.sock")
     host.succeed(inside + "test -f /home/cody-ai/workspaces/service-proof")

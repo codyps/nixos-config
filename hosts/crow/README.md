@@ -102,6 +102,40 @@ blob enters the initrd; iwd receives its plaintext in a private runtime
 directory. Read the [secure-unlock procedure](../../docs/secure-unlock.md)
 for the Secure Boot/PCR 7 sealing prerequisites.
 
+## OpenCode server
+
+`opencode-server.service` runs `opencode serve` as `cody` on
+`127.0.0.1:49375`. `opencode-tailscale-serve.service` exposes that port over
+Tailscale Serve, so other tailnet clients connect at
+`http://crow.little-moth.ts.net:49375` without a firewall change. The password
+is in `secrets.yaml`; read it with `sudo cat /run/secrets/opencode-password`.
+`restartUnits` restarts the daemon when that secret changes.
+
+Connect a TUI or another OpenCode client with:
+
+```sh
+OPENCODE_PASSWORD="$(sudo cat /run/secrets/opencode-password)" \
+  opencode --server http://crow.little-moth.ts.net:49375
+```
+
+For a browser or app pairing link, keep the same server and add the public URL:
+
+```sh
+OPENCODE_PASSWORD="$(sudo cat /run/secrets/opencode-password)" \
+  opencode --server http://crow.little-moth.ts.net:49375 \
+  pair --url http://crow.little-moth.ts.net:49375
+```
+
+OpenCode reads managed configuration from `/etc/opencode/opencode.json`
+(rendered from `services.opencode.settings`) with the highest precedence.
+OpenCode does not rewrite that file. User-level settings live in
+`~/.config/opencode/cli.json` and the managed background service's
+`service.json`; in-app changes to the global `shell` setting are written to the
+user's `opencode.json(c)`, which managed settings still override. The Strata
+API key is SOPS-encrypted in `secrets.yaml`; the managed config reads it from
+`/run/secrets/strata-api-key`. Rotating either `strata-api-key` or
+`opencode-password` restarts `opencode-server.service`.
+
 ## AI container
 
 `crow-ai` and `warbler-ai` share [the AI container module](../../nixos-modules/ai-container),

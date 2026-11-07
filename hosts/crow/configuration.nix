@@ -12,6 +12,7 @@ in
     ./wifi.nix
     ./ai-container.nix
     ../../nixos-modules/codex-remote-control.nix
+    ../../nixos-modules/opencode.nix
     ./hindsight.nix
     ./secure-boot.nix
     ../../nixos-modules/secure-unlock
@@ -33,6 +34,53 @@ in
     linkConfig.RequiredForOnline = false;
   };
   services.codex-remote-control.enable = true;
+  sops.secrets.opencode-password = {
+    sopsFile = ./secrets.yaml;
+    mode = "0400";
+    restartUnits = [ "opencode-server.service" ];
+  };
+  sops.secrets.strata-api-key = {
+    sopsFile = ./secrets.yaml;
+    mode = "0400";
+    owner = "cody";
+    restartUnits = [ "opencode-server.service" ];
+  };
+  # Managed settings live in /etc/opencode; OpenCode does not write to them.
+  services.opencode = {
+    enable = true;
+    settings = {
+      "$schema" = "https://opencode.ai/config.json";
+      providers.strata = {
+        name = "Strata (local)";
+        package = "@opencode/ai/providers/openai-compatible";
+        settings = {
+          baseURL = "http://desktop-lgmeaa4.little-moth.ts.net:8080/v1";
+          apiKey = "{file:${config.sops.secrets.strata-api-key.path}}";
+        };
+        models."qwen3.8-flash-next-iq3_s" = {
+          name = "Qwen3.8-Flash-Next (local)";
+          capabilities = {
+            tools = true;
+            input = [ "text" "image" ];
+            output = [ "text" ];
+            reasoning.supported = true;
+          };
+          compatibility.reasoningField = "reasoning_content";
+          limit = {
+            context = 131072;
+            input = 114688;
+            output = 16384;
+          };
+        };
+      };
+    };
+    server = {
+      enable = true;
+      user = "cody";
+      passwordFile = config.sops.secrets.opencode-password.path;
+      tailscaleServe.enable = true;
+    };
+  };
   hardware.msA2.powerLed.enable = true;
   home-manager.users.cody.programs.git.signing = {
     format = lib.mkForce "ssh";

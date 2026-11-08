@@ -685,6 +685,24 @@
           ];
         };
 
+        darwinConfigurations.kestrel = (withCommonModules nix-darwin.lib.darwinSystem) {
+          specialArgs = { inherit self; };
+          modules = [
+            ./nix-darwin/configuration.nix
+            ./hosts/kestrel/darwin.nix
+            home-manager.darwinModules.home-manager
+            {
+              nixpkgs = nixpkgsConfig;
+              home-manager.useGlobalPkgs = true;
+              home-manager.useUserPackages = true;
+              home-manager.users.cody.imports = [
+                ./nix-darwin/home.nix
+                ./home-manager/home.nix
+              ];
+            }
+          ];
+        };
+
         darwinConfigurations.wren = (withCommonModules nix-darwin-26-05.lib.darwinSystem) {
           specialArgs = { inherit self; };
           modules = [

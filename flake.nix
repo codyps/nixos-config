@@ -109,6 +109,7 @@
           in
           {
             inherit caddy;
+            dedupit = dedupit.packages.${prev.stdenv.hostPlatform.system}.dedupit;
             atuin = prev.callPackage (atuin + "/atuin.nix") {
               stdenv = compatStdenv;
               # The fork's atuin.nix builds with crane; point crane at the
@@ -901,6 +902,16 @@
                 home.homeDirectory = "/home/cody";
               })
               ./home-manager/home.nix
+              ./home-manager/dedupit.nix
+              ({ ... }: {
+                # Container root is Btrfs and sharing works unprivileged, but
+                # Crostini drops capabilities, so this uses directory mode with
+                # the portable scanner instead of the NixOS whole-volume module.
+                services.dedupit = {
+                  enable = true;
+                  databaseStorage = "nocow";
+                };
+              })
               ({ lib, ... }: {
                 programs.git.signing = {
                   format = lib.mkForce "ssh";

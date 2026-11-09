@@ -75,9 +75,10 @@
       mkOverlays = nixpkgsSource: [
         (final: prev:
           let
-            # Atuin and its pinned Fenix input still read the deprecated
-            # stdenv.isDarwin/isLinux aliases. Supply equivalent plain values
-            # until those inputs adopt stdenv.hostPlatform.
+            # Evaluate atuin's pinned fenix and crane inputs against this
+            # host's package set (otherwise fenix fetches its own nixpkgs at
+            # eval time). Plain isDarwin/isLinux values ride along in case a
+            # pin still reads the deprecated stdenv aliases.
             compatStdenv = prev.stdenv // {
               isDarwin = prev.stdenv.hostPlatform.isDarwin;
               isLinux = prev.stdenv.hostPlatform.isLinux;
@@ -111,14 +112,10 @@
             inherit caddy;
             atuin = prev.callPackage (atuin + "/atuin.nix") {
               stdenv = compatStdenv;
-              # The fork's atuin.nix builds with crane; point crane at the
-              # toolchain Rust the fork requires.
-              craneLib = atuin.inputs.crane.mkLib (compatPkgs // {
-                rustPlatform = prev.makeRustPlatform {
-                  cargo = atuinToolchain;
-                  rustc = atuinToolchain;
-                };
-              });
+              # The fork's atuin.nix builds with crane. Crane resolves cargo
+              # and rustc from its own scope (never from rustPlatform), so the
+              # pinned toolchain must be injected with overrideToolchain.
+              craneLib = (atuin.inputs.crane.mkLib compatPkgs).overrideToolchain atuinToolchain;
             };
             caddyFull = caddy.withPlugins {
               plugins = [

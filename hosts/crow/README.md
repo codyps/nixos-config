@@ -138,6 +138,57 @@ API key is SOPS-encrypted in `secrets.yaml`; the managed config reads it from
 `/run/secrets/strata-api-key`. Rotating either `strata-api-key` or
 `opencode-password` restarts `opencode-server.service`.
 
+### Sandbox: per-project tool execution in the AI container
+
+The server itself stays on Crow; provider traffic, managed settings,
+sessions, and secrets never enter the container; and the sandbox is
+strictly opt-in per project. The system configuration never loads the
+plugin; `opencode-sandbox.nix` only builds it and registers admin
+commands:
+
+```sh
+sys opencode-sandbox-enable /home/cody/<project>   # sandbox sessions in that project
+sys opencode-sandbox-disable /home/cody/<project>  # un-sandbox them again
+sys opencode-sandbox-check                          # probe the SSH channel to crow-ai
+```
+
+`enable` writes a `plugins` entry into `<project>/.opencode/opencode.json`;
+`disable` removes it. OpenCode hot-reloads project configuration, so both
+take effect immediately, with no rebuild. Only sessions anchored inside an
+enabled project are affected.
+
+In an enabled project, the session's `shell` tool runs as
+`cody-ai@10.80.0.2` over SSH: a `create.before` hook rewrites each command
+to `ssh`, keeping the native output handling, timeouts, and background
+semantics intact. The host-executing filesystem tools (`read`, `write`,
+`edit`, `glob`, `grep`, `patch`, and the worktree create/remove tools) are
+removed for enabled projects; the model performs file operations through
+the sandboxed shell (heredocs, `cat`, `sed`). Orchestration tools
+(`question`, `skill`, `subagent`) stay host-side and do not touch the
+filesystem; subagents inherit the sandboxed toolset. When the container is
+unreachable, sandboxed tools fail closed; they never fall back to
+executing on the host.
+
+Connections authenticate with cody's host key (`~/.ssh/id_ed25519`),
+which `cody-ai` accepts through the shared authorized keys. The
+container's host key is trusted on first use and pinned in
+`/var/lib/opencode/sandbox-known-hosts`; if the container is ever rebuilt
+with a fresh host key, remove that file and restart `opencode-server`.
+
+Host session directories map onto the container's workspace root:
+`/home/cody/<project>` becomes `/home/cody-ai/workspaces/<project>` (the
+shell tool creates the mapped directory on first use), and absolute
+container paths pass through unchanged.
+
+Known limitations: the host-side VCS view (change summaries, diffs)
+reflects the session's host anchor directory rather than the container
+workspace; ask the agent to run `git` commands instead; file operations
+go through shell commands rather than dedicated file tools, so reads do
+not come pre-numbered and edits are plain text replacement; sandboxed
+sessions lose the `patch` and worktree create/remove tools. When a
+newer OpenCode allows declaring per-tool output schemas, dedicated
+SSH-backed file tools can return.
+
 ## AI container
 
 `crow-ai` and `warbler-ai` share [the AI container module](../../nixos-modules/ai-container),

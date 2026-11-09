@@ -13,6 +13,7 @@ in
     ./ai-container.nix
     ../../nixos-modules/codex-remote-control.nix
     ../../nixos-modules/opencode.nix
+    ./opencode-sandbox.nix
     ./hindsight.nix
     ./secure-boot.nix
     ../../nixos-modules/secure-unlock

@@ -95,6 +95,20 @@ assert c.services.hardwareIdentities.templates."etc/systemd/network/10-crow-wifi
 assert lib.hasInfix "Name=wlp6s0" c.services.hardwareIdentities.templates."etc/systemd/network/10-crow-wifi.link".text;
 assert c.sops.secrets.wifi.restartUnits == [ "iwd.service" ];
 assert c.sops.useSystemdActivation;
+# The OpenCode server stays on the host; agent tools run in crow-ai.
+assert c.services.opencode.enable;
+assert c.services.opencode.server.enable;
+assert c.systemd.services ? opencode-server;
+assert !(c.services.opencode.settings ? plugins);
+assert c.programs.adminCommands.commands ? opencode-sandbox-enable;
+assert c.programs.adminCommands.commands ? opencode-sandbox-disable;
+assert lib.hasInfix "tcp://127.0.0.1:49375" c.systemd.services.opencode-tailscale-serve.serviceConfig.ExecStart;
+assert c.sops.secrets.opencode-password.restartUnits == [ "opencode-server.service" ];
+assert !(c.systemd.services ? crow-ai-opencode-secrets);
+assert !(c.containers.crow-ai.bindMounts ? "/run/opencode-secrets");
+assert !(guest.services.opencode.enable or false);
+assert c.systemd.services.opencode-server.serviceConfig.StateDirectory == [ "opencode" ];
+assert c.programs.adminCommands.commands ? opencode-sandbox-check;
 assert c.boot.secureUnlock.remoteUnlock.enable;
 assert c.boot.secureUnlock.tpmUnlock.enable;
 assert c.programs.adminCommands.commands ? setup-secure-boot;
@@ -118,6 +132,8 @@ assert recovery.boot.initrd.systemd.network.networks."20-wifi".networkConfig.DHC
   usbMountBroker = true;
   fuse = true;
   routedContainer = true;
+  opencodeHostServer = true;
+  opencodeSandbox = true;
   sopsIwd = true;
   sealedIwdRecovery = true;
   stagedProvisioning = true;

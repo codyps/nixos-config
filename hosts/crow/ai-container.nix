@@ -1,5 +1,6 @@
 { config, lib, pkgs, hardwareIdentities, ... }:
 {
+  imports = [ ./ai-container-runtime.nix ];
   # These controls are host-wide, not namespaced. Allow per-process profiling
   # (including kernel time) and debugger attachment to same-UID dumpable tasks.
   # System-wide perf and tracing other users still require privileges.
@@ -36,7 +37,7 @@
       isReadOnly = false;
     };
     # nspawn otherwise filters perf_event_open; explicitly permit debugging
-    # syscalls too, without granting cody-ai capabilities or sudo access.
+    # syscalls too.
     extraFlags = [
       "--network-ipvlan=wlp6s0"
       "--network-ipvlan=enp3s0"
@@ -56,6 +57,14 @@
     config = {
       imports = [ ../../nixos-modules/ai-container ];
       networking.hostName = "crow-ai";
+      # Sudo administers the guest within its remapped user namespace.
+      security.sudo = {
+        enable = lib.mkForce true;
+        extraRules = [{
+          users = [ "cody-ai" ];
+          commands = [{ command = "ALL"; options = [ "NOPASSWD" ]; }];
+        }];
+      };
       programs.fuse.enable = true;
       virtualisation.docker.rootless = {
         enable = true;

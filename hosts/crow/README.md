@@ -142,7 +142,8 @@ API key is SOPS-encrypted in `secrets.yaml`; the managed config reads it from
 
 `crow-ai` and `warbler-ai` share [the AI container module](../../nixos-modules/ai-container),
 including guest tools, user services, persistent home, and
-unprivileged `cody-ai` user. Crow has no host-level `cody-ai` account or legacy
+`cody-ai` user, with passwordless sudo enabled specifically on Crow.
+Crow has no host-level `cody-ai` account or legacy
 sandbox service. The container uses veth addresses `10.80.0.1` (host) and
 `10.80.0.2` (guest) for management. L2 ipvlans on Ethernet (`enp3s0`) and Wi-Fi
 provide separate LAN DHCP leases, broadcast/multicast access, and no NAT.
@@ -191,6 +192,34 @@ device into the container. After rebuilding, restart `container@crow-ai` on Crow
 to apply this device access (interrupting guest sessions). In the guest,
 verify `test -r /dev/fuse && test -w /dev/fuse` and `fusermount3 --version`,
 then test a mount with the intended FUSE application.
+
+Crow uses a dedicated launcher in `ai-container-runtime.nix`, rather than the
+standard launcher's shared host Nix mounts. Guest UIDs/GIDs 0 through 1048575
+map to host IDs 1048576 through 2097151. Reserve that host range for this
+container; do not assign it to host accounts or another container. Rootless
+Docker uses guest subordinate IDs 100000 through 165535 within that range.
+ID-mapped mounts preserve existing on-disk ownership of the root, home, and
+scratch files without a recursive chown. Startup requires kernel/filesystem
+support for ID-mapped mounts and fails rather than falling back to unmapped
+root. Crow's Btrfs storage supports these mounts.
+
+The guest runs its own Nix daemon with a writable store, database, profiles,
+and GC roots under host `/var/lib/crow-ai/nix`, persisted on `/persist`.
+The running guest has no host Nix store or daemon socket mounted. A temporary
+user namespace, with the host store read-only and no daemon socket, copies
+the guest system closure before boot. Copies use reflinks where possible,
+never hardlinks to host store files. The guest registers its own system
+closure and roots it before starting services. The daemon's writable-socket
+directory condition now applies to the guest's own state.
+
+Before the first restart, back up the stopped guest root and any Nix user
+profiles needed for recovery. Existing home/application data is retained.
+The private store initially contains the guest system closure; packages
+installed through old user Nix profiles may need reinstalling. Old host-side
+profiles and GC roots are left intact, but are not mounted into the guest.
+The first start needs space for the closure and may take longer; its startup
+timeout is 30 minutes. Future host rebuilds require restarting the container
+to seed and boot the new system; automatic in-place reload is disabled.
 
 ## Installation checkpoints
 

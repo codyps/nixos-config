@@ -45,10 +45,27 @@ assert c.containers.crow-ai.bindMounts."/dev/fuse".hostPath == "/dev/fuse";
 assert !c.containers.crow-ai.bindMounts."/dev/fuse".isReadOnly;
 assert guest.programs.fuse.enable;
 assert guest.security.wrappers.fusermount3.setuid;
-assert guest.users.users.cody-ai.autoSubUidGidRange;
+assert c.containers.crow-ai.privateUsers == 1048576;
+assert !guest.users.users.cody-ai.autoSubUidGidRange;
+assert guest.users.users.cody-ai.subUidRanges == [{ startUid = 100000; count = 65536; }];
+assert guest.users.users.cody-ai.subGidRanges == [{ startGid = 100000; count = 65536; }];
+assert guest.nix.enable && guest.nix.daemon.enable;
+assert builtins.elem "sockets.target" guest.systemd.sockets.nix-daemon.wantedBy;
+assert !c.systemd.services."container@crow-ai".reloadIfChanged;
+assert c.systemd.services."container@crow-ai".serviceConfig.ExecReload == [ ];
 assert guest.systemd.user.services.docker.serviceConfig.Delegate;
 assert lib.hasInfix "DOCKER_HOST=unix:///run/user/1001/docker.sock" guest.environment.etc."environment.d/61-docker.conf".text;
-assert !guest.security.sudo.enable;
+assert guest.security.sudo.enable;
+assert builtins.any
+  (rule:
+  builtins.elem "cody-ai" rule.users &&
+  builtins.any
+    (command:
+      command.command == "ALL" && builtins.elem "NOPASSWD" command.options
+    )
+    rule.commands
+  )
+  guest.security.sudo.extraRules;
 assert c.containers.crow-ai.macvlans == [ ];
 assert !c.networking.nat.enable;
 assert builtins.elem "--network-ipvlan=wlp6s0" c.containers.crow-ai.extraFlags;
@@ -86,6 +103,8 @@ assert recovery.boot.initrd.systemd.network.networks."20-wifi".networkConfig.DHC
   separateSwap = true;
   noHostAiAccount = true;
   rootlessDocker = true;
+  remappedRoot = true;
+  privateNixDaemon = true;
   fuse = true;
   routedContainer = true;
   sopsIwd = true;

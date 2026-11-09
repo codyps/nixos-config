@@ -56,6 +56,16 @@ assert c.systemd.services."container@crow-ai".serviceConfig.ExecReload == [ ];
 assert guest.systemd.user.services.docker.serviceConfig.Delegate;
 assert lib.hasInfix "DOCKER_HOST=unix:///run/user/1001/docker.sock" guest.environment.etc."environment.d/61-docker.conf".text;
 assert guest.security.sudo.enable;
+assert !guest.security.wrappers.mount.enable;
+assert !guest.security.wrappers.umount.enable;
+assert guest.programs.adminCommands.commands ? usb-mount-help;
+assert c.systemd.sockets.crow-ai-usb-mount.socketConfig.SocketUser == "1048576";
+assert c.systemd.sockets.crow-ai-usb-mount.socketConfig.SocketMode == "0600";
+assert c.containers.crow-ai.bindMounts."/run/crow-ai-usb-mount".isReadOnly;
+assert !(c.containers.crow-ai.bindMounts ? "/dev/usb-host");
+assert c.containers.crow-ai.bindMounts."/dev/bus/usb".hostPath == "/dev/crow-ai-usb/bus/usb";
+assert c.containers.crow-ai.bindMounts."/run/crow-ai-usb-devices".isReadOnly;
+assert builtins.elem "multi-user.target" guest.systemd.services.crow-ai-usb-dev-layout.wantedBy;
 assert builtins.any
   (rule:
   builtins.elem "cody-ai" rule.users &&
@@ -105,6 +115,7 @@ assert recovery.boot.initrd.systemd.network.networks."20-wifi".networkConfig.DHC
   rootlessDocker = true;
   remappedRoot = true;
   privateNixDaemon = true;
+  usbMountBroker = true;
   fuse = true;
   routedContainer = true;
   sopsIwd = true;

@@ -1,6 +1,27 @@
 { config, lib, pkgs, hardwareIdentities, ... }:
+let
+  # Host udev mirrors USB nodes into a directory shared with the guest.
+  usbDeviceNode = pkgs.writeShellScript "crow-ai-usb-device" ''
+    set -eu
+    case "$DEVNAME" in
+      /dev/*) node="/dev/crow-ai-usb/''${DEVNAME#/dev/}" ;;
+      *) exit 0 ;;
+    esac
+    if [ "$ACTION" = remove ]; then
+      ${pkgs.coreutils}/bin/rm -f -- "$node"
+      exit 0
+    fi
+    ${pkgs.coreutils}/bin/mkdir -p -- "$(${pkgs.coreutils}/bin/dirname "$node")"
+    kind=c
+    if [ "$SUBSYSTEM" = block ]; then kind=b; fi
+    ${pkgs.coreutils}/bin/rm -f -- "$node"
+    ${pkgs.coreutils}/bin/mknod -m 0600 -- "$node" "$kind" "$MAJOR" "$MINOR"
+    # Translate the AI user's IDs into the host namespace.
+    ${pkgs.coreutils}/bin/chown ${toString (config.containers.crow-ai.privateUsers + 1001)}:${toString (config.containers.crow-ai.privateUsers + 993)} -- "$node"
+  '';
+in
 {
-  imports = [ ./ai-container-runtime.nix ];
+  imports = [ ./ai-container-runtime.nix ./usb-mounts.nix ];
   # These controls are host-wide, not namespaced. Allow per-process profiling
   # (including kernel time) and debugger attachment to same-UID dumpable tasks.
   # System-wide perf and tracing other users still require privileges.
@@ -9,7 +30,8 @@
     "kernel.yama.ptrace_scope" = 0;
   };
   # The guest cannot load the host kernel modules needed by nested Docker or FUSE.
-  boot.kernelModules = [ "overlay" "bridge" "veth" "br_netfilter" "xt_nat" "ip_tables" "iptable_nat" "fuse" ];
+  # Register USB disk majors before systemd resolves the device allowlist.
+  boot.kernelModules = [ "overlay" "bridge" "veth" "br_netfilter" "xt_nat" "ip_tables" "iptable_nat" "fuse" "usb_storage" "uas" "sd_mod" ];
 
   # Primary AI environment; no AI account or sandbox is created on the host.
   # /var/lib is persisted on Crow's encrypted /persist filesystem.
@@ -21,6 +43,15 @@
   # machine name as an authoritative DNS domain, so a machine named "ai" makes
   # lookups such as z.ai and api.z.ai return NXDOMAIN. Keep the machine name
   # distinct from every real TLD.
+  # Keep the directory stable so the running guest sees hotplug updates.
+  systemd.tmpfiles.rules = [
+    "d /dev/crow-ai-usb 0755 root root -"
+    "d /dev/crow-ai-usb/bus/usb 0755 root root -"
+  ];
+  services.udev.extraRules = ''
+    ACTION=="add|change", SUBSYSTEMS=="usb", ENV{MAJOR}!="", ENV{CROW_AI_USB}="1", RUN+="${usbDeviceNode}"
+    ACTION=="remove", ENV{CROW_AI_USB}=="1", RUN+="${usbDeviceNode}"
+  '';
   containers.crow-ai = {
     bindMounts."/run/hardware-identities" = {
       hostPath = "${config.services.hardwareIdentities.stateDirectory}/current/containers/warbler-ai";
@@ -31,7 +62,20 @@
     ephemeral = false;
     # RootlessKit uses a TUN interface inside its user/network namespace.
     enableTun = true;
-    allowedDevices = [{ node = "/dev/fuse"; modifier = "rw"; }];
+    # USB spans many device majors; only USB nodes are mirrored into the guest.
+    allowedDevices = [
+      { node = "/dev/fuse"; modifier = "rw"; }
+      { node = "char-*"; modifier = "rw"; }
+      { node = "block-*"; modifier = "rw"; }
+    ];
+    bindMounts."/run/crow-ai-usb-devices" = {
+      hostPath = "/dev/crow-ai-usb";
+      isReadOnly = true;
+    };
+    bindMounts."/dev/bus/usb" = {
+      hostPath = "/dev/crow-ai-usb/bus/usb";
+      isReadOnly = true;
+    };
     bindMounts."/dev/fuse" = {
       hostPath = "/dev/fuse";
       isReadOnly = false;
@@ -57,6 +101,20 @@
     config = {
       imports = [ ../../nixos-modules/ai-container ];
       networking.hostName = "crow-ai";
+      systemd.services.crow-ai-usb-dev-layout = {
+        description = "Expose USB devices at their normal guest /dev paths";
+        wantedBy = [ "multi-user.target" ];
+        serviceConfig = {
+          ExecStartPre = "${pkgs.python3}/bin/python3 -E -s ${./usb-dev-layout.py} --once";
+          ExecStart = "${pkgs.python3}/bin/python3 -E -s ${./usb-dev-layout.py}";
+          RuntimeDirectory = "crow-ai-usb-layout";
+          RuntimeDirectoryPreserve = "yes";
+          UMask = "0077";
+          NoNewPrivileges = true;
+          Restart = "on-failure";
+          RestartSec = 1;
+        };
+      };
       # Sudo administers the guest within its remapped user namespace.
       security.sudo = {
         enable = lib.mkForce true;

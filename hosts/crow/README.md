@@ -193,6 +193,67 @@ to apply this device access (interrupting guest sessions). In the guest,
 verify `test -r /dev/fuse && test -w /dev/fuse` and `fusermount3 --version`,
 then test a mount with the intended FUSE application.
 
+USB devices use normal kernel device paths with read/write access for
+`cody-ai`: `/dev/sdb1`, `/dev/hidraw0`, `/dev/ttyUSB0`, `/dev/ttyACM0`, and
+`/dev/input/event0`, for example. Raw USB nodes are directly available under
+`/dev/bus/usb`. Host udev maintains a USB-only mirror, bound read-only at
+`/run/crow-ai-usb-devices`; a guest service maintains normal `/dev` links to
+its block and character nodes, including hotplug removal, within about half
+a second. Existing container devices are never overwritten. The raw USB
+directory is a direct bind of the mirror's USB bus directory. Read-only
+binds protect device-node metadata while permitting read/write device I/O.
+Persistent udev aliases such as `/dev/serial/by-id` are not mirrored.
+Internal disks are not mirrored. This grants direct write access to USB disks;
+coordinate host and guest use to avoid corrupting filesystems mounted on the
+host.
+
+`cody-ai` has passwordless sudo for all commands in Crow's container. Check
+with `sudo -n id`. Sudo grants root inside the guest's user namespace.
+The guest's `mount` and `umount` wrappers delegate USB filesystem operations
+to `crow-ai-usb-mount.service` on the host:
+
+```sh
+sudo mkdir -p /mnt/usb
+sudo mount /dev/sdb1 /mnt/usb
+sudo umount /mnt/usb
+```
+
+Substitute the actual device node. `sudo mount -r ...` mounts read-only;
+`-t TYPE` and `-o ro,rw,noatime,relatime,nosuid,nodev,noexec` are supported
+(choose either ro or rw, and either noatime or relatime). Unmounting by the
+`/dev` source path also works. Destinations must be existing empty
+directories under `/mnt` or `/media`, with no symlinks or `..` components.
+Other mount operations use the regular util-linux commands locally.
+
+The broker authenticates the mapped root UID and Crow AI's main user/mount
+namespaces using Unix socket peer credentials. It verifies USB ancestry in
+host sysfs and rejects devices used by host mounts (including Btrfs members
+and mounted sibling partitions), swap, device-mapper/RAID holders, and loop
+devices. Supported types are ext2/3/4, Btrfs, XFS, FAT, exFAT, NTFS via ntfs3,
+ISO9660, and UDF, subject to kernel support; POSIX filesystems require
+ID-mapped mounting support. It always sets `nosuid,nodev,noexec`; arbitrary
+options, bind/remount operations, network filesystems, encrypted/LVM/RAID
+volumes, external journals, multi-device/seed Btrfs, Btrfs with metadata-UUID
+remapping or an already registered host UUID, and forced/lazy unmount requests
+are rejected.
+
+The host creates a detached mount and attaches it directly into the guest
+mount namespace using pinned descriptors. Guest paths are opened with
+`openat2` confined to the guest root and without symlink traversal. No host
+mount propagation channel is shared. The helper records mount IDs privately
+under `/run/crow-ai-usb-mount-state` and only unmounts its own recorded mounts.
+It never runs guest executables as host root. Disk ownership is not rewritten:
+POSIX owners are mapped to guest IDs; FAT-style volumes use `cody-ai` ownership.
+Normal busy mounts fail without lazy detaching. Close files/processes and
+unmount before unplugging; do not move or overmount managed mountpoints.
+
+Native USB filesystems still use the shared host kernel, including its
+filesystem parsers. Host-use checks apply at request time; coordinate host
+mounts and direct raw writes separately. Raw USB I/O and FUSE remain
+available. The guest cannot load host kernel modules directly.
+`sys usb-mount-help` and `/etc/crow-ai-usb-mounts.md` explain this interface
+inside the guest; the login banner and wrapper errors point to that guide.
+
 Crow uses a dedicated launcher in `ai-container-runtime.nix`, rather than the
 standard launcher's shared host Nix mounts. Guest UIDs/GIDs 0 through 1048575
 map to host IDs 1048576 through 2097151. Reserve that host range for this
@@ -212,6 +273,12 @@ never hardlinks to host store files. The guest registers its own system
 closure and roots it before starting services. The daemon's writable-socket
 directory condition now applies to the guest's own state.
 
+The container still shares Crow's kernel, can contact Crow and the LAN, and
+can directly modify exposed USB media. User ID remapping and independent
+Nix remove important host privilege paths, but kernel vulnerabilities and
+explicitly shared resources remain part of the boundary. Other AI containers
+retain the shared default of no sudo and their existing Nix setup.
+
 Before the first restart, back up the stopped guest root and any Nix user
 profiles needed for recovery. Existing home/application data is retained.
 The private store initially contains the guest system closure; packages
@@ -220,6 +287,46 @@ profiles and GC roots are left intact, but are not mounted into the guest.
 The first start needs space for the closure and may take longer; its startup
 timeout is 30 minutes. Future host rebuilds require restarting the container
 to seed and boot the new system; automatic in-place reload is disabled.
+
+After rebuilding, restart `container@crow-ai` (interrupting guest sessions),
+then reconnect existing USB devices to populate the mirror. In the guest,
+check the expected normal device path, such as `ls -l /dev/sdb1`, and its
+read/write permissions. `systemctl status crow-ai-usb-dev-layout` diagnoses
+the normal-path sync service. Device names can change after reconnecting. Later hotplug
+does not require a rebuild. If a newly loaded driver registers a new device
+major, restart the container after connecting it so systemd refreshes its
+device allowlist. USB disk drivers are preloaded to avoid this for storage.
+
+After the remapping transition, verify inside the guest:
+
+```sh
+sudo -n id
+cat /proc/self/uid_map /proc/self/gid_map
+sudo systemctl start nix-daemon.service
+systemctl status nix-daemon.service
+findmnt -T /nix/store
+nix build --no-link nixpkgs#hello
+systemctl --user status docker
+docker run --rm hello-world
+```
+
+The maps should show `0 1048576 1048576`; `sudo` should report guest UID 0.
+On Crow, `systemctl show container@crow-ai -p ExecStart` should reference
+`crow-ai-start`. Check the guest's `/proc/self/mountinfo` for its private Nix
+mount and confirm there are no host database, socket, or per-container
+profile mounts. Builds and evaluation do not establish runtime isolation;
+the first restart must verify the maps, private daemon, Docker, FUSE, and USB
+permissions on Crow. The host broker socket starts before the container;
+rebuild the host and restart `container@crow-ai` to install both ends. With a
+disposable USB filesystem, verify mounting, creating a file (unless read-only),
+and unmounting through the commands above. On Crow inspect
+`journalctl -u crow-ai-usb-mount.service` if the broker cannot start.
+Run `python3 scripts/test-crow-usb-mounts.py` for policy tests and an actual
+mount/unmount test using tmpfs in disposable user/mount namespaces, without
+physical disks. The kernel test skips if unprivileged namespaces are unavailable.
+Runtime regression tests can be run after building with
+`python3 scripts/test-crow-container-runtime.py /nix/store/...-crow-ai-start`,
+using the `ExecStart` path from `nix eval --raw path:.#nixosConfigurations.crow.config.systemd.services.container@crow-ai.serviceConfig.ExecStart`.
 
 ## Installation checkpoints
 

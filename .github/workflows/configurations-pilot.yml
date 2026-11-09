@@ -54,6 +54,8 @@ jobs:
           python3 scripts/test-warbler-install.py
       - name: Test pilot reporting
         run: python3 scripts/test-configuration-pilot.py
+      - name: Test Crow USB mount policy and namespace operations
+        run: python3 scripts/test-crow-usb-mounts.py
       - name: Test Caddy hash updater
         run: python3 scripts/test-update-caddy-hashes.py
       - name: Test macOS image automation

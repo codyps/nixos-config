@@ -234,7 +234,12 @@ in
     serviceConfig = { Type = "oneshot"; RemainAfterExit = true; };
     script = ''
       if [ ! -x ${home}/.local/share/python-default/bin/python ]; then
-        ${pkgs.python3}/bin/python3 -m venv ${home}/.local/share/python-default
+        # --clear also repairs a venv whose interpreter symlink dangles
+        # after the system python's store path changed; without it, venv
+        # fails on the broken existing environment. Packages pip-installed
+        # into it are lost together with the interpreter they were built
+        # for, which is the only recovery in that state anyway.
+        ${pkgs.python3}/bin/python3 -m venv --clear ${home}/.local/share/python-default
       fi
     '';
   };

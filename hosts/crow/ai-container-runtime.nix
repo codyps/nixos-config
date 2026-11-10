@@ -28,6 +28,53 @@ let
     export PATH=${lib.makeBinPath [ pkgs.coreutils ]}
     ${builtins.readFile ./ai-container-seed-nix.sh}
   '';
+  # nspawn overmounts /proc files and directories in every container (masked
+  # /proc/kcore, /proc/keys, /proc/kallsyms, ... plus a read-only /proc/sys).
+  # Those mounts are unlocked at the container's own privilege level, but the
+  # kernel locks them in every child user namespace and then refuses the fresh
+  # per-build /proc remounts that Nix's sandbox performs ("VFS: Mount too
+  # revealing"; see mount_too_revealing() in fs/namespace.c). Remove them so
+  # guest builds keep the unmodified Nix sandbox. This grants nothing: guest
+  # root could unmount them at any time, and the uid remap keeps the masked
+  # nodes protected by DAC (/proc/kcore is 0400 root:root against guest uid
+  # 1048576, and so on).
+  unmaskProc = pkgs.writeShellScript "crow-ai-unmask-proc" ''
+    set -eu
+    # Arguments: [--dry-run] [MOUNTINFO]. --dry-run lists targets instead of
+    # unmounting, for scripts/test-crow-unmask-proc.py.
+    dry_run=false
+    mountinfo=/proc/self/mountinfo
+    if [ "''${1-}" = "--dry-run" ]; then
+      dry_run=true
+      shift
+    fi
+    if [ "$#" -ge 1 ]; then
+      mountinfo=$1
+    fi
+    removed=0
+    left=0
+    # Deepest targets first. Deduplicate whole lines before the numeric
+    # sort: "sort -rn -u" collapses different paths that share a depth
+    # number and would silently leave most overmounts in place.
+    for target in $(${pkgs.gawk}/bin/gawk '$5 ~ /^\/proc\// { print gsub(/\//, "/", $5), $5 }' "$mountinfo" \
+        | ${pkgs.coreutils}/bin/sort -u \
+        | ${pkgs.coreutils}/bin/sort -rn \
+        | ${pkgs.coreutils}/bin/cut -d' ' -f2-); do
+      if $dry_run; then
+        echo "would unmount: $target"
+        removed=$((removed + 1))
+        continue
+      fi
+      if ${pkgs.util-linux}/bin/umount "$target" 2>/dev/null \
+         || ${pkgs.util-linux}/bin/umount -l "$target" 2>/dev/null; then
+        removed=$((removed + 1))
+      else
+        left=$((left + 1))
+        echo "crow-ai-unmask-proc: could not unmount $target" >&2
+      fi
+    done
+    echo "crow-ai-unmask-proc: unmounted $removed mount(s) under /proc, $left remaining"
+  '';
   bindFlags = lib.mapAttrsToList
     (name: mount:
       let
@@ -78,6 +125,23 @@ in
   containers.crow-ai.config = {
     nix.enable = true;
     nix.daemon.enable = true;
+    # Keep Nix's full build sandbox; crow-ai-unmask-proc clears nspawn's
+    # /proc overmounts first so the kernel accepts the sandbox's fresh proc
+    # mounts. If that ever stops working (a future nspawn/systemd change),
+    # fall back to unsandboxed builds with a warning instead of failing:
+    # the nspawn boundary still confines the daemon's nixbld builders.
+    # mkForce overrides NixOS's deliberate sandbox-fallback = false default.
+    nix.settings.sandbox-fallback = lib.mkForce true;
+    systemd.services.crow-ai-unmask-proc = {
+      description = "Clear nspawn's /proc overmounts for nested Nix sandboxes";
+      wantedBy = [ "multi-user.target" ];
+      before = [ "nix-daemon.service" ];
+      serviceConfig = {
+        Type = "oneshot";
+        RemainAfterExit = true;
+        ExecStart = "${unmaskProc}";
+      };
+    };
     users.users.cody-ai = {
       autoSubUidGidRange = lib.mkForce false;
       subUidRanges = [{ startUid = 100000; count = 65536; }];

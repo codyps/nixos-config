@@ -361,6 +361,38 @@ never hardlinks to host store files. The guest registers its own system
 closure and roots it before starting services. The daemon's writable-socket
 directory condition now applies to the guest's own state.
 
+Guest builds use Nix's full, unmodified build sandbox (user, mount, PID,
+IPC, UTS, and network namespaces plus chroot). Two kernel facts make that
+work inside nspawn, where it normally cannot:
+
+- nspawn always overmounts `/proc` files and directories (masked
+  `/proc/kcore`, `/proc/keys`, `/proc/kallsyms`, a read-only `/proc/sys`,
+  and more). Those mounts are unlocked at the container's own privilege
+  level, but the kernel locks every mount when a mount namespace is copied
+  into a child user namespace. Nix's sandbox performs such a copy, and the
+  kernel then refuses its fresh per-build `/proc` remount with "VFS: Mount
+  too revealing" (`mount_too_revealing()` in fs/namespace.c refuses when
+  the visible proc has locked overmounts over non-empty files).
+- Guest root can unmount the overmounts at any time, so they are not a
+  boundary against the ID-remapped container; the uid mapping already
+  protects the masked nodes through DAC (`/proc/kcore` is 0400 root:root
+  against guest uid 1048576).
+
+`crow-ai-unmask-proc.service` therefore removes every overmount under
+`/proc` (deepest first, with a lazy detach for the busy `/proc/sys`)
+before `nix-daemon.service` starts. nspawn recreates the overmounts on
+every container start, and the service clears them on every guest boot.
+A verified sandboxed build sees only its own PID namespace (one process
+visible versus dozens in the container). `sandbox-fallback` stays enabled
+so that if a future systemd/nspawn change ever makes `/proc` uncleanable
+again, builds degrade to unsandboxed with a warning instead of failing;
+the nspawn boundary still confines the daemon's `nixbld` builders.
+
+Rootless Docker containers remain unable to start: runc also mounts a
+fresh proc and sysfs after pivoting away the old root, where no clean
+same-type mount is visible at all, and the guest's `/sys` overmounts stay
+in place. That is independent of the Nix sandbox.
+
 The container still shares Crow's kernel, can contact Crow and the LAN, and
 can directly modify exposed USB media. User ID remapping and independent
 Nix remove important host privilege paths, but kernel vulnerabilities and
@@ -415,6 +447,12 @@ physical disks. The kernel test skips if unprivileged namespaces are unavailable
 Runtime regression tests can be run after building with
 `python3 scripts/test-crow-container-runtime.py /nix/store/...-crow-ai-start`,
 using the `ExecStart` path from `nix eval --raw path:.#nixosConfigurations.crow.config.systemd.services.container@crow-ai.serviceConfig.ExecStart`.
+The same pattern applies to
+`python3 scripts/test-crow-unmask-proc.py /nix/store/...-crow-ai-unmask-proc`
+with the `ExecStart` from
+`...systemd.services.crow-ai-unmask-proc.serviceConfig.ExecStart` inside
+`containers.crow-ai.config`; it checks that the service's target selection
+picks up every /proc overmount, in deepest-first order.
 
 ## Installation checkpoints
 

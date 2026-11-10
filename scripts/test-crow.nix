@@ -50,6 +50,14 @@ assert !guest.users.users.cody-ai.autoSubUidGidRange;
 assert guest.users.users.cody-ai.subUidRanges == [{ startUid = 100000; count = 65536; }];
 assert guest.users.users.cody-ai.subGidRanges == [{ startGid = 100000; count = 65536; }];
 assert guest.nix.enable && guest.nix.daemon.enable;
+# Guest builds keep Nix's sandbox: crow-ai-unmask-proc clears nspawn's /proc
+# overmounts before nix-daemon starts, so the kernel accepts the sandbox's
+# fresh per-build proc mounts. Degrade, not fail, if that ever breaks.
+assert guest.nix.settings.sandbox;
+assert guest.nix.settings.sandbox-fallback;
+assert guest.systemd.services.crow-ai-unmask-proc.before == [ "nix-daemon.service" ];
+assert builtins.elem "multi-user.target" guest.systemd.services.crow-ai-unmask-proc.wantedBy;
+assert lib.hasInfix "crow-ai-unmask-proc" guest.systemd.services.crow-ai-unmask-proc.serviceConfig.ExecStart;
 assert builtins.elem "sockets.target" guest.systemd.sockets.nix-daemon.wantedBy;
 assert !c.systemd.services."container@crow-ai".reloadIfChanged;
 assert c.systemd.services."container@crow-ai".serviceConfig.ExecReload == [ ];

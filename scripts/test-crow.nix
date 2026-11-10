@@ -67,6 +67,10 @@ assert lib.hasInfix "--bind-ro=/run/crow-ai-sysfs-seed:/run/host/sysfs-seed"
   (builtins.readFile c.systemd.services."container@crow-ai".serviceConfig.ExecStart);
 assert lib.any (line: lib.hasInfix "crow-ai-sysfs-seed" (builtins.readFile line))
   c.systemd.services."container@crow-ai".serviceConfig.ExecStartPre;
+# USB events are replayed at container start so the guest's raw /dev/bus/usb
+# view (libusb access) starts complete without replugging devices.
+assert lib.any (line: lib.hasInfix "udevadm trigger --subsystem-match=usb --action=add --wait" (builtins.readFile line))
+  c.systemd.services."container@crow-ai".serviceConfig.ExecStartPre;
 assert guest.systemd.user.services.docker.serviceConfig.Delegate;
 assert lib.hasInfix "DOCKER_HOST=unix:///run/user/1001/docker.sock" guest.environment.etc."environment.d/61-docker.conf".text;
 assert guest.security.sudo.enable;

@@ -417,8 +417,10 @@ The first start needs space for the closure and may take longer; its startup
 timeout is 30 minutes. Future host rebuilds require restarting the container
 to seed and boot the new system; automatic in-place reload is disabled.
 
-After rebuilding, restart `container@crow-ai` (interrupting guest sessions),
-then reconnect existing USB devices to populate the mirror. In the guest,
+After rebuilding, restart `container@crow-ai` (interrupting guest sessions).
+The restart replays USB device events into the mirror, so the guest's raw
+`/dev/bus/usb` view and libusb access start complete without reconnecting
+devices; later hotplug propagates normally. In the guest,
 check the expected normal device path, such as `ls -l /dev/sdb1`, and its
 read/write permissions. `systemctl status crow-ai-usb-dev-layout` diagnoses
 the normal-path sync service. Device names can change after reconnecting. Later hotplug

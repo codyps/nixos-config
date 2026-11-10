@@ -199,6 +199,14 @@ in
       if [ "$(${pkgs.util-linux}/bin/findmnt -n -o FSTYPE -T /var/lib/crow-ai/tmp)" = btrfs ]; then
         ${pkgs.e2fsprogs}/bin/chattr +C /var/lib/crow-ai/tmp
       fi
+      # Replay USB device events so the udev mirror starts complete. Rules
+      # only run on events: devices enumerated before the mirror rule first
+      # loaded (rule deployed mid-boot, or the mirror directory recreated)
+      # would otherwise stay invisible to the guest's raw /dev/bus/usb view
+      # and libusb-style access until replugged. The same events fire during
+      # normal boot coldplug, so this is idempotent; --wait ensures udevd has
+      # processed them before the container binds the mirror.
+      ${pkgs.systemd}/bin/udevadm trigger --subsystem-match=usb --action=add --wait
     '';
   };
   # Override systemd's 80-container-ve.network, which otherwise replaces

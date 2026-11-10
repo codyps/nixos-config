@@ -14,6 +14,7 @@ in
     ../../nixos-modules/codex-remote-control.nix
     ../../nixos-modules/opencode.nix
     ./opencode-sandbox.nix
+    ./opencode-container.nix
     ./hindsight.nix
     ./secure-boot.nix
     ../../nixos-modules/secure-unlock
@@ -38,13 +39,14 @@ in
   sops.secrets.opencode-password = {
     sopsFile = ./secrets.yaml;
     mode = "0400";
-    restartUnits = [ "opencode-server.service" ];
+    # Consumed by both the host server and the crow-ai container's server.
+    restartUnits = [ "opencode-server.service" "crow-ai-opencode-secrets.service" ];
   };
   sops.secrets.strata-api-key = {
     sopsFile = ./secrets.yaml;
     mode = "0400";
     owner = "cody";
-    restartUnits = [ "opencode-server.service" ];
+    restartUnits = [ "opencode-server.service" "crow-ai-opencode-secrets.service" ];
   };
   # Managed settings live in /etc/opencode; OpenCode does not write to them.
   services.opencode = {

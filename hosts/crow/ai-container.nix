@@ -63,8 +63,10 @@ in
     # RootlessKit uses a TUN interface inside its user/network namespace.
     enableTun = true;
     # USB spans many device majors; only USB nodes are mirrored into the guest.
+    # /dev/fuse needs "m": nspawn creates the node inside the container,
+    # under this unit's device cgroup filter.
     allowedDevices = [
-      { node = "/dev/fuse"; modifier = "rw"; }
+      { node = "/dev/fuse"; modifier = "rwm"; }
       { node = "char-*"; modifier = "rw"; }
       { node = "block-*"; modifier = "rw"; }
     ];

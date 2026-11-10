@@ -34,7 +34,9 @@ let
         flag = if mount.isReadOnly then "--bind-ro" else "--bind";
         source = if mount.hostPath == null then mount.mountPoint else mount.hostPath;
         # The scratch filesystem and root-only hardware template need their
-        # original ownership translated. Device nodes already have mapped UIDs.
+        # original ownership translated. Device nodes already have mapped
+        # UIDs. Staged OpenCode secrets are owned by container-mapped UIDs
+        # already, so a plain bind resolves them correctly in the guest.
         mapping = lib.optionalString (name == "/tmp" || name == "/run/hardware-identities") ":idmap";
       in
       "${flag}=${source}:${mount.mountPoint}${mapping}"

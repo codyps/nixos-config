@@ -189,6 +189,43 @@ sessions lose the `patch` and worktree create/remove tools. When a
 newer OpenCode allows declaring per-tool output schemas, dedicated
 SSH-backed file tools can return.
 
+### OpenCode server in the AI container
+
+A second OpenCode server runs entirely inside `crow-ai` as `cody-ai`,
+listening on the private container link at `10.80.0.2:49375`. Everything
+it does happens in the container by construction; the sandbox plugin is
+not loaded there. The host exposes it at
+`https://crow.little-moth.ts.net:8444` (the host server keeps 8443), and
+tailnet clients can also reach `http://10.80.0.2:49375` directly through
+the advertised `10.80.0.2/32` route. It uses the same `opencode-password`
+secret as the host server:
+
+```sh
+OPENCODE_PASSWORD="$(sudo cat /run/secrets/opencode-password)" \
+  opencode --server https://crow.little-moth.ts.net:8444
+```
+
+Both secrets stay SOPS-encrypted on Crow (`secrets.yaml`) and are staged
+by `crow-ai-opencode-secrets.service` into
+`/var/lib/crow-ai/opencode-secrets` with container-mapped ownership, then
+bind-mounted read-only and id-mapped into the guest at
+`/run/opencode-secrets`. Rotating either `strata-api-key` or
+`opencode-password` restages the files and restarts the in-container
+daemon via `systemctl --machine=crow-ai`; the host relays need no restart.
+The bind mount set is a container boundary: changes require restarting
+`container@crow-ai`, which interrupts guest sessions.
+
+The container has no tailscaled, so MagicDNS names such as the Strata
+backend are answered by Crow's resolver on `10.80.0.1:53` on the private
+link, and `100.64.0.0/10` routes through Crow. Return traffic rides the
+advertised `10.80.0.2/32` subnet route; no NAT is involved. After
+activation, verify from Crow with
+`systemd-run -M crow-ai --pipe getent hosts desktop-lgmeaa4.little-moth.ts.net`.
+
+Choose the host server when you want provider traffic and configuration
+on Crow with optional per-project sandboxing (above); choose this one
+when the whole session, tools included, should live in the container.
+
 ## AI container
 
 `crow-ai` and `warbler-ai` share [the AI container module](../../nixos-modules/ai-container),

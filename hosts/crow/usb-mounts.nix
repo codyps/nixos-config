@@ -67,11 +67,20 @@ in
     assertion = uidBase == 1048576;
     message = "Crow's USB mount broker requires the reserved crow-ai UID mapping.";
   }];
+  # systemd resolves SocketUser through NSS and does not accept a raw
+  # numeric UID there, so hold the reserved crow-ai mapping base with a
+  # real account and reference it by name; socket ownership is unchanged.
+  users.groups.crow-ai-usb.gid = uidBase;
+  users.users.crow-ai-usb = {
+    isSystemUser = true;
+    group = "crow-ai-usb";
+    uid = uidBase;
+  };
   systemd.sockets.crow-ai-usb-mount = {
     wantedBy = [ "sockets.target" ];
     socketConfig = {
       ListenStream = "/run/crow-ai-usb-mount/control.sock";
-      SocketUser = toString uidBase;
+      SocketUser = "crow-ai-usb";
       SocketMode = "0600";
       DirectoryMode = "0755";
       RemoveOnStop = true;

@@ -194,7 +194,12 @@ SSH-backed file tools can return.
 A second OpenCode server runs entirely inside `crow-ai` as `cody-ai`,
 listening on the private container link at `10.80.0.2:49375`. Everything
 it does happens in the container by construction; the sandbox plugin is
-not loaded there. The host exposes it at
+not loaded there. Cody's OpenCode plugins do load there: Crow's
+`/home/cody/.config/opencode/plugins` is bind-mounted read-only at
+`/run/opencode-plugins`, and `cody-ai`'s own
+`~/.config/opencode/opencode.json` lists them; it is seeded by guest
+activation if missing, then editable, and deliberately outside the
+managed `/etc/opencode` settings. The host exposes it at
 `https://crow.little-moth.ts.net:8444` (the host server keeps 8443), and
 tailnet clients can also reach `http://10.80.0.2:49375` directly through
 the advertised `10.80.0.2/32` route. It uses the same `opencode-password`
@@ -212,7 +217,10 @@ bind-mounted read-only and id-mapped into the guest at
 `/run/opencode-secrets`. Rotating either `strata-api-key` or
 `opencode-password` restages the files and restarts the in-container
 daemon via `systemctl --machine=crow-ai`; the host relays need no restart.
-The bind mount set is a container boundary: changes require restarting
+Edit plugin code as `cody` on Crow and apply it with
+`systemctl --machine=crow-ai try-restart opencode-server.service`; edit
+the plugin list inside the container as `cody-ai` the same way. The
+bind mount set is a container boundary: changes require restarting
 `container@crow-ai`, which interrupts guest sessions.
 
 The container has no tailscaled, so MagicDNS names such as the Strata

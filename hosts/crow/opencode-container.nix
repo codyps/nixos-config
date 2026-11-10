@@ -3,7 +3,11 @@
 # The host server (services.opencode in configuration.nix) stays untouched,
 # including its optional per-project sandbox plugin. This server runs in
 # the guest as cody-ai, so everything it does happens inside the container
-# by construction; no plugin is loaded there. It listens on the private
+# by construction. Cody's plugins from /home/cody/.config/opencode/plugins
+# are bind-mounted read-only at /run/opencode-plugins and listed in
+# cody-ai's own editable user config, seeded below; nothing plugin-related
+# is baked into the managed /etc settings, and the sandbox plugin is not
+# loaded here. It listens on the private
 # container link at 10.80.0.2:49375 and is exposed as
 # https://crow.little-moth.ts.net:8444 through a Tailscale Serve relay on
 # the host. Tailnet clients can also reach http://10.80.0.2:49375
@@ -30,6 +34,25 @@ let
   # host-side user-namespace range, for staging secrets the guest can read.
   aiUid = toString (config.containers.crow-ai.privateUsers + 1001);
   aiGid = toString (config.containers.crow-ai.privateUsers + 993);
+  # Guest copy of cody's plugin list (see /home/cody/.config/opencode/
+  # opencode.json on Crow), with paths rebased to the read-only /run mount
+  # below. Seeded into cody-ai's home once and never overwritten, so the
+  # list stays editable inside the container.
+  userConfig = pkgs.writeText "opencode-user-config.json" (builtins.toJSON {
+    "$schema" = "https://opencode.ai/config.json";
+    plugins = [
+      "/run/opencode-plugins/pareto-cost"
+      {
+        package = "/run/opencode-plugins/zai-plan-cost";
+        options = {
+          monthlyPrice = 64;
+          weeklyCredits = 60000;
+        };
+      }
+      "/run/opencode-plugins/peak-hours"
+      "/run/opencode-plugins/zai-quota"
+    ];
+  });
 in
 {
   systemd.services.crow-ai-opencode-secrets = {
@@ -61,6 +84,14 @@ in
 
   containers.crow-ai.bindMounts."/run/opencode-secrets" = {
     hostPath = "/var/lib/crow-ai/opencode-secrets";
+    isReadOnly = true;
+  };
+
+  # Live plugin sources, shared with the host server's user config: edits
+  # as cody on Crow apply after restarting the guest daemon. Like the
+  # secrets mount, this is part of the container's bind mount boundary.
+  containers.crow-ai.bindMounts."/run/opencode-plugins" = {
+    hostPath = "/home/cody/.config/opencode/plugins";
     isReadOnly = true;
   };
 
@@ -100,6 +131,19 @@ in
         hostname = "10.80.0.2";
         passwordFile = "/run/opencode-secrets/opencode-password";
       };
+    };
+    # Seed cody-ai's editable OpenCode user config (the plugin list) once;
+    # activation never overwrites it afterwards. Mirrors the codex-config
+    # seeding pattern, including runuser's users/etc dependencies.
+    system.activationScripts.seedOpencodeUserConfig = {
+      deps = [ "users" "etc" ];
+      text = ''
+        if [ ! -e /home/cody-ai/.config/opencode/opencode.json ]; then
+          ${pkgs.util-linux}/bin/runuser -u cody-ai -- \
+            ${pkgs.coreutils}/bin/install -D -m 0644 \
+            ${userConfig} /home/cody-ai/.config/opencode/opencode.json
+        fi
+      '';
     };
     # Reach tailnet CGNAT addresses (including the Strata backend)
     # through Crow; the resolver below handles MagicDNS names.

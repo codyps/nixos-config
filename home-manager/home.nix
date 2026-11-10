@@ -37,6 +37,7 @@
     pkgs.universal-ctags
     pkgs.watch
     pkgs.yt-dlp
+    pkgs.opencode
 
   ];
 }

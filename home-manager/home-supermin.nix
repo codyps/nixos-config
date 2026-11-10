@@ -7,6 +7,7 @@ let
     else
       ".cache"
   ;
+  direnvHooks = import ../lib/direnv.nix { inherit pkgs; };
 in
 {
   imports = [ ./ca-trust.nix ./git-emdash-hook.nix ./codex-config.nix ./gpg-agent-forwarding.nix ];
@@ -33,9 +34,7 @@ in
     # cursor only invokes `~/.zshenv`, so we put things that need to be in the environment there, and things that should only be in interactive shells in `~/.zshrc`
     envExtra =
       if config.programs.direnv.enable then
-        ''
-          eval "$(${pkgs.direnv}/bin/direnv hook zsh)"
-        ''
+        direnvHooks.zshHook
       else
         "";
   };

@@ -7,6 +7,7 @@ let
     else
       ".cache"
   ;
+  direnvHooks = import ../lib/direnv.nix { inherit pkgs; };
 in
 {
   imports = [ ./ca-trust.nix ./git-emdash-hook.nix ./atuin.nix ./codex-config.nix ./gpg-agent-forwarding.nix ];
@@ -28,7 +29,10 @@ in
       size = 20000;
       share = false;
     };
-    initContent = (builtins.readFile ../config/.zshrc);
+    initContent = lib.mkMerge [
+      (builtins.readFile ../config/.zshrc)
+      (lib.mkAfter direnvHooks.zshHook)
+    ];
 
     envExtra = ''
       if [ -x /opt/homebrew/bin/brew ]; then
@@ -42,7 +46,7 @@ in
         unsetopt equals
       fi
       if [ -n "$CLAUDECODE" ] && command -v direnv >/dev/null 2>&1; then
-        eval "$(${pkgs.direnv}/bin/direnv hook zsh)"
+        ${direnvHooks.zshHook}
         eval "$(DIRENV_LOG_FORMAT= ${pkgs.direnv}/bin/direnv export zsh)"
       fi
     '';
@@ -68,7 +72,7 @@ in
 
     bashrcExtra = ''
       if [ -n "$CLAUDECODE" ] && command -v direnv >/dev/null 2>&1; then
-        eval "$(${pkgs.direnv}/bin/direnv hook bash)"
+        ${direnvHooks.bashHook}
         eval "$(DIRENV_LOG_FORMAT= ${pkgs.direnv}/bin/direnv export bash)"
       fi
     '';
@@ -252,6 +256,9 @@ in
 
   programs.direnv = {
     enable = true;
+    # The stock zsh hook restarts interrupted loads (see lib/direnv.nix);
+    # the patched hook is installed in programs.zsh.initContent instead.
+    enableZshIntegration = false;
     nix-direnv.enable = true;
   };
 

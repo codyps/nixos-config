@@ -388,10 +388,19 @@ so that if a future systemd/nspawn change ever makes `/proc` uncleanable
 again, builds degrade to unsandboxed with a warning instead of failing;
 the nspawn boundary still confines the daemon's `nixbld` builders.
 
-Rootless Docker containers remain unable to start: runc also mounts a
-fresh proc and sysfs after pivoting away the old root, where no clean
-same-type mount is visible at all, and the guest's `/sys` overmounts stay
-in place. That is independent of the Nix sandbox.
+Rootless Docker containers additionally need a sysfs instance at a
+superblock root: nspawn presents a user-namespaced container's `/sys` as a
+tmpfs with read-only subtree binds, so the kernel's visibility check
+denies every fresh sysfs mount in child user namespaces, and runc fails
+starting containers ("error mounting sysfs"). A userns container cannot
+bootstrap its own first sysfs instance. The launcher therefore prepares an
+**empty sysfs seed**: a sysfs instance mounted on the host for a dedicated
+throwaway network namespace (it lists only `lo`, disclosing nothing),
+bound read-only into the guest at `/run/host/sysfs-seed`. runc mounts each
+container's sysfs read-only via the classic `mount(2)` path, which the
+read-only seed satisfies; containers then see their own network
+namespace's sysfs, not the host's. The seed's network namespace and mount
+persist across container restarts and are recreated on host reboot.
 
 The container still shares Crow's kernel, can contact Crow and the LAN, and
 can directly modify exposed USB media. User ID remapping and independent

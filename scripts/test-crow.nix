@@ -61,6 +61,12 @@ assert lib.hasInfix "crow-ai-unmask-proc" guest.systemd.services.crow-ai-unmask-
 assert builtins.elem "sockets.target" guest.systemd.sockets.nix-daemon.wantedBy;
 assert !c.systemd.services."container@crow-ai".reloadIfChanged;
 assert c.systemd.services."container@crow-ai".serviceConfig.ExecReload == [ ];
+# The launcher binds the empty sysfs seed into the guest so nested user
+# namespaces (rootless Docker/runc) can mount their own sysfs instances.
+assert lib.hasInfix "--bind-ro=/run/crow-ai-sysfs-seed:/run/host/sysfs-seed"
+  (builtins.readFile c.systemd.services."container@crow-ai".serviceConfig.ExecStart);
+assert lib.any (line: lib.hasInfix "crow-ai-sysfs-seed" (builtins.readFile line))
+  c.systemd.services."container@crow-ai".serviceConfig.ExecStartPre;
 assert guest.systemd.user.services.docker.serviceConfig.Delegate;
 assert lib.hasInfix "DOCKER_HOST=unix:///run/user/1001/docker.sock" guest.environment.etc."environment.d/61-docker.conf".text;
 assert guest.security.sudo.enable;

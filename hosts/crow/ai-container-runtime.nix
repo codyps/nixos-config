@@ -23,6 +23,20 @@ let
     exec ${cfg.path}/init
   '';
   closure = pkgs.closureInfo { rootPaths = [ guestEntry ]; };
+  # An empty sysfs instance mounted for a dedicated network namespace, bound
+  # read-only into the guest so nested user namespaces can mount sysfs.
+  # nspawn presents a user-namespaced container's /sys as a tmpfs with
+  # read-only subtree binds, so no sysfs exists at a superblock root and the
+  # kernel's mount_too_revealing() check refuses every fresh sysfs mount in
+  # any child user namespace ("VFS: Mount too revealing"). Rootless Docker
+  # containers fail to start on exactly that: runc mounts a per-network-
+  # namespace sysfs read-only with the classic mount(2) call. The seed is an
+  # instance created for a throwaway network namespace (it lists only "lo"),
+  # so it discloses nothing and, being read-only, satisfies runc's
+  # MS_RDONLY request while leaving the guest's own curated /sys untouched.
+  sysfsSeed = "/run/crow-ai-sysfs-seed";
+  sysfsSeedNetns = "crow-ai-sysfs-seed";
+  sysfsSeedGuestPath = "/run/host/sysfs-seed";
   seed = pkgs.writeShellScript "crow-ai-seed-nix" ''
     set -euo pipefail
     export PATH=${lib.makeBinPath [ pkgs.coreutils ]}
@@ -114,6 +128,7 @@ let
       --private-network --network-veth \
       --bind=${privateNix}:/nix:idmap \
       --bind-ro=${closure}:/run/crow-nix-closure:idmap \
+      --bind-ro=${sysfsSeed}:${sysfsSeedGuestPath} \
       ${lib.escapeShellArgs bindFlags} \
       ${lib.escapeShellArgs cfg.extraFlags} \
       ${guestEntry}
@@ -156,6 +171,17 @@ in
     unitConfig.RequiresMountsFor = [ privateNix ];
     preStart = lib.mkAfter ''
       ${pkgs.coreutils}/bin/install -d -m 0755 ${privateNix}
+      # Prepare the empty sysfs seed (see the sysfsSeed comment above).
+      # nsenter rather than ip netns exec: the mount must land in this mount
+      # namespace, and ip netns exec would unshare a throwaway one. The
+      # network namespace and mount persist across container restarts and
+      # are recreated after host reboots.
+      ${pkgs.iproute2}/bin/ip netns add ${sysfsSeedNetns} 2>/dev/null || true
+      ${pkgs.coreutils}/bin/mkdir -p ${sysfsSeed}
+      if ! ${pkgs.util-linux}/bin/findmnt -rn -t sysfs -M ${sysfsSeed} >/dev/null; then
+        ${pkgs.util-linux}/bin/nsenter --net=/run/netns/${sysfsSeedNetns} \
+          ${pkgs.util-linux}/bin/mount -t sysfs sysfs ${sysfsSeed}
+      fi
     '';
   };
 }

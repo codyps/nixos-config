@@ -65,6 +65,10 @@ class CrowContainerRuntimeTests(unittest.TestCase):
             self.assertFalse(any(arg.startswith("--bind=/nix/store") for arg in bootstrap))
             self.assertIn("--bind=/var/lib/crow-ai/nix:/nix:idmap", guest)
             self.assertIn("--network-veth", guest)
+            # The empty sysfs seed lets nested user namespaces mount sysfs
+            # (rootless Docker/runc); only the boot invocation needs it.
+            self.assertIn("--bind-ro=/run/crow-ai-sysfs-seed:/run/host/sysfs-seed", guest)
+            self.assertFalse(any("sysfs-seed" in arg for arg in bootstrap))
             self.assertFalse(any(arg.startswith(("--bind=/nix/", "--bind-ro=/nix/store:")) for arg in guest))
             self.assertFalse(any("profiles/per-container" in arg for arg in guest))
 

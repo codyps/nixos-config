@@ -43,6 +43,19 @@
           checkFlags = (old.checkFlags or [ ]) ++ [ "--skip=utils::tests::should_canonicalize" ];
         })
     else prev.cargo-generate;
+
+  # The OpenCode server rejects clients newer than itself, so the servers on
+  # crow (host and crow-ai container) and the home-manager CLI installs must
+  # not trail upstream releases. Track the newest tag (nixpkgs/opencode.nix)
+  # until the nixpkgs pins catch up. Upstream's 2.x line dropped x86_64-darwin
+  # from meta.platforms, so u3's Intel pin keeps its supported 1.15.10; its
+  # older clients can still talk to the newer servers.
+  opencode =
+    if prev.stdenv.hostPlatform.system == "x86_64-darwin" then
+      prev.opencode
+    else if prev.lib.versionOlder prev.opencode.version "2.2.7" then
+      final.callPackage ../opencode.nix { }
+    else prev.opencode;
 } // prev.lib.packagesFromDirectoryRecursive {
   inherit (final) callPackage;
   directory = ./pkgs;

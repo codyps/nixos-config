@@ -137,6 +137,12 @@ assert c.containers.crow-ai.bindMounts."/run/opencode-secrets".hostPath == "/var
 assert c.containers.crow-ai.bindMounts."/run/opencode-secrets".isReadOnly;
 assert lib.hasInfix "10.80.0.2:49375" c.systemd.services.opencode-container-tailscale-https.serviceConfig.ExecStart;
 assert lib.hasInfix "--https=8444" c.systemd.services.opencode-container-tailscale-https.serviceConfig.ExecStart;
+# sys opencode-pair mints links through the running servers' pairing API;
+# `opencode pair` rejects --server and only pairs the background service.
+assert c.programs.adminCommands.commands ? opencode-pair;
+assert lib.hasInfix "origin=http://127.0.0.1:49375" (builtins.readFile (builtins.head c.programs.adminCommands.commands.opencode-pair));
+assert lib.hasInfix "origin=http://10.80.0.2:49375" (builtins.readFile (builtins.head c.programs.adminCommands.commands.opencode-pair));
+assert lib.hasInfix "public=https://crow.little-moth.ts.net:8444" (builtins.readFile (builtins.head c.programs.adminCommands.commands.opencode-pair));
 assert guest.systemd.network.networks."10-ai".routes == [ { Gateway = "10.80.0.1"; Destination = "100.64.0.0/10"; } ];
 assert guest.services.resolved.settings.Resolve.DNS == "10.80.0.1";
 assert guest.services.resolved.settings.Resolve.Domains == "~little-moth.ts.net";
@@ -172,6 +178,7 @@ assert recovery.boot.initrd.systemd.network.networks."20-wifi".networkConfig.DHC
   opencodeHostServer = true;
   opencodeSandbox = true;
   opencodeContainerServer = true;
+  opencodePairCommand = true;
   sopsIwd = true;
   sealedIwdRecovery = true;
   stagedProvisioning = true;

@@ -15,6 +15,7 @@ in
     ../../nixos-modules/opencode.nix
     ./opencode-sandbox.nix
     ./opencode-container.nix
+    ./opencode-pair.nix
     ./hindsight.nix
     ./secure-boot.nix
     ../../nixos-modules/secure-unlock

@@ -120,13 +120,16 @@ OPENCODE_PASSWORD="$(sudo cat /run/secrets/opencode-password)" \
   opencode --server https://crow.little-moth.ts.net:8443
 ```
 
-For a browser or app pairing link, keep the same server and add the public URL:
+For a browser or app pairing link, run:
 
 ```sh
-OPENCODE_PASSWORD="$(sudo cat /run/secrets/opencode-password)" \
-  opencode --server http://127.0.0.1:49375 \
-  pair --url https://crow.little-moth.ts.net:8443
+sudo sys opencode-pair host
 ```
+
+`opencode pair` only pairs the caller's shared background service and
+rejects `--server`, so the helper mints the single-use code through the
+running server's pairing API instead and prints a
+`https://crow.little-moth.ts.net:8443/auth/connect/...` link.
 
 OpenCode reads managed configuration from `/etc/opencode/opencode.json`
 (rendered from `services.opencode.settings`) with the highest precedence.
@@ -209,6 +212,10 @@ secret as the host server:
 OPENCODE_PASSWORD="$(sudo cat /run/secrets/opencode-password)" \
   opencode --server https://crow.little-moth.ts.net:8444
 ```
+
+For a pairing link to the container server, run `sudo sys opencode-pair
+container`, which prints a one-time
+`https://crow.little-moth.ts.net:8444/auth/connect/...` link.
 
 Both secrets stay SOPS-encrypted on Crow (`secrets.yaml`) and are staged
 by `crow-ai-opencode-secrets.service` into

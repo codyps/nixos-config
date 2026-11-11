@@ -1,4 +1,4 @@
-{ lib, rustPlatform, fetchFromGitHub, pkg-config, git, cacert }:
+{ lib, rustPlatform, fetchFromGitHub, pkg-config, git, cacert, aws-lc, openssl, zstd }:
 
 rustPlatform.buildRustPackage rec {
   pname = "mbx";
@@ -13,6 +13,10 @@ rustPlatform.buildRustPackage rec {
 
   cargoHash = "sha256-qkoWANkbFqkwW3BP6j16K0EOnYYMly6v9YgFnkuzQvA=";
   nativeBuildInputs = [ pkg-config ];
+  # nixpkgs' cargo setup hook now forces system libraries: zstd-sys probes
+  # pkg-config instead of falling back, openssl-sys refuses to vendor, and
+  # aws-lc-sys requires a system AWS-LC. Supply each crate's library.
+  buildInputs = [ aws-lc openssl zstd ];
   nativeCheckInputs = [ git ];
   cargoBuildFlags = [ "-p" "mbx" ];
   # Keep local Intel Mac builds practical while retaining release optimization.

@@ -110,7 +110,14 @@
           in
           {
             inherit caddy;
-            dedupit = dedupit.packages.${prev.stdenv.hostPlatform.system}.dedupit;
+            # nixpkgs' cargo setup hook now forces system libraries, so
+            # libsqlite3-sys links -lsqlite3 instead of vendoring SQLite.
+            # dedupit's own expression predates that and ships no library.
+            dedupit =
+              (dedupit.packages.${prev.stdenv.hostPlatform.system}.dedupit).overrideAttrs
+                (old: {
+                  buildInputs = (old.buildInputs or [ ]) ++ [ prev.sqlite ];
+                });
             atuin = prev.callPackage (atuin + "/atuin.nix") {
               stdenv = compatStdenv;
               # The fork's atuin.nix builds with crane. Crane resolves cargo
@@ -355,7 +362,7 @@
           } // pkgs.lib.optionalAttrs pkgs.stdenv.hostPlatform.isDarwin {
             claude-quota-bar = pkgs.claude-quota-bar;
           } // pkgs.lib.optionalAttrs pkgs.stdenv.hostPlatform.isLinux {
-            dedupit = dedupit.packages.${system}.dedupit;
+            dedupit = pkgs.dedupit;
             actions-vm-scaler = pkgs.callPackage ./nixpkgs/actions-vm-scaler.nix { };
             luks-volume-key-id = pkgs.callPackage ./scripts/luks-volume-key-id.nix { };
             # Refresh both platform-independent source bundles on Linux CI.

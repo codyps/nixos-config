@@ -53,6 +53,11 @@ creation_rules:
   - path_regex: hosts/crow/hindsight-secrets\.json$
     age:
     - *host_crow
+  # Restic backup endpoint configuration shares the age-only constraint of
+  # hindsight-secrets.json; the repository password itself never leaves Crow.
+  - path_regex: hosts/crow/backup-secrets\.yaml$
+    age:
+    - *host_crow
   - path_regex: hosts/crow/secrets\.yaml$
     pgp:
     - *admin_cody

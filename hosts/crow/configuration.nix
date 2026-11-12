@@ -17,6 +17,7 @@ in
     ./opencode-container.nix
     ./opencode-pair.nix
     ./hindsight.nix
+    ./backup.nix
     ./secure-boot.nix
     ../../nixos-modules/secure-unlock
     ../../nixos-modules/ms-a2-power-led

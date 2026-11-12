@@ -7,6 +7,10 @@ and activity history on Crow and Warbler; add `--json` for raw records.
 `sudo sys dedupit-compact` rebuilds the index using its configured storage policy
 while preserving scan progress. Stop `dedupit.service` first and restart it after
 compaction; the native command refuses a live service/index.
+Crow exposes `sudo sys setup-backup-keys` (subcommands `generate`, `enter`,
+`show`) to provision the TPM-sealed restic backup credentials and
+`sudo sys backup-now` to start the TrueNAS backup immediately; see the Crow
+README's Backups section.
 
 For example, Warbler exposes `sudo sys setup-luks-tpm-unlock`; u3 exposes
 `sudo sys nix-maintenance`. Commands are available after rebuilding and activating

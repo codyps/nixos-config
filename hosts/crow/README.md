@@ -241,6 +241,72 @@ Choose the host server when you want provider traffic and configuration
 on Crow with optional per-project sandboxing (above); choose this one
 when the whole session, tools included, should live in the container.
 
+## Backups
+
+Restic backs up `/persist` and `/home` to the TrueNAS REST server. The
+endpoint (`https://restic.terni.einic.org/cody/1`) and username are
+SOPS-encrypted in `backup-secrets.yaml` (age-only to Crow's SSH identity,
+like `hindsight-secrets.json`); edit them with `sops hosts/crow/backup-secrets.yaml`.
+`restic-backups-truenas.timer` runs the nightly backup at 02:30 with up
+to 45 minutes of randomized delay, catching up after downtime; backup
+runs wait up to 30 minutes for the repository lock instead of failing.
+Retention is a separate weekly job, `restic-backups-truenas-prune.timer`
+(Sunday 04:30, up to 15 minutes of delay): forget/prune takes an
+exclusive lock over the shared repository, so it is staggered away from
+the backup windows, host-scoped with `--host crow`, and waits up to 60
+minutes for the lock. It keeps 7 daily, 5 weekly, 12 monthly, and 3
+yearly snapshots. `restic-truenas` and `restic-truenas-prune` are
+interactive wrappers with the same environment as their services, and
+`sudo sys backup-now` starts a backup immediately.
+
+Two credentials never leave Crow in any form, not even encrypted in Git:
+the restic repository password (`restic-password`) and the REST-server
+basic-auth password (`rest-server-password`). `sudo sys setup-backup-keys
+generate` provisions any missing one as TPM-sealed ciphertext in
+`/persist/credstore.encrypted`, bound to PCR 7 exactly like the
+secure-unlock credentials, and prints each generated value once; store
+both in a password manager immediately; they cannot be recovered from
+Crow's disks or the repository alone. To reuse credentials that already
+exist elsewhere (a repository password from an existing restic
+repository, or a basic-auth password already configured on TrueNAS),
+seal them instead with `sudo sys setup-backup-keys enter restic-password`
+or `sudo sys setup-backup-keys enter rest-server-password` (each value is
+read hidden from the terminal, entered twice, and sealed verbatim).
+`sudo sys setup-backup-keys show` re-prints sealed values.
+
+Snapshots carry backrest-compatible tags: `plan:crow` and
+`created-by:crow` (backrest identifies snapshots via `plan:` and
+`created-by:` tags, and accepts them on externally created snapshots).
+Backrest's per-plan forget only selects snapshots tagged with its own
+plan or instance, so Crow's snapshots are invisible to it, but a
+repo-level scheduled forget policy in backrest applies to every snapshot
+in the repository, including Crow's; keep that policy disabled on the
+TrueNAS repo or coordinate it with this one. List this host's snapshots
+with `restic-truenas snapshots --host crow` or
+`restic-truenas snapshots --tag created-by:crow`.
+
+At boot, `restic-backup-credentials.service` unseals both credentials
+through the TPM (Secure Boot must be enabled, and the service fails
+closed otherwise) and composes root-only
+`/run/restic-backup-credentials/{restic-password,repository}`. Until
+both sealed credentials exist, that service and the backup unit skip
+through path conditions, keeping activation and boot clean while backups
+stay refused. The backup unit starts only after that service and after
+the daily `postgresqlBackup` dump. Excluded from backups: the live PostgreSQL
+cluster (restore from the captured dumps in `/var/lib/postgresql-backups`),
+the TPM credstores, the rebuildable dedupit index, re-downloadable
+Hindsight model caches, and `~/.cache`.
+
+On the TrueNAS side, run a restic REST server reachable at the endpoint
+above with basic-auth user `cody` matching the sealed password, a valid
+TLS certificate (restic rejects self-signed certificates by default), and
+space for the retention policy; an append-only server breaks
+forget/prune. If Secure Boot policy changes (PCR 7) or the TPM is cleared,
+unsealing fails: re-seal both values from the password manager with
+`sudo sys setup-backup-keys enter …`. Restores need only repository
+access plus the two credentials, for example
+`sudo restic-truenas restore latest --target /tmp/restore`.
+
 ## AI container
 
 `crow-ai` and `warbler-ai` share [the AI container module](../../nixos-modules/ai-container),
@@ -559,7 +625,8 @@ nix flake check --no-build path:.
 ```
 
 The configuration test checks LVM/swap wiring, reset ordering, the absence of a
-host AI account, container routing, SOPS ordering, and sealed iwd recovery.
+host AI account, container routing, SOPS ordering, sealed iwd recovery, and
+the TPM-gated TrueNAS restic backup wiring.
 Evaluation and builds do not test physical Wi-Fi reconnection, firmware
 trust, disk formatting, TPM enrollment, or boot. Installation and activation
 are separate steps.
@@ -579,6 +646,11 @@ The private provisioning bundle on the installing machine is
 Keep these plaintext files outside Git and the Nix store. Crow stores account
 hashes in `/persist/shadow.d/{root,cody}`. Later `passwd` changes persist those
 hashes but do not update the saved initial passwords. SSH is key-only.
+
+The restic repository password and the TrueNAS REST-server password are
+shown once by `sudo sys setup-backup-keys generate` and sealed to Crow's
+TPM; they exist nowhere else. Keep both in the password manager alongside
+this bundle; without them the TrueNAS backups cannot be restored.
 
 ### Whole-volume deduplication
 

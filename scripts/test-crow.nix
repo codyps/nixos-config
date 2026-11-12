@@ -165,6 +165,56 @@ assert recovery.boot.initrd.systemd.services.secure-unlock-wifi.serviceConfig.Lo
 assert lib.hasInfix "/libexec/iwd" recovery.boot.initrd.systemd.services.secure-unlock-wifi.serviceConfig.ExecStart;
 assert !(recovery.systemd.services ? secure-unlock-wifi);
 assert recovery.boot.initrd.systemd.network.networks."20-wifi".networkConfig.DHCP == "ipv4";
+# Restic backups target the TrueNAS REST server. The repository password and
+# the REST-server basic-auth password exist only as TPM-sealed ciphertext on
+# Crow; the endpoint URL and username are SOPS-encrypted.
+assert c.services.restic.backups ? truenas;
+assert c.services.restic.backups.truenas.paths == [ "/persist" "/home" ];
+assert c.services.restic.backups.truenas.passwordFile == "/run/restic-backup-credentials/restic-password";
+assert c.services.restic.backups.truenas.repositoryFile == "/run/restic-backup-credentials/repository";
+assert c.services.restic.backups.truenas.initialize;
+assert c.services.restic.backups.truenas.extraBackupArgs == [ "--tag plan:crow" "--tag created-by:crow" "--retry-lock 30m" ];
+# Retention is a separate weekly host-scoped prune-only job so its exclusive
+# lock never blocks the nightly backup windows of this or other hosts.
+assert c.services.restic.backups.truenas.pruneOpts == [ ];
+assert c.services.restic.backups ? truenas-prune;
+assert !(c.services.restic.backups."truenas-prune".paths != null && c.services.restic.backups."truenas-prune".paths != [ ]);
+assert lib.head c.services.restic.backups."truenas-prune".pruneOpts == "--retry-lock 60m";
+assert builtins.elem "--host crow" c.services.restic.backups."truenas-prune".pruneOpts;
+assert c.systemd.timers."restic-backups-truenas-prune".timerConfig.OnCalendar == "Sun *-*-* 04:30:00";
+assert c.systemd.timers."restic-backups-truenas-prune".timerConfig.Persistent;
+assert builtins.elem "restic-backup-credentials.service" c.systemd.services."restic-backups-truenas-prune".requires;
+assert c.systemd.services."restic-backups-truenas-prune".unitConfig.ConditionPathExists == c.systemd.services.restic-backup-credentials.unitConfig.ConditionPathExists;
+assert lib.any (p: p.name == "restic-truenas-prune") c.environment.systemPackages;
+assert builtins.elem "/persist/credstore.encrypted" c.services.restic.backups.truenas.exclude;
+assert builtins.elem "/persist/var/lib/postgresql" c.services.restic.backups.truenas.exclude;
+assert c.systemd.timers."restic-backups-truenas".timerConfig.OnCalendar == "02:30";
+assert c.systemd.timers."restic-backups-truenas".timerConfig.Persistent;
+assert builtins.elem "restic-backup-credentials.service" c.systemd.services."restic-backups-truenas".after;
+assert builtins.elem "postgresqlBackup.service" c.systemd.services."restic-backups-truenas".after;
+assert builtins.elem "restic-backup-credentials.service" c.systemd.services."restic-backups-truenas".requires;
+assert c.systemd.services.restic-backup-credentials.serviceConfig.LoadCredentialEncrypted == [
+  "restic-password:/persist/credstore.encrypted/restic-password"
+  "rest-server-password:/persist/credstore.encrypted/rest-server-password"
+];
+assert builtins.elem "restic-repository-endpoint:${c.sops.secrets.restic-repository-endpoint.path}"
+  c.systemd.services.restic-backup-credentials.serviceConfig.LoadCredential;
+assert builtins.elem "sops-nix.service" c.systemd.services.restic-backup-credentials.after;
+assert builtins.elem "multi-user.target" c.systemd.services.restic-backup-credentials.wantedBy;
+assert c.systemd.services.restic-backup-credentials.unitConfig.ConditionSecurity == "uefi-secureboot";
+assert c.systemd.services.restic-backup-credentials.unitConfig.ConditionPathExists == [
+  "/persist/credstore.encrypted/restic-password"
+  "/persist/credstore.encrypted/rest-server-password"
+];
+assert c.systemd.services."restic-backups-truenas".unitConfig.ConditionPathExists == [
+  "/persist/credstore.encrypted/restic-password"
+  "/persist/credstore.encrypted/rest-server-password"
+];
+assert lib.hasInfix "crow-backup-keys" c.systemd.services.restic-backup-credentials.serviceConfig.ExecStart;
+assert c.programs.adminCommands.commands ? setup-backup-keys;
+assert c.programs.adminCommands.commands ? backup-now;
+assert lib.hasSuffix "backup-secrets.yaml" (toString c.sops.secrets.restic-repository-endpoint.sopsFile);
+assert lib.any (p: p.name == "restic-truenas") c.environment.systemPackages;
 {
   encryptedLvm = true;
   separateSwap = true;
@@ -182,4 +232,6 @@ assert recovery.boot.initrd.systemd.network.networks."20-wifi".networkConfig.DHC
   sopsIwd = true;
   sealedIwdRecovery = true;
   stagedProvisioning = true;
+  resticTruenasBackup = true;
+  tpmSealedBackupKeys = true;
 }

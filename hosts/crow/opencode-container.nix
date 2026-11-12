@@ -34,24 +34,84 @@ let
   # host-side user-namespace range, for staging secrets the guest can read.
   aiUid = toString (config.containers.crow-ai.privateUsers + 1001);
   aiGid = toString (config.containers.crow-ai.privateUsers + 993);
-  # Guest copy of cody's plugin list (see /home/cody/.config/opencode/
-  # opencode.json on Crow), with paths rebased to the read-only /run mount
-  # below. Seeded into cody-ai's home once and never overwritten, so the
-  # list stays editable inside the container.
+  # The plugin list shared by the seed and the activation migration. Keep it
+  # in sync with /home/cody/.config/opencode/opencode.json on Crow.
+  pluginEntries = [
+    "/run/opencode-plugins/pareto-cost"
+    {
+      package = "/run/opencode-plugins/zai-plan-cost";
+      options = {
+        monthlyPrice = 64;
+        weeklyCredits = 60000;
+      };
+    }
+    "/run/opencode-plugins/peak-hours"
+    "/run/opencode-plugins/zai-quota"
+    "/run/opencode-plugins/deepseek-balance"
+    {
+      package = "/run/opencode-plugins/provider-router";
+      options = {
+        quotaThreshold = 0.85;
+      };
+    }
+  ];
+  pluginEntriesJson = pkgs.writeText "opencode-plugin-entries.json" (builtins.toJSON pluginEntries);
+  # Guest copy of cody's user config (see /home/cody/.config/opencode/
+  # opencode.json on Crow), with plugin paths rebased to the read-only
+  # /run mount below and the pareto model list included so the
+  # pareto-cost plugin has models to price. Seeded into cody-ai's home
+  # once and never overwritten, so the file stays editable inside the
+  # container.
   userConfig = pkgs.writeText "opencode-user-config.json" (builtins.toJSON {
     "$schema" = "https://opencode.ai/config.json";
-    plugins = [
-      "/run/opencode-plugins/pareto-cost"
-      {
-        package = "/run/opencode-plugins/zai-plan-cost";
-        options = {
-          monthlyPrice = 64;
-          weeklyCredits = 60000;
+    plugins = pluginEntries;
+    providers.pareto = {
+      models = {
+        "deepseek/deepseek-v4.1-flash" = {
+          name = "DeepSeek V4.1 Flash";
+          capabilities = {
+            tools = true;
+            input = [ "text" ];
+            output = [ "text" ];
+            reasoning = {
+              supported = true;
+              effort = [ "low" "medium" "high" ];
+            };
+          };
+          limit = {
+            context = 1048576;
+            input = 917504;
+            output = 131072;
+          };
         };
-      }
-      "/run/opencode-plugins/peak-hours"
-      "/run/opencode-plugins/zai-quota"
-    ];
+        "xiaomi/mimo-v2.6-flash" = {
+          name = "MiMo V2.6 Flash";
+          capabilities = {
+            tools = true;
+            input = [ "text" ];
+            output = [ "text" ];
+          };
+          limit = {
+            context = 1048576;
+            input = 917504;
+            output = 131072;
+          };
+        };
+        "moonshotai/kimi-k3.1-pro" = {
+          name = "Kimi K3.1 Pro";
+          capabilities = {
+            tools = true;
+            input = [ "text" ];
+            output = [ "text" ];
+          };
+          limit = {
+            context = 1048576;
+            input = 917504;
+            output = 131072;
+          };
+        };
+      };
+    };
   });
 in
 {
@@ -135,13 +195,38 @@ in
     # Seed cody-ai's editable OpenCode user config (the plugin list) once;
     # activation never overwrites it afterwards. Mirrors the codex-config
     # seeding pattern, including runuser's users/etc dependencies.
+    #
+    # Existing configs get any newly introduced plugin entries appended on
+    # activation. Existing entries and their options are preserved, so edits
+    # made inside the container still win. This is how provider-router reaches
+    # containers that were seeded before it existed.
     system.activationScripts.seedOpencodeUserConfig = {
       deps = [ "users" "etc" ];
       text = ''
-        if [ ! -e /home/cody-ai/.config/opencode/opencode.json ]; then
+        config=/home/cody-ai/.config/opencode/opencode.json
+        if [ ! -e "$config" ]; then
           ${pkgs.util-linux}/bin/runuser -u cody-ai -- \
             ${pkgs.coreutils}/bin/install -D -m 0644 \
-            ${userConfig} /home/cody-ai/.config/opencode/opencode.json
+            ${userConfig} "$config"
+        fi
+        if [ -f "$config" ] && ${pkgs.jq}/bin/jq -e . "$config" >/dev/null 2>&1; then
+          tmp="$config.tmp.$$"
+          ${pkgs.jq}/bin/jq --slurpfile desired ${pluginEntriesJson} '
+            reduce $desired[0][] as $entry (.;
+              ($entry | if type == "object" then .package else . end) as $pkg
+              | if any(.plugins[]?; (if type == "object" then .package else . end) == $pkg)
+                then .
+                else .plugins = ((.plugins // []) + [$entry])
+                end
+            )
+          ' "$config" > "$tmp"
+          if ${pkgs.diffutils}/bin/cmp -s "$config" "$tmp"; then
+            ${pkgs.coreutils}/bin/rm -f "$tmp"
+          else
+            ${pkgs.coreutils}/bin/chown cody-ai:cody-ai "$tmp"
+            ${pkgs.coreutils}/bin/chmod 0644 "$tmp"
+            ${pkgs.coreutils}/bin/mv "$tmp" "$config"
+          fi
         fi
       '';
     };

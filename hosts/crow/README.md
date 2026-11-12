@@ -202,7 +202,15 @@ not loaded there. Cody's OpenCode plugins do load there: Crow's
 `/run/opencode-plugins`, and `cody-ai`'s own
 `~/.config/opencode/opencode.json` lists them; it is seeded by guest
 activation if missing, then editable, and deliberately outside the
-managed `/etc/opencode` settings. The host exposes it at
+managed `/etc/opencode` settings. The list includes
+`provider-router` with the same 85% quota threshold as Crow's host
+config. Activation appends any newly introduced plugin entries to an
+existing `cody-ai` config while preserving existing entries and options,
+so containers seeded before a plugin was added pick it up without losing
+local edits. Provider routes are still resolved inside the container:
+OpenRouter and LLMGateway are only used there after their keys are
+connected to the in-container server; otherwise the router falls back to
+the providers that container can see. The host exposes it at
 `https://crow.little-moth.ts.net:8444` (the host server keeps 8443), and
 tailnet clients can also reach `http://10.80.0.2:49375` directly through
 the advertised `10.80.0.2/32` route. It uses the same `opencode-password`

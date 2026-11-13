@@ -77,15 +77,14 @@ let
       # NOTE: Required else we get errors that our fixed-output derivation references store paths
       dontFixup = true;
 
-      # Computed against this repository's pins (bun 1.4.2) for v2.2.7 on
-      # x86_64-linux. Upstream nixpkgs splits Linux/Darwin hashes; the Darwin
-      # value is seeded from Linux and needs recording from a real
-      # aarch64-darwin build if it ever mismatches there.
+      # Computed against this repository's pins for v2.2.7: the Linux value
+      # on x86_64-linux and the Darwin value on aarch64-darwin. Upstream
+      # nixpkgs also splits Linux/Darwin hashes.
       outputHash =
         if stdenv.hostPlatform.isLinux then
           "sha256-jLQpq4xXkOt0ZKcHh3eC2SI1SPjAkv1scsTEGMaOB5A="
         else if stdenv.hostPlatform.isDarwin then
-          "sha256-jLQpq4xXkOt0ZKcHh3eC2SI1SPjAkv1scsTEGMaOB5A="
+          "sha256-5Xem/BuaV9ZjeckUTPyoJXDSCgsKZVVImTOzmrRSlcM="
         else
           throw "Unsupported platform";
       outputHashMode = "recursive";

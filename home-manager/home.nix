@@ -1,4 +1,7 @@
-{ pkgs, ... }:
+{ config, pkgs, ... }:
+let
+  npmGlobalPrefix = "${config.home.homeDirectory}/.npm-global";
+in
 {
   imports = [
     ../modules/admin-commands.nix
@@ -7,6 +10,12 @@
   ];
 
   config.programs.mbx.enable = true;
+
+  # Nix's npm defaults its global prefix to the read-only store, so
+  # `npm install -g` (and self-updaters that call it) fail with EACCES.
+  # Use a writable per-user prefix whose bin directory precedes Homebrew.
+  config.home.sessionVariables.NPM_CONFIG_PREFIX = npmGlobalPrefix;
+  config.home.sessionPath = [ "${npmGlobalPrefix}/bin" ];
 
   config.home.packages = [
     #pkgs.cargo-outdated

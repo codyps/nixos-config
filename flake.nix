@@ -870,6 +870,9 @@
                 home.packages = with pkgs; [
                   _1password-cli
                 ];
+                # The oMLX installer appends this to ~/.zshrc, replacing
+                # Home Manager's link; keep its CLI shims on PATH here.
+                home.sessionPath = [ "/Users/codyschafer/.omlx/bin" ];
                 programs.claude-code.enable = true;
                 programs.direnv.config = {
                   whitelist = { prefix = [ "/Volumes/dev/rivian/" ]; };

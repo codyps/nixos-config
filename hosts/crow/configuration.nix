@@ -148,12 +148,6 @@ in
     extraSetFlags = [ "--advertise-exit-node" ];
   };
   environment.systemPackages = with pkgs; [ sbctl cryptsetup lvm2 tpm2-tools neovim htop tmux ghostty.terminfo ];
-  # Claude Code's installer (curl -fsSL https://claude.ai/install.sh | bash)
-  # drops a generic glibc ELF into cody's ~/.local/bin. Without nix-ld the
-  # host only provides stub-ld at /lib64/ld-linux-x86-64.so.2, which refuses
-  # to run it; the crow-ai container already enables nix-ld for the same
-  # reason. Host-installed tools keep working: static binaries (codex) are
-  # unaffected, and Nix binaries carry their own interpreter.
   programs.nix-ld.enable = true;
   system.autoUpgrade.enable = lib.mkForce false;
   p.nix.buildMachines.ward.enable = lib.mkForce false;

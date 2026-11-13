@@ -31,6 +31,16 @@
         })
     else prev.rxvt-unicode-unwrapped;
 
+  # ccache 4.14.2 lists Linux-only elfutils (for eu-elfcmp) as an
+  # unconditional check input, so Darwin evaluation is refused. Its base and
+  # fprebuilt_module_path suites also fail on Darwin because the clang wrapper
+  # emits unused-argument warnings the tests treat as unexpected stderr.
+  # Skip the check phase on Darwin, which also drops the check inputs.
+  ccache =
+    if prev.stdenv.hostPlatform.isDarwin && prev.ccache.version == "4.14.2"
+    then prev.ccache.overrideAttrs (_: { doCheck = false; })
+    else prev.ccache;
+
   # cargo-generate 0.25.0 moved should_canonicalize to utils::tests, so
   # nixpkgs' Darwin skip for git::utils::should_canonicalize no longer
   # matches. The test expects "../" to resolve under /Users/, which fails in

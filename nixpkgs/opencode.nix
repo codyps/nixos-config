@@ -82,7 +82,7 @@ let
       # nixpkgs also splits Linux/Darwin hashes.
       outputHash =
         if stdenv.hostPlatform.isLinux then
-          "sha256-jLQpq4xXkOt0ZKcHh3eC2SI1SPjAkv1scsTEGMaOB5A="
+          "sha256-qCpbtGPs+FWKHbxUlLAHvudspvUqd0pPJPa93pn837w="
         else if stdenv.hostPlatform.isDarwin then
           "sha256-5Xem/BuaV9ZjeckUTPyoJXDSCgsKZVVImTOzmrRSlcM="
         else

@@ -2,8 +2,8 @@
 
 Warbler runs GARM 0.2.1 with the Incus provider 0.1.5. Each runner is a
 disposable KVM VM. GitHub scale sets allow zero idle VMs without a public webhook.
-The Incus `garm` project is configured for three runner VMs, with each of the two
-repository scale sets allowed to use all three slots. Each VM has 4 vCPUs,
+The Incus `garm` project is configured for three runner VMs in total, with each
+repository scale set allowed to use all three slots. Each VM has 4 vCPUs,
 8 GiB RAM and a 40 GiB disk. Excess work queues; these are capacity limits,
 not reservations.
 
@@ -41,8 +41,16 @@ Never delete/regenerate the database key while retaining the database.
 
 ## GitHub App and repositories
 
-The private App `codyps-warbler-garm` is installed only on `codyps/zpl` and
-`codyps/zpl-comparison`:
+The private App `codyps-warbler-garm` is installed on all `codyps` repositories.
+`garm-repo-sync.timer` runs `sudo sys garm sync-repos` every 15 minutes: it lists
+the installation's unarchived repositories and registers any missing GARM
+repository and `warbler-linux` scale set (min 0/max 3, settings in `garm.nix`).
+It never deletes; repositories no longer granted to the App are logged as
+warnings for manual removal. Run it on demand with `sudo sys garm sync-repos` and
+inspect it with `journalctl -u garm-repo-sync`. Existing scale sets are not
+modified, so changing `syncScaleSet` affects only newly created ones.
+
+The original manual registrations:
 
 - App ID: `5099875`; installation ID: `165554289`.
 - GARM credential: `codyps-app`; scale set: `warbler-linux` (ID `1`).
@@ -61,7 +69,7 @@ App configuration:
 - Homepage: `https://github.com/cloudbase/garm`.
 - Disable the webhook; do not configure OAuth callbacks.
 - Repository permissions: Administration read/write, Metadata read-only.
-- Install only on the two selected repositories above.
+- Install on all repositories (shared with the macOS `actions-vm-scaler`).
 - Generate an App private key. Keep the PEM outside the checkout and Nix store.
   If persisted in this repository, encrypt it with SOPS for Warbler first.
 
@@ -97,8 +105,9 @@ sudo sys garm scaleset update 2 --min-idle-runners 0 --max-runners 3
 ```
 
 Select this scale set with `runs-on: warbler-linux` in a workflow. Personal-account
-repositories need separate GARM repository registrations and scale sets; GitHub
-App installations do not create an account-wide runner group.
+repositories need separate GARM repository registrations and scale sets (GitHub
+App installations do not create an account-wide runner group); `sync-repos`
+creates them automatically.
 
 The base cloud image is not a GitHub-hosted runner image: toolchains and Docker
 must be explicitly installed or baked into a custom Incus image when needed.

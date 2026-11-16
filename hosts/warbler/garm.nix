@@ -41,7 +41,26 @@ let
       };
     }];
   };
+  # Every repository granted to the App installation gets this scale set.
+  syncScaleSet = {
+    name = "warbler-linux";
+    provider_name = "incus";
+    image = "images:ubuntu/24.04/cloud";
+    flavor = "runner";
+    os_type = "linux";
+    os_arch = "amd64";
+    min_idle_runners = 0;
+    max_runners = 3;
+    runner_bootstrap_timeout = 20;
+    enabled = true;
+  };
   admin = pkgs.writeShellScript "garm-admin" ''
+    export GARM_SYNC_APP_ID=5099875
+    export GARM_SYNC_INSTALLATION_ID=165554289
+    export GARM_SYNC_APP_KEY=${config.sops.secrets.garm-app-key.path}
+    export GARM_SYNC_CREDENTIALS=codyps-app
+    export GARM_SYNC_OPENSSL=${pkgs.openssl}/bin/openssl
+    export GARM_SYNC_SCALE_SET=${lib.escapeShellArg (builtins.toJSON syncScaleSet)}
     exec ${pkgs.python3}/bin/python3 ${./garm-admin.py} ${packages.cli}/bin/garm-cli "$@"
   '';
 in
@@ -175,6 +194,8 @@ in
       ExecStart = "${packages.garm}/bin/garm -config /run/garm/config.toml";
       Restart = "on-failure";
       RestartSec = 5;
+      # One GitHub message-session listener per synced scale set.
+      LimitNOFILE = "65536:524288";
       UMask = "0077";
       NoNewPrivileges = true;
       PrivateTmp = true;
@@ -184,6 +205,29 @@ in
       ProtectKernelModules = true;
       ProtectControlGroups = true;
       RestrictSUIDSGID = true;
+    };
+  };
+
+  # Register repositories newly granted to the App (installed on all repos).
+  systemd.services.garm-repo-sync = {
+    description = "Register GitHub App repositories with GARM";
+    requires = [ "garm.service" ];
+    after = [ "garm.service" "network-online.target" ];
+    wants = [ "network-online.target" ];
+    path = [ pkgs.cacert ];
+    environment = config.programs.caTrust.environment;
+    serviceConfig = {
+      Type = "oneshot";
+      ExecStart = "${admin} sync-repos";
+      UMask = "0077";
+    };
+  };
+  systemd.timers.garm-repo-sync = {
+    wantedBy = [ "timers.target" ];
+    timerConfig = {
+      OnBootSec = "5min";
+      OnUnitActiveSec = "15min";
+      RandomizedDelaySec = "1min";
     };
   };
 

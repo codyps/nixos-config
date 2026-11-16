@@ -1,15 +1,19 @@
 """Local root-only GARM administration without secrets in command arguments."""
+import base64
 import json
 import os
 from pathlib import Path
 import secrets
 import subprocess
 import sys
+import time
 import tomllib
 from urllib.error import HTTPError
+from urllib.parse import quote
 from urllib.request import Request, urlopen
 
 BASE = "http://127.0.0.1:9997"
+GITHUB_API = "https://api.github.com"
 
 
 def request(method, path, data=None, token=None):
@@ -22,6 +26,89 @@ def request(method, path, data=None, token=None):
     with urlopen(req, timeout=30) as response:
         body = response.read()
         return json.loads(body) if body else None
+
+
+def b64url(data):
+    return base64.urlsafe_b64encode(data).rstrip(b"=").decode()
+
+
+def github(method, path, token, scheme="token"):
+    req = Request(GITHUB_API + path, method=method, headers={
+        "Accept": "application/vnd.github+json",
+        "Authorization": f"{scheme} {token}",
+        "X-GitHub-Api-Version": "2022-11-28",
+    })
+    with urlopen(req, timeout=30) as response:
+        return json.loads(response.read())
+
+
+def installation_repositories(env):
+    """Return {(owner, name)} for every unarchived repository granted to the App."""
+    now = int(time.time())
+    header = b64url(json.dumps({"alg": "RS256", "typ": "JWT"}).encode())
+    claims = b64url(json.dumps({"iat": now - 60, "exp": now + 540, "iss": env["GARM_SYNC_APP_ID"]}).encode())
+    signature = subprocess.run(
+        [env["GARM_SYNC_OPENSSL"], "dgst", "-sha256", "-sign", env["GARM_SYNC_APP_KEY"]],
+        input=f"{header}.{claims}".encode(), capture_output=True, check=True).stdout
+    jwt = f"{header}.{claims}.{b64url(signature)}"
+    installation = env["GARM_SYNC_INSTALLATION_ID"]
+    token = github("POST", f"/app/installations/{installation}/access_tokens", jwt, "Bearer")["token"]
+    repos, page = [], 1
+    while True:
+        result = github("GET", f"/installation/repositories?per_page=100&page={page}", token)
+        total = result["total_count"]
+        repos.extend(result["repositories"])
+        if not result["repositories"] or len(repos) >= total:
+            break
+        page += 1
+    if len(repos) != total:
+        raise SystemExit(f"Incomplete installation listing: {len(repos)} of {total}")
+    return {(r["owner"]["login"], r["name"]) for r in repos if not r["archived"]}
+
+
+def sync_repos(token):
+    """Register every App-visible repository and its scale set; never deletes."""
+    env = os.environ
+    credentials = env["GARM_SYNC_CREDENTIALS"]
+    scale_set = json.loads(env["GARM_SYNC_SCALE_SET"])
+    wanted = installation_repositories(env)
+
+    def key(owner, name):
+        return owner.lower(), name.lower()
+
+    wanted_keys = {key(*repo) for repo in wanted}
+    garm_repos = {key(r["owner"], r["name"]): r for r in request("GET", "/repositories", token=token) or []}
+    with_scale_set = {s["repo_id"] for s in request("GET", "/scalesets", token=token) or []
+                      if s.get("repo_id") and s["name"] == scale_set["name"]}
+    added_repos = added_sets = failed = 0
+    for owner, name in sorted(wanted, key=lambda repo: key(*repo)):
+        try:
+            repo = garm_repos.get(key(owner, name))
+            if repo is None:
+                repo = request("POST", "/repositories", {
+                    "owner": owner, "name": name, "credentials_name": credentials,
+                    "webhook_secret": secrets.token_urlsafe(32),
+                    "pool_balancer_type": "roundrobin", "forge_type": "github",
+                }, token)
+                added_repos += 1
+                print(f"registered {owner}/{name}", flush=True)
+            if repo["id"] not in with_scale_set:
+                request("POST", f"/repositories/{quote(repo['id'])}/scalesets", scale_set, token)
+                with_scale_set.add(repo["id"])
+                added_sets += 1
+                print(f"created scale set {scale_set['name']} for {owner}/{name}", flush=True)
+        except HTTPError as error:
+            failed += 1
+            detail = error.read().decode(errors="replace")[:300]
+            print(f"failed {owner}/{name}: HTTP {error.code} {detail}", file=sys.stderr, flush=True)
+    for k, repo in sorted(garm_repos.items()):
+        if repo.get("credentials_name") == credentials and k not in wanted_keys:
+            print(f"warning: {repo['owner']}/{repo['name']} is registered but no longer "
+                  "granted to the App (not removed)", flush=True)
+    print(f"{len(wanted)} repositories granted; registered {added_repos}, "
+          f"created {added_sets} scale sets, {failed} failures", flush=True)
+    if failed:
+        raise SystemExit(1)
 
 
 def main():
@@ -56,6 +143,9 @@ def main():
     token = request("POST", "/auth/login", {
         "username": "admin", "password": password_path.read_text()
     })["token"]
+    if args == ["sync-repos"]:
+        sync_repos(token)
+        return
     # Upstream uses ~/.local/share, not XDG_CONFIG_HOME. Preserve other profiles.
     folder = Path.home() / ".local/share/garm-cli"
     folder.mkdir(parents=True, exist_ok=True, mode=0o700)

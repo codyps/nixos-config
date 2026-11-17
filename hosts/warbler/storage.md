@@ -94,6 +94,11 @@ persistent `/var/lib/dedupit/filesystem.sqlite` index. The previous container-on
 `ai.sqlite` index is retained; its roots differ and cannot be reused for this scan.
 The new index requires additional disk space. Dedupit excludes its own active
 index and sidecar files by inode, including through the alternate mount path.
+The index uses NOCOW storage, matching Crow, to avoid Btrfs copy-on-write overhead
+for SQLite updates. Converting an existing COW index requires stopping the
+service and running `sudo sys dedupit-compact` before restarting it. Compaction
+preserves scan progress and needs space for both the original and replacement
+indexes until validation and the atomic swap finish.
 
 Busy executables and other failed sharing jobs remain pending for the next run.
 Changed files are rescanned. Completed runs with per-file errors and fatal scan

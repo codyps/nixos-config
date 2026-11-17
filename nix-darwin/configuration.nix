@@ -87,5 +87,7 @@ in
 
   nixpkgs.config.allowDeprecatedx86_64Darwin = "force";
 
-  environment.etc."nix/source-flake".source = ../.;
+  # Lazy trees make `../.` a virtual store path that is never realised, leaving
+  # a dangling link that breaks /etc activation. Force a real store copy.
+  environment.etc."nix/source-flake".source = builtins.path { path = ../.; name = "nixos-config-source"; };
 }

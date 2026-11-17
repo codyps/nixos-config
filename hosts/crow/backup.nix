@@ -36,6 +36,11 @@ in
       "/persist/credstore.encrypted"
       "/persist/var/lib/dedupit"
       "/persist/var/lib/hindsight/cache"
+      # In-container AI tool caches and interpreters, all re-downloadable;
+      # they were ~2-3 GiB of new raw data every night.
+      "/persist/var/lib/nixos-containers/crow-ai/home/*/.codex/packages"
+      "/persist/var/lib/nixos-containers/crow-ai/home/*/.local/share/claude/versions"
+      "/persist/var/lib/nixos-containers/crow-ai/home/*/.rustup"
       "/persist/var/lib/postgresql"
     ];
     passwordFile = "${credentialsDirectory}/restic-password";

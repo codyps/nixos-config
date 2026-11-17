@@ -14,16 +14,19 @@ from urllib.request import Request, urlopen
 
 BASE = "http://127.0.0.1:9997"
 GITHUB_API = "https://api.github.com"
+# Creation waits on GitHub token setup, which queues behind every worker while
+# GARM restarts; a client disconnect cancels the creation server-side.
+SLOW_TIMEOUT = 1800
 
 
-def request(method, path, data=None, token=None):
+def request(method, path, data=None, token=None, timeout=30):
     headers = {"Content-Type": "application/json"}
     if token:
         headers["Authorization"] = "Bearer " + token
     req = Request(BASE + "/api/v1" + path,
                   data=json.dumps(data).encode() if data is not None else None,
                   headers=headers, method=method)
-    with urlopen(req, timeout=30) as response:
+    with urlopen(req, timeout=timeout) as response:
         body = response.read()
         return json.loads(body) if body else None
 
@@ -89,11 +92,12 @@ def sync_repos(token):
                     "owner": owner, "name": name, "credentials_name": credentials,
                     "webhook_secret": secrets.token_urlsafe(32),
                     "pool_balancer_type": "roundrobin", "forge_type": "github",
-                }, token)
+                }, token, timeout=SLOW_TIMEOUT)
                 added_repos += 1
                 print(f"registered {owner}/{name}", flush=True)
             if repo["id"] not in with_scale_set:
-                request("POST", f"/repositories/{quote(repo['id'])}/scalesets", scale_set, token)
+                request("POST", f"/repositories/{quote(repo['id'])}/scalesets", scale_set, token,
+                        timeout=SLOW_TIMEOUT)
                 with_scale_set.add(repo["id"])
                 added_sets += 1
                 print(f"created scale set {scale_set['name']} for {owner}/{name}", flush=True)

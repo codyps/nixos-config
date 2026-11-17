@@ -372,6 +372,13 @@ to apply this device access (interrupting guest sessions). In the guest,
 verify `test -r /dev/fuse && test -w /dev/fuse` and `fusermount3 --version`,
 then test a mount with the intended FUSE application.
 
+KVM virtual machines can run as `cody-ai` through the writable `/dev/kvm`
+bind mount. Host udev grants the container-mapped user read/write access
+with an ACL, preserving the host's KVM ownership and group permissions.
+After rebuilding, restart `container@crow-ai` on Crow to apply the bind mount
+(interrupting guest sessions). In the guest as `cody-ai`, verify
+`test -r /dev/kvm && test -w /dev/kvm`, then start a VM with KVM acceleration.
+
 USB devices use normal kernel device paths with read/write access for
 `cody-ai`: `/dev/sdb1`, `/dev/hidraw0`, `/dev/ttyUSB0`, `/dev/ttyACM0`, and
 `/dev/input/event0`, for example. Raw USB nodes are directly available under

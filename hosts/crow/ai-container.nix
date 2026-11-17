@@ -49,6 +49,8 @@ in
     "d /dev/crow-ai-usb/bus/usb 0755 root root -"
   ];
   services.udev.extraRules = ''
+    # The guest's remapped user cannot use the host's kvm group permissions.
+    ACTION=="add|change", SUBSYSTEM=="misc", KERNEL=="kvm", RUN+="${pkgs.acl}/bin/setfacl -m u:${toString (config.containers.crow-ai.privateUsers + 1001)}:rw /dev/kvm"
     ACTION=="add|change", SUBSYSTEMS=="usb", ENV{MAJOR}!="", ENV{CROW_AI_USB}="1", RUN+="${usbDeviceNode}"
     ACTION=="remove", ENV{CROW_AI_USB}=="1", RUN+="${usbDeviceNode}"
   '';
@@ -66,6 +68,7 @@ in
     # /dev/fuse needs "m": nspawn creates the node inside the container,
     # under this unit's device cgroup filter.
     allowedDevices = [
+      { node = "/dev/kvm"; modifier = "rw"; }
       { node = "/dev/fuse"; modifier = "rwm"; }
       { node = "char-*"; modifier = "rw"; }
       { node = "block-*"; modifier = "rw"; }
@@ -80,6 +83,10 @@ in
     };
     bindMounts."/dev/fuse" = {
       hostPath = "/dev/fuse";
+      isReadOnly = false;
+    };
+    bindMounts."/dev/kvm" = {
+      hostPath = "/dev/kvm";
       isReadOnly = false;
     };
     # nspawn otherwise filters perf_event_open; explicitly permit debugging
@@ -220,6 +227,8 @@ in
       # normal boot coldplug, so this is idempotent; --wait ensures udevd has
       # processed them before the container binds the mirror.
       ${pkgs.systemd}/bin/udevadm trigger --subsystem-match=usb --action=add --wait
+      # Apply KVM access even when its device predates the new udev rule.
+      ${pkgs.systemd}/bin/udevadm trigger --subsystem-match=misc --sysname-match=kvm --action=change --wait
     '';
   };
   # Override systemd's 80-container-ve.network, which otherwise replaces

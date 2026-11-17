@@ -48,10 +48,14 @@ let
     "/run/opencode-plugins/peak-hours"
     "/run/opencode-plugins/zai-quota"
     "/run/opencode-plugins/deepseek-balance"
+    "/run/opencode-plugins/llmgateway-balance"
+    "/run/opencode-plugins/opencodego-quota"
     {
       package = "/run/opencode-plugins/provider-router";
       options = {
-        quotaThreshold = 0.85;
+        quotaThreshold = 0.99;
+        allowFree = true;
+        freeFirst = true;
       };
     }
   ];
@@ -64,11 +68,17 @@ let
   # container.
   userConfig = pkgs.writeText "opencode-user-config.json" (builtins.toJSON {
     "$schema" = "https://opencode.ai/config.json";
+    # Session titles are model requests on the session's own route (a
+    # `small=true, agent=title` call), so a session sitting on an exhausted
+    # route (e.g. the free tier after its dynamic limit trips) would never
+    # be renamed. Pin the title agent to a reliable flat route so naming
+    # never depends on the session's routing state.
+    agent.title.model = "llmgateway-providers/scx-ai-gp/deepseek-v4.1-flash-1017";
     plugins = pluginEntries;
     providers.pareto = {
       models = {
         "deepseek/deepseek-v4.1-flash" = {
-          name = "DeepSeek V4.1 Flash";
+          name = "DeepSeek V4.1 Flash (1017)";
           capabilities = {
             tools = true;
             input = [ "text" ];

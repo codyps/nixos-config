@@ -203,8 +203,10 @@ not loaded there. Cody's OpenCode plugins do load there: Crow's
 `~/.config/opencode/opencode.json` lists them; it is seeded by guest
 activation if missing, then editable, and deliberately outside the
 managed `/etc/opencode` settings. The list includes
-`provider-router` with the same 85% quota threshold as Crow's host
-config. Activation appends any newly introduced plugin entries to an
+`provider-router` with the same options as Crow's host config (99% quota
+threshold, free OpenCode routes enabled and preferred over subscriptions).
+Activation appends any newly
+introduced plugin entries to an
 existing `cody-ai` config while preserving existing entries and options,
 so containers seeded before a plugin was added pick it up without losing
 local edits. Provider routes are still resolved inside the container:

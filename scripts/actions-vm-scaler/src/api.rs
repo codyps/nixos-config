@@ -5,7 +5,27 @@ use anyhow::{bail, ensure, Context, Result};
 use reqwest::{Client, Method, StatusCode, Url};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
-use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
+use std::{
+    sync::Arc,
+    time::{Duration, Instant, SystemTime, UNIX_EPOCH},
+};
+use tokio::sync::{Mutex, Semaphore};
+
+struct AppAuth {
+    token: Mutex<Option<(String, Instant)>>,
+    next_request: Mutex<Instant>,
+    requests: Semaphore,
+}
+
+impl AppAuth {
+    fn new() -> Arc<Self> {
+        Arc::new(Self {
+            token: Mutex::new(None),
+            next_request: Mutex::new(Instant::now()),
+            requests: Semaphore::new(8),
+        })
+    }
+}
 
 const SETS: &str = "_apis/runtime/runnerscalesets";
 const RUNNERS: &str = "_apis/distributedtask/pools/0/agents";
@@ -108,6 +128,7 @@ pub struct Repository {
 
 pub struct Api {
     http: Client,
+    app: Arc<AppAuth>,
     config: Config,
     github_api: String,
     connection: Option<(Connection, Instant)>,
@@ -119,6 +140,7 @@ impl Api {
     pub(crate) fn scoped(&self, config: Config) -> Self {
         Self {
             http: self.http.clone(),
+            app: self.app.clone(),
             config,
             github_api: self.github_api.clone(),
             connection: None,
@@ -146,6 +168,7 @@ impl Api {
 
     pub fn new(config: Config) -> Result<Self> {
         Ok(Self {
+            app: AppAuth::new(),
             http: Client::builder()
                 .timeout(Duration::from_secs(75))
                 .connect_timeout(Duration::from_secs(15))
@@ -183,6 +206,42 @@ impl Api {
         body: Option<&Value>,
         capacity: Option<usize>,
     ) -> Result<(StatusCode, Value)> {
+        let trace = std::env::var("ACTIONS_VM_TRACE_REPOSITORY")
+            .is_ok_and(|repo| repo == self.config.github_url);
+        let operation = if capacity.is_some() {
+            "queue poll"
+        } else {
+            match url.path().rsplit('/').next().unwrap_or("") {
+                "access_tokens" => "installation authentication",
+                "registration-token" => "repository authentication",
+                "runner-registration" => "Actions authentication",
+                "runnerscalesets" => "scale-set lookup",
+                "sessions" => "session creation",
+                "generatejitconfig" => "JIT configuration",
+                "acquirejobs" => "job acquisition",
+                _ => "Actions request",
+            }
+        };
+        if trace {
+            eprintln!("API trace: {operation} request, capacity={capacity:?}");
+        }
+        // Gate GitHub REST setup calls only. Long polling uses a separate
+        // Actions endpoint and must not consume these short-request slots.
+        let github_rest = url.as_str().starts_with(&format!("{}/", self.github_api));
+        let _permit = if github_rest {
+            Some(self.app.requests.acquire().await?)
+        } else {
+            None
+        };
+        if github_rest {
+            let mut next = self.app.next_request.lock().await;
+            tokio::time::sleep_until((*next).into()).await;
+            #[cfg(not(test))]
+            let spacing = Duration::from_millis(400);
+            #[cfg(test)]
+            let spacing = Duration::ZERO;
+            *next = Instant::now() + spacing;
+        }
         let mut request = self
             .http
             .request(method, url)
@@ -200,14 +259,28 @@ impl Api {
             .await
             .map_err(|_| anyhow::anyhow!("HTTP transport failed"))?;
         let status = response.status();
-        if status == StatusCode::TOO_MANY_REQUESTS || status == StatusCode::SERVICE_UNAVAILABLE {
+        if trace {
+            eprintln!("API trace: {operation} returned HTTP {status}");
+        }
+        if [
+            StatusCode::TOO_MANY_REQUESTS,
+            StatusCode::SERVICE_UNAVAILABLE,
+            StatusCode::FORBIDDEN,
+        ]
+        .contains(&status)
+        {
             if let Some(seconds) = response
                 .headers()
                 .get("retry-after")
                 .and_then(|s| s.to_str().ok())
                 .and_then(|s| s.parse::<u64>().ok())
             {
-                tokio::time::sleep(Duration::from_secs(seconds.min(300))).await;
+                let delay = Duration::from_secs(seconds.min(300));
+                if github_rest {
+                    let mut next = self.app.next_request.lock().await;
+                    *next = (*next).max(Instant::now() + delay);
+                }
+                tokio::time::sleep(delay).await;
             }
         }
         if !status.is_success() {
@@ -235,6 +308,14 @@ impl Api {
     }
 
     async fn installation_token(&self) -> Result<String> {
+        // A fleet has one installation identity. Serialize refreshes and reuse
+        // its one-hour token for 50 minutes instead of minting one per repo.
+        let mut cached = self.app.token.lock().await;
+        if let Some((token, at)) = &*cached {
+            if at.elapsed() < Duration::from_secs(3000) {
+                return Ok(token.clone());
+            }
+        }
         #[derive(Serialize)]
         struct Claims<'a> {
             iat: u64,
@@ -266,7 +347,17 @@ impl Api {
         let token = token["token"]
             .as_str()
             .context("missing installation token")?;
-        Ok(token.to_owned())
+        let token = token.to_owned();
+        *cached = Some((token.clone(), Instant::now()));
+        Ok(token)
+    }
+
+    async fn invalidate_installation_token(&self, used: &str) {
+        let mut cached = self.app.token.lock().await;
+        // A slow rejection must not evict a newer token refreshed by a peer.
+        if cached.as_ref().is_some_and(|(token, _)| token == used) {
+            *cached = None;
+        }
     }
 
     /// Complete pagination before publishing discovery, so a failed later page
@@ -283,6 +374,9 @@ impl Api {
             let (status, value) = self
                 .send(Method::GET, url, &format!("Bearer {token}"), None, None)
                 .await?;
+            if status == StatusCode::UNAUTHORIZED {
+                self.invalidate_installation_token(&token).await;
+            }
             ensure!(
                 status == StatusCode::OK,
                 "repository discovery returned HTTP {status}"
@@ -319,6 +413,9 @@ impl Api {
         let (status, registration) = self
             .send(Method::POST, url, &format!("Bearer {token}"), None, None)
             .await?;
+        if status == StatusCode::UNAUTHORIZED {
+            self.invalidate_installation_token(&token).await;
+        }
         ensure!(
             status == StatusCode::CREATED,
             "runner registration returned HTTP {status}"

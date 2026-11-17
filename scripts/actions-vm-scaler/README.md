@@ -13,6 +13,11 @@ repositories, and maintains a separate scale set for each. All repositories use
 the same workflow label and share one host-wide VM capacity limit. Discovery is
 refreshed every 60 seconds (configurable with `discovery_interval_secs`).
 Archived/disabled repositories are excluded because they cannot execute jobs.
+Repository clients share an installation token and serialize its refresh; GitHub
+REST setup requests are paced and have a bounded concurrency limit. Large
+installations therefore come online gradually rather than issuing an authentication
+burst. Long polling uses separate Actions endpoints and is not held behind the
+REST setup gate.
 
 New grants are picked up automatically. Removed grants stop that repository's
 listener and local VMs; other repositories keep running. A failed or partially

@@ -849,3 +849,70 @@ async fn listener_only_acknowledges_after_failed_provisioning_has_recovered() {
     manager.stop_all().await;
     manager.reap(&mut api).await.unwrap();
 }
+
+#[tokio::test]
+async fn repository_clients_share_one_installation_token_under_concurrent_startup() {
+    let temp = TempDir::new().unwrap();
+    let c = config(&temp);
+    let server = MockServer::start().await;
+    Mock::given(method("POST"))
+        .and(path("/app/installations/456/access_tokens"))
+        .respond_with(
+            ResponseTemplate::new(201).set_body_json(json!({"token":"shared-installation"})),
+        )
+        .expect(1)
+        .mount(&server)
+        .await;
+    Mock::given(method("GET"))
+        .and(path("/installation/repositories"))
+        .and(header("Authorization", "Bearer shared-installation"))
+        .respond_with(
+            ResponseTemplate::new(200).set_body_json(json!({"total_count":0,"repositories":[]})),
+        )
+        .expect(20)
+        .mount(&server)
+        .await;
+    let api = Api::fixture(c.clone(), &server.uri(), false);
+    let mut tasks = tokio::task::JoinSet::new();
+    for i in 0..20 {
+        let mut scoped = c.clone();
+        scoped.github_url = format!("https://github.com/example/repo-{i}");
+        let client = api.scoped(scoped);
+        tasks.spawn(async move { client.repositories().await.unwrap() });
+    }
+    while let Some(result) = tasks.join_next().await {
+        assert!(result.unwrap().is_empty());
+    }
+}
+
+#[tokio::test]
+async fn a_rejected_cached_installation_token_is_refreshed_for_other_repositories() {
+    use std::sync::{
+        atomic::{AtomicUsize, Ordering},
+        Arc,
+    };
+    let temp = TempDir::new().unwrap();
+    let c = config(&temp);
+    let server = MockServer::start().await;
+    let calls = Arc::new(AtomicUsize::new(0));
+    let counter = calls.clone();
+    Mock::given(method("POST"))
+        .and(path("/app/installations/456/access_tokens"))
+        .respond_with(move |_: &Request| ResponseTemplate::new(201).set_body_json(json!({"token":if counter.fetch_add(1,Ordering::SeqCst)==0 {"old-token"} else {"new-token"}})))
+        .expect(2).mount(&server).await;
+    Mock::given(method("GET"))
+        .and(path("/installation/repositories"))
+        .respond_with(|r: &Request| {
+            if r.headers.get("Authorization").unwrap() == "Bearer old-token" {
+                ResponseTemplate::new(401)
+            } else {
+                ResponseTemplate::new(200).set_body_json(json!({"total_count":0,"repositories":[]}))
+            }
+        })
+        .mount(&server)
+        .await;
+    let api = Api::fixture(c.clone(), &server.uri(), false);
+    assert!(api.repositories().await.is_err());
+    assert!(api.scoped(c).repositories().await.unwrap().is_empty());
+    assert_eq!(calls.load(Ordering::SeqCst), 2);
+}

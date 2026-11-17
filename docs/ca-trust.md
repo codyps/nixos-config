@@ -25,8 +25,11 @@ avoid adding an unrelated OpenSSL fallback store. Node uses
 `NODE_OPTIONS=--use-openssl-ca` so Vite+ and downloaded Node runtimes replace
 their embedded roots; `NODE_EXTRA_CA_CERTS` alone would only add trust.
 
-For Erlang/Elixir, `ERL_AFLAGS` and `ERL_ZFLAGS` set the `public_key`
-application's `cacerts_path` to the same bundle. This changes the default roots
+For Erlang/Elixir, `ERL_AFLAGS` and `ERL_ZFLAGS` pass `-config` with a
+generated file that sets the `public_key` application's `cacerts_path` to the
+same bundle. The file avoids the Erlang string quoting that shell, launchd and
+pam_env writers mangle into an ERTS syntax error. Releases and `-config` flags
+of their own merge with it. This changes the default roots
 returned by `public_key:cacerts_get/0` on OTP 27.2 and newer. Mix/Hex also receive
 `HEX_CACERTS_PATH`. See the [Mix TLS documentation](https://mix.hexdocs.pm/Mix.html#module-ssl-certificates).
 Hex must be at least 2.5.2: older releases can still trust their bundled roots

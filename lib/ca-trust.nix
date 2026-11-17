@@ -10,8 +10,14 @@ let
   "${certificates}/etc/ssl/certs/ca-no-trust-rules-bundle.crt";
   # Prevent OpenSSL clients from falling back to an unrelated CA directory.
   emptyDirectory = pkgs.runCommand "empty-ca-directory" { } ''mkdir -p "$out"'';
-  # ERTS parses these as command-line arguments, including the Erlang string term.
-  beamFlags = "-public_key cacerts_path ${pkgs.lib.escapeShellArg (builtins.toJSON caBundle)}";
+  # Inline `-public_key cacerts_path` needs embedded double quotes, which the
+  # nix-darwin, Home Manager, launchd and pam_env writers do not escape. ERTS
+  # then logs a syntax error at every start and keeps its default roots. A
+  # config file keeps the flag value free of shell and Erlang quoting.
+  beamConfig = pkgs.writeText "erlang-ca-trust.config" ''
+    [{public_key, [{cacerts_path, ${builtins.toJSON caBundle}}]}].
+  '';
+  beamFlags = "-config ${beamConfig}";
   # buildcatrust emits ordinary PEM entries for server-trusted CAs, alongside
   # AUX-bearing TRUSTED entries which must never be blindly imported into Java.
   javaCertificates = pkgs.runCommand "java-ca-truststore"

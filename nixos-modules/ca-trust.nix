@@ -6,8 +6,6 @@ let
 in
 {
   imports = [ ../modules/ca-trust.nix ];
-  # pam_env cannot represent embedded double quotes in the Erlang string term.
-  # Keep these flags in environment.variables (shells) and systemd instead.
-  environment.sessionVariables = builtins.removeAttrs environment [ "ERL_AFLAGS" "ERL_ZFLAGS" ];
+  environment.sessionVariables = environment;
   systemd.globalEnvironment = environment;
 }

@@ -10,8 +10,8 @@ let
 in
 {
   home.sessionVariables = defaults;
-  # Home Manager writes these values verbatim to environment.d. Preserve the
-  # inner ERTS quoting when systemd parses that file.
+  # Home Manager writes these values verbatim to environment.d. Quote values
+  # containing spaces, such as JAVA_TOOL_OPTIONS, for systemd's parser.
   systemd.user.sessionVariables = lib.mkIf pkgs.stdenv.hostPlatform.isLinux
     (lib.mapAttrs (_: value: lib.mkDefault (builtins.toJSON value))
       (builtins.removeAttrs trust.environment [ "NODE_OPTIONS" ]));

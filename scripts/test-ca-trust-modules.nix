@@ -45,7 +45,8 @@ let
     assert c.environment.variables.HEX_CACERTS_PATH == toString c.programs.caTrust.bundle;
     assert c.environment.variables.JAVA_TOOL_OPTIONS == "-Djavax.net.ssl.trustStore=${toString c.programs.caTrust.javaTrustStore} -Djavax.net.ssl.trustStoreType=PKCS12 -Djavax.net.ssl.trustStorePassword=changeit";
     assert c.environment.variables.ERL_AFLAGS == c.environment.variables.ERL_ZFLAGS;
-    assert builtins.match ".*cacerts_path.*" c.environment.variables.ERL_AFLAGS != null;
+    # Every environment writer must be able to pass the value through unquoted.
+    assert builtins.match "-config /nix/store/[^ \"'\\\\]+" c.environment.variables.ERL_AFLAGS != null;
     assert builtins.elem extraCA c.security.pki.certificateFiles;
     assert c.security.pki.caCertificateBlacklist == blacklist version;
     true;
@@ -59,12 +60,10 @@ assert checkSystem flake.inputs.nixpkgs-darwin.legacyPackages.x86_64-darwin.cace
 assert checkSystem flake.inputs.nixpkgs.legacyPackages.aarch64-darwin.cacert.version arm;
 assert linux.systemd.globalEnvironment.SSL_CERT_FILE == toString linux.programs.caTrust.bundle;
 assert !(linux.systemd.globalEnvironment ? NODE_OPTIONS);
-assert !(linux.environment.sessionVariables ? ERL_AFLAGS);
-assert !(linux.environment.sessionVariables ? ERL_ZFLAGS);
+assert linux.environment.sessionVariables.ERL_AFLAGS == linux.environment.variables.ERL_AFLAGS;
 assert linux.systemd.globalEnvironment.ERL_AFLAGS == linux.environment.variables.ERL_AFLAGS;
 assert linux.systemd.globalEnvironment.ERL_ZFLAGS == linux.environment.variables.ERL_ZFLAGS;
-assert !(flake.inputs.nixpkgs.lib.hasInfix "ERL_AFLAGS" linux.environment.etc."pam/environment".text);
-assert !(flake.inputs.nixpkgs.lib.hasInfix "ERL_ZFLAGS" linux.environment.etc."pam/environment".text);
+assert intel.launchd.user.envVariables.ERL_AFLAGS == intel.environment.variables.ERL_AFLAGS;
 assert !(intel.launchd.user.envVariables ? NODE_OPTIONS);
 assert linux.systemd.globalEnvironment.JAVA_TOOL_OPTIONS == linux.environment.variables.JAVA_TOOL_OPTIONS;
 assert intel.launchd.user.envVariables.JAVA_TOOL_OPTIONS == intel.environment.variables.JAVA_TOOL_OPTIONS;

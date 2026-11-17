@@ -386,6 +386,15 @@ host.
 
 `cody-ai` has passwordless sudo for all commands in Crow's container. Check
 with `sudo -n id`. Sudo grants root inside the guest's user namespace.
+
+`cody-ai` and its services may lock up to 16 GiB of memory per process with
+`mlock`/`mlockall` (for example, to keep model weights resident). The
+`container@crow-ai` unit raises the hard limit nspawn otherwise leaves at
+8 MiB, and the guest's system and user managers plus PAM apply the same value
+to services, SSH, and `sudo` sessions. Applying a change to this boundary
+requires restarting `container@crow-ai`, interrupting guest sessions. Inside
+the guest, `ulimit -l` should report `16777216` and
+`grep MemLock /proc/self/limits` should show the same soft and hard values.
 The guest's `mount` and `umount` wrappers delegate USB filesystem operations
 to `crow-ai-usb-mount.service` on the host:
 

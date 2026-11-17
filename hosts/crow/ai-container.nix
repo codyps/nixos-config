@@ -125,6 +125,16 @@ in
           commands = [{ command = "ALL"; options = [ "NOPASSWD" ]; }];
         }];
       };
+      # Keep model weights and working sets resident instead of swapping.
+      # nspawn gives the guest 8 MiB by default, so the container boundary
+      # raises RLIMIT_MEMLOCK as well. PAM covers SSH/sudo logins, while the
+      # managers cover user services and everything they start.
+      systemd.settings.Manager.DefaultLimitMEMLOCK = "16G";
+      systemd.user.settings.Manager.DefaultLimitMEMLOCK = "16G";
+      security.pam.loginLimits = [
+        { domain = "cody-ai"; item = "memlock"; type = "soft"; value = "16777216"; }
+        { domain = "cody-ai"; item = "memlock"; type = "hard"; value = "16777216"; }
+      ];
       programs.fuse.enable = true;
       virtualisation.docker.rootless = {
         enable = true;
@@ -178,6 +188,9 @@ in
     # Activate guest changes in place; container boundary changes need a restart.
     reloadIfChanged = true;
     unitConfig.RequiresMountsFor = [ "/var/lib/nixos-containers" ];
+    # The guest cannot raise its hard limit above the container's; keep this
+    # equal to the guest's DefaultLimitMEMLOCK.
+    serviceConfig.LimitMEMLOCK = "16G";
     # Stop the old "ai" instance before the renamed unit starts so its state is
     # no longer in use when preStart moves it.
     conflicts = [ "container@ai.service" ];

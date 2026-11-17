@@ -46,6 +46,14 @@ assert !c.containers.crow-ai.bindMounts."/dev/fuse".isReadOnly;
 assert guest.programs.fuse.enable;
 assert guest.security.wrappers.fusermount3.setuid;
 assert c.containers.crow-ai.privateUsers == 1048576;
+# mlock budget: the container boundary and the guest's managers/PAM must agree.
+assert c.systemd.services."container@crow-ai".serviceConfig.LimitMEMLOCK == "16G";
+assert guest.systemd.settings.Manager.DefaultLimitMEMLOCK == "16G";
+assert guest.systemd.user.settings.Manager.DefaultLimitMEMLOCK == "16G";
+assert guest.security.pam.loginLimits == [
+  { domain = "cody-ai"; item = "memlock"; type = "soft"; value = "16777216"; }
+  { domain = "cody-ai"; item = "memlock"; type = "hard"; value = "16777216"; }
+];
 assert !guest.users.users.cody-ai.autoSubUidGidRange;
 assert guest.users.users.cody-ai.subUidRanges == [{ startUid = 100000; count = 65536; }];
 assert guest.users.users.cody-ai.subGidRanges == [{ startGid = 100000; count = 65536; }];

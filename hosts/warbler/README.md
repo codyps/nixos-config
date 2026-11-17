@@ -46,6 +46,14 @@ Use `runs-on: warbler-macos-intel` for CLI macOS jobs; full Xcode is not install
 Inspect `systemctl status actions-vm-scaler` and
 `journalctl -u actions-vm-scaler` for controller status. GARM continues serving
 its separate Linux scale sets.
+Windows jobs use `runs-on: warbler-windows`, with one independently capped VM
+slot and the same App repository discovery. Its controller is
+`actions-vm-scaler-windows.service`; its isolated network is `10.80.0.0/24`.
+The [Windows image tool](../../scripts/actions-windows-image/README.md) prepares
+Windows 11 Pro, Git, PowerShell 7, and Visual Studio C++ Build Tools from the local
+installation ISO. Images, workspaces, and disposable disks live on the
+[separate encrypted SATA volume](storage.md#actions-vm-storage).
+
 See the [scaler validation procedure](../../scripts/actions-vm-scaler/README.md#validation)
 for job lifecycle and isolation checks.
 
@@ -66,7 +74,8 @@ recovery. Its Codex service is disabled.
 
 See [disk usage and recovery](storage.md) for read-only inspection commands,
 cleanup policy, and capacity recommendations. All persistent workloads
-share the encrypted SSD; subvolumes do not isolate free space.
+share the encrypted system SSD except VM image storage and Windows runtime state on the separate
+SATA volume; subvolumes do not isolate free space.
 
 ## Hardware and firmware references
 

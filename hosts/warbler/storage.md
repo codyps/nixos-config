@@ -5,6 +5,37 @@ share one encrypted 475 GiB Btrfs filesystem. Separate subvolumes and bind
 mounts do not reserve capacity. The root reset at boot does not clean persistent
 container homes, caches, or scratch storage.
 
+## Actions VM storage
+
+The internal SATA SSD has a separate LUKS2 container labeled `warbler-actions`
+and Btrfs filesystem labeled `warbler-actions-data`. It mounts at
+`/var/lib/actions-vm`; `build/` holds trusted installer workspaces,
+`images/` holds immutable published Windows images and `images/macos/` holds
+macOS images (bind-mounted at their original `/var/lib/actions-vm-images` path), and `state/` is bind-mounted at
+`/var/lib/actions-vm-scaler-windows` for disposable job disks and controller state.
+This keeps both published OS images, Windows preparation, and Windows job growth
+off the system SSD. Existing macOS runtime state remains in `/var/lib/actions-vm-scaler`.
+
+The mounts use `nofail`: losing the runner disk does not put the host in emergency
+mode. Scaler mount dependencies still prevent jobs from writing into the hidden
+system-disk directories when the SATA volume is unavailable.
+
+`actions-vm-storage.service` unlocks the volume after `/persist` is mounted,
+using the root-only `/persist/var/lib/actions-vm-storage/key`. The key was generated
+on Warbler and is never part of the repository, Nix store, or initrd. Losing that
+key loses access to the runner volume; preserve it in trusted encrypted recovery
+storage when backing up the host. The volume does not participate in early boot
+unlock, signing, or measurements. The OS installation's disko configuration still
+targets only the NVMe; it must not repartition the runner SSD during reinstalls.
+
+```sh
+systemctl status actions-vm-storage
+findmnt -T /var/lib/actions-vm
+findmnt -T /var/lib/actions-vm-images
+findmnt -T /var/lib/actions-vm-scaler-windows
+df -h /var/lib/actions-vm
+```
+
 ## Inspect usage
 
 `ncdu` is installed system-wide on Warbler, inside warbler-ai, and in the shared

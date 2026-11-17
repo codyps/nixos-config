@@ -39,6 +39,23 @@ let
   invalid = evaluate (lib.recursiveUpdate enabled {
     services.actions-vm-scaler.privateKeyFile = "/nix/store/example-key";
   });
+  multi = evaluate (lib.recursiveUpdate enabled {
+    services.actions-vm-scaler.instances.windows = {
+      enable = true;
+      capacity = 1;
+      networkOctet = 79;
+      macSlotOffset = 32;
+      privateKeyFile = "/run/secrets/app-key";
+      imageConfigFile = "/images/windows/vm.json";
+      settings = { scale_set = "test-windows"; app_id = "123"; installation_id = 456; vm.guest_os = "windows"; };
+    };
+  });
+  overlap = evaluate (lib.recursiveUpdate enabled {
+    networking.interfaces.ai-ssh.ipv4.addresses = [{ address = "10.78.0.2"; prefixLength = 24; }];
+  });
+  broadOverlap = evaluate (lib.recursiveUpdate enabled {
+    networking.interfaces.test.ipv4.addresses = [{ address = "10.78.9.1"; prefixLength = 16; }];
+  });
   unit = on.systemd.services.actions-vm-scaler.serviceConfig;
 in
 assert builtins.all (x: x.assertion) on.assertions;
@@ -50,6 +67,15 @@ assert unit.LoadCredential == [ "github-app-key:/run/secrets/app-key" ];
 assert unit.ProtectSystem == "strict";
 assert unit.StateDirectoryMode == "0700";
 assert !(on.networking.firewall.filterForward);
+assert builtins.all (x: x.assertion) multi.assertions;
+assert builtins.any (x: !x.assertion && lib.hasInfix "overlaps" x.message) overlap.assertions;
+assert builtins.any (x: !x.assertion && lib.hasInfix "overlaps" x.message) broadOverlap.assertions;
+assert multi.systemd.services.actions-vm-scaler-windows.serviceConfig.User == "actions-vm-scaler-windows";
+assert multi.systemd.services.actions-vm-scaler-windows.serviceConfig.StateDirectory != unit.StateDirectory;
+assert multi.systemd.services.actions-vm-scaler-windows.unitConfig.RequiresMountsFor == [ "/images/windows/vm.json" "/var/lib/actions-vm-scaler-windows" ];
+assert lib.hasInfix "av79br0" (builtins.readFile multi.systemd.services.actions-vm-scaler-windows-network.serviceConfig.ExecStart);
+assert lib.hasInfix "10.79.0.0/24" multi.networking.nftables.tables.actions-vm-scaler-windows-isolation.content;
+assert lib.hasInfix "10.78.0.0/24" multi.networking.nftables.tables.actions-vm-isolation.content;
 assert lib.hasInfix "10.78.0.0/24" on.networking.nftables.tables.actions-vm-isolation.content;
 assert builtins.any (x: !x.assertion && lib.hasInfix "runtime secret" x.message) invalid.assertions;
 {

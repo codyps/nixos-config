@@ -38,7 +38,15 @@ pub struct VmConfig {
     pub qemu_img: PathBuf,
     pub xorriso: PathBuf,
     pub base_disk: PathBuf,
-    pub opencore_disk: PathBuf,
+    #[serde(default)]
+    pub opencore_disk: Option<PathBuf>,
+    #[serde(default)]
+    pub guest_os: GuestOs,
+    #[serde(default)]
+    pub tpm: Option<TpmConfig>,
+    /// Offset within the locally administered synthetic NIC range.
+    #[serde(default)]
+    pub mac_slot_offset: u8,
     pub firmware_code: PathBuf,
     pub firmware_vars: PathBuf,
     /// Root-managed QEMU device options, one argument per entry. Never a shell command.
@@ -51,6 +59,22 @@ pub struct VmConfig {
     #[serde(default = "default_cpus")]
     pub cpus: u32,
 }
+#[derive(Clone, Copy, Default, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+pub enum GuestOs {
+    #[default]
+    Macos,
+    Windows,
+}
+
+#[derive(Clone, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct TpmConfig {
+    pub swtpm: PathBuf,
+    pub state_template: PathBuf,
+    pub socket_dir: PathBuf,
+}
+
 fn default_group() -> u64 {
     1
 }
@@ -152,6 +176,26 @@ impl Config {
             self.vm.memory_mib >= 1024 && self.vm.cpus > 0,
             "invalid VM resources"
         );
+        ensure!(
+            usize::from(self.vm.mac_slot_offset) + self.vm.taps.len() <= 256,
+            "synthetic NIC slot range exceeds one byte"
+        );
+        if let Some(tpm) = &self.vm.tpm {
+            ensure!(
+                tpm.socket_dir.as_os_str().as_encoded_bytes().len() + 46 < 108,
+                "TPM socket directory is too long for Unix sockets"
+            );
+        }
+        match self.vm.guest_os {
+            GuestOs::Macos => ensure!(
+                self.vm.opencore_disk.is_some() && self.vm.tpm.is_none(),
+                "macOS requires OpenCore and no TPM"
+            ),
+            GuestOs::Windows => ensure!(
+                self.vm.opencore_disk.is_none() && self.vm.tpm.is_some(),
+                "Windows requires a TPM and no OpenCore"
+            ),
+        }
         for path in [
             &self.private_key_file,
             &self.state_dir,
@@ -159,10 +203,17 @@ impl Config {
             &self.vm.qemu_img,
             &self.vm.xorriso,
             &self.vm.base_disk,
-            &self.vm.opencore_disk,
             &self.vm.firmware_code,
             &self.vm.firmware_vars,
-        ] {
+        ]
+        .into_iter()
+        .chain(self.vm.opencore_disk.iter())
+        .chain(
+            self.vm
+                .tpm
+                .iter()
+                .flat_map(|t| [&t.swtpm, &t.state_template, &t.socket_dir]),
+        ) {
             ensure!(
                 path.is_absolute(),
                 "paths must be absolute: {}",
@@ -202,16 +253,25 @@ impl Config {
             &self.vm.qemu_img,
             &self.vm.xorriso,
             &self.vm.base_disk,
-            &self.vm.opencore_disk,
             &self.vm.firmware_code,
             &self.vm.firmware_vars,
-        ] {
+        ]
+        .into_iter()
+        .chain(self.vm.opencore_disk.iter())
+        .chain(self.vm.tpm.iter().map(|t| &t.swtpm))
+        {
             ensure!(
                 fs::metadata(path)
                     .with_context(|| format!("reading {}", path.display()))?
                     .is_file(),
                 "not a file: {}",
                 path.display()
+            );
+        }
+        if let Some(tpm) = &self.vm.tpm {
+            ensure!(
+                fs::metadata(&tpm.state_template)?.is_dir(),
+                "TPM template must be a directory"
             );
         }
         Ok(())

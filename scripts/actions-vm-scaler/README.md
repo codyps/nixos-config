@@ -1,4 +1,4 @@
-# Disposable macOS GitHub Actions runners on Linux
+# Disposable GitHub Actions VMs on Linux
 
 `actions-vm-scaler` is a Rust scale-set client and single-host QEMU/KVM lifecycle
 manager. It serves GitHub Actions jobs, not Nix remote-build requests. It uses
@@ -31,6 +31,28 @@ process. GHES, multiple installations, multi-host placement and rolling image bu
 installation, first-boot setup, provisioning, sealing, and publication. Keep GARM handling the
 existing Linux scale sets. Supplying a nonempty `github_url` explicitly selects
 legacy single-repository/organization mode; **omit it for all granted repositories**.
+
+## Windows scale sets
+
+The same controller also supports Windows x64 with `vm.guest_os = "windows"`.
+Prepare an image using the [Windows image tool](../actions-windows-image/README.md).
+Windows uses native SATA/e1000e devices, UEFI Secure Boot firmware and a software
+TPM. Omit `opencore_disk` and supply `tpm.state_template`; the NixOS module supplies
+`swtpm` and a private short socket directory. OS disk, firmware variables and TPM
+state are private copies for every job. Windows jobs run as guest SYSTEM through
+the startup bootstrap and shut down after their JIT runner exits.
+
+`services.actions-vm-scaler.instances.NAME` adds a separate controller alongside
+the existing default instance. Each instance needs a distinct `networkOctet`,
+`macSlotOffset` range, scale-set name, image, state directory, and service account.
+Additional services are `actions-vm-scaler-NAME`; the default keeps its existing
+unit names and network. Capacity is shared across repositories **within each
+instance**; separate OS instances have independent capacity limits. Set
+`settings.vm.guest_os = "windows"` for Windows instances, including when loading
+image settings through `imageConfigFile`.
+
+Warbler uses one Windows slot (`warbler-windows`) and one macOS slot
+(`warbler-macos-intel`). Windows state is on its dedicated encrypted SSD.
 
 ## Image contract
 
@@ -154,7 +176,8 @@ pre-created for the service account; QEMU runs without root or CAP_NET_ADMIN.
 
 The network units intentionally retain the bridge/TAPs until reboot. If removing
 or shrinking this service, stop it before manually removing unused interfaces.
-The current module reserves these fixed names for its one instance.
+The default instance retains these names. Additional instances use `av<networkOctet>`
+interface prefixes and their own private subnet; reserve distinct networks and NIC slots.
 
 Select the runner in an Actions workflow:
 

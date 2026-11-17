@@ -1,6 +1,6 @@
 use crate::{
     api::Api,
-    config::Config,
+    config::{Config, GuestOs},
     pool::{Lease, Pool},
 };
 use anyhow::{ensure, Context, Result};
@@ -33,6 +33,7 @@ pub struct Vm {
     _lease: Lease,
     pub slot: usize,
     pub child: Child,
+    pub tpm: Option<Child>,
     pub started: Option<Instant>,
     pub created: Instant,
     pub retiring: bool,
@@ -52,6 +53,9 @@ impl Drop for Manager {
         self.pool.cancel(&self.owner);
         for vm in self.vms.values_mut() {
             let _ = vm.child.start_kill();
+            if let Some(tpm) = &mut vm.tpm {
+                let _ = tpm.start_kill();
+            }
         }
         // flock is tied to the open file description. Another thread may have
         // forked a helper that briefly holds a copy until exec closes CLOEXEC
@@ -137,6 +141,18 @@ impl Manager {
             fs::symlink_metadata(&runs)?.is_dir(),
             "runs must be a real directory"
         );
+        if let Some(tpm) = &config.vm.tpm {
+            if !tpm.socket_dir.exists() {
+                private_dir(&tpm.socket_dir)?;
+            }
+            let meta = fs::symlink_metadata(&tpm.socket_dir)?;
+            ensure!(
+                meta.is_dir()
+                    && !meta.file_type().is_symlink()
+                    && meta.permissions().mode() & 0o077 == 0,
+                "TPM socket directory must be a private real directory"
+            );
+        }
         Ok(Self {
             pool,
             owner: format!("actions-vm-{}", identity.controller),
@@ -179,6 +195,14 @@ impl Manager {
 
     fn remove_files(&self, name: &str) -> Result<()> {
         let dir = self.dir(name)?;
+        if let Some(tpm) = &self.config.vm.tpm {
+            let socket = tpm.socket_dir.join(format!("{name}.sock"));
+            match fs::remove_file(socket) {
+                Ok(()) => (),
+                Err(e) if e.kind() == std::io::ErrorKind::NotFound => (),
+                Err(e) => return Err(e.into()),
+            }
+        }
         if dir.exists() {
             ensure!(
                 fs::symlink_metadata(&dir)?.is_dir(),
@@ -213,6 +237,11 @@ impl Manager {
             if vm.child.try_wait()?.is_some() {
                 vm.retiring = true;
             }
+            if let Some(tpm) = &mut vm.tpm {
+                if tpm.try_wait()?.is_some() {
+                    vm.retiring = true;
+                }
+            }
             let timed_out = match vm.started {
                 Some(at) => at.elapsed() >= Duration::from_secs(self.config.job_timeout_secs),
                 None => {
@@ -233,6 +262,9 @@ impl Manager {
             if vm.retiring {
                 // Keep the slot reserved until the child has actually stopped.
                 vm.child.kill().await.context("stopping QEMU")?;
+                if let Some(tpm) = &mut vm.tpm {
+                    tpm.kill().await.context("stopping TPM")?;
+                }
                 retired.push(name.clone());
             }
         }
@@ -270,14 +302,15 @@ impl Manager {
             .arg(&disk))
         .await
         .context("creating disposable disk")?;
-        // IDE hard disks require a writable block node. Keep the shared boot
-        // image immutable by giving OpenCore its own disposable overlay too.
-        run(Command::new(&self.config.vm.qemu_img)
-            .args(["create", "-f", "qcow2", "-F", "qcow2", "-b"])
-            .arg(&self.config.vm.opencore_disk)
-            .arg(dir.join("opencore.qcow2")))
-        .await
-        .context("creating disposable OpenCore disk")?;
+        if let Some(opencore) = &self.config.vm.opencore_disk {
+            // IDE hard disks require a writable block node.
+            run(Command::new(&self.config.vm.qemu_img)
+                .args(["create", "-f", "qcow2", "-F", "qcow2", "-b"])
+                .arg(opencore)
+                .arg(dir.join("opencore.qcow2")))
+            .await
+            .context("creating disposable OpenCore disk")?;
+        }
         fs::copy(&self.config.vm.firmware_vars, dir.join("nvram.fd"))?;
         fs::set_permissions(dir.join("nvram.fd"), fs::Permissions::from_mode(0o600))?;
         run(Command::new(&self.config.vm.xorriso)
@@ -301,6 +334,7 @@ impl Manager {
             .write(true)
             .mode(0o600)
             .open(dir.join("qemu.log"))?;
+        let tpm = self.start_tpm(&dir, &name).await?;
         let mut command = Command::new(&self.config.vm.qemu);
         command
             .args(qemu_args(&self.config, &dir, &name, slot, id))
@@ -315,6 +349,7 @@ impl Manager {
                 _lease: lease,
                 slot,
                 child,
+                tpm,
                 started: None,
                 created: Instant::now(),
                 retiring: false,
@@ -322,6 +357,49 @@ impl Manager {
         );
         eprintln!("started runner {name} in slot {slot}");
         Ok(true)
+    }
+
+    async fn start_tpm(&self, dir: &Path, name: &str) -> Result<Option<Child>> {
+        let Some(tpm) = &self.config.vm.tpm else {
+            return Ok(None);
+        };
+        let state = dir.join("tpm");
+        private_dir(&state)?;
+        let mut count = 0;
+        for entry in fs::read_dir(&tpm.state_template)? {
+            let entry = entry?;
+            ensure!(
+                entry.file_type()?.is_file(),
+                "TPM template must contain only regular files"
+            );
+            let destination = state.join(entry.file_name());
+            fs::copy(entry.path(), &destination)?;
+            fs::set_permissions(destination, fs::Permissions::from_mode(0o600))?;
+            count += 1;
+        }
+        ensure!(count > 0, "empty TPM template");
+        let socket = tpm.socket_dir.join(format!("{name}.sock"));
+        ensure!(!socket.exists(), "TPM socket already exists");
+        let mut command = Command::new(&tpm.swtpm);
+        command
+            .args(["socket", "--tpm2", "--tpmstate"])
+            .arg(format!("dir={}", state.display()))
+            .arg("--ctrl")
+            .arg(format!("type=unixio,path={}", socket.display()))
+            .args(["--flags", "not-need-init", "--terminate"])
+            .stdin(Stdio::null())
+            .stdout(Stdio::null())
+            .stderr(Stdio::null());
+        prepare_child(&mut command);
+        let mut child = command.spawn().context("starting TPM")?;
+        for _ in 0..100 {
+            ensure!(child.try_wait()?.is_none(), "TPM exited before startup");
+            if socket.exists() {
+                return Ok(Some(child));
+            }
+            tokio::time::sleep(Duration::from_millis(20)).await;
+        }
+        anyhow::bail!("TPM socket startup timed out")
     }
 
     /// Release local resources while retaining empty registration-intent directories.
@@ -366,6 +444,11 @@ impl Manager {
             if let Err(error) = vm.child.kill().await {
                 eprintln!("QEMU stop failed: {error}");
             }
+            if let Some(tpm) = &mut vm.tpm {
+                if let Err(error) = tpm.kill().await {
+                    eprintln!("TPM stop failed: {error}");
+                }
+            }
         }
     }
 }
@@ -409,13 +492,19 @@ pub fn qemu_args(config: &Config, dir: &Path, name: &str, slot: usize, id: Uuid)
         ),
         "-device".into(),
         "ich9-ahci,id=sata".into(),
-        "-drive".into(),
-        format!(
-            "id=opencore,if=none,format=qcow2,file={}",
-            dir.join("opencore.qcow2").display()
-        ),
-        "-device".into(),
-        "ide-hd,bus=sata.2,drive=opencore".into(),
+    ]);
+    if v.guest_os == GuestOs::Macos {
+        args.extend([
+            "-drive".into(),
+            format!(
+                "id=opencore,if=none,format=qcow2,file={}",
+                dir.join("opencore.qcow2").display()
+            ),
+            "-device".into(),
+            "ide-hd,bus=sata.2,drive=opencore".into(),
+        ]);
+    }
+    args.extend([
         "-drive".into(),
         format!(
             "id=seed,if=none,format=raw,readonly=on,media=cdrom,file={}",
@@ -429,7 +518,11 @@ pub fn qemu_args(config: &Config, dir: &Path, name: &str, slot: usize, id: Uuid)
             dir.join("disk.qcow2").display()
         ),
         "-device".into(),
-        "ide-hd,bus=sata.4,drive=os".into(),
+        if v.guest_os == GuestOs::Windows {
+            "ide-hd,bus=sata.4,drive=os,bootindex=1".into()
+        } else {
+            "ide-hd,bus=sata.4,drive=os".into()
+        },
         "-device".into(),
         "VGA".into(),
         "-netdev".into(),
@@ -438,8 +531,29 @@ pub fn qemu_args(config: &Config, dir: &Path, name: &str, slot: usize, id: Uuid)
             v.taps[slot]
         ),
         "-device".into(),
-        format!("vmxnet3,netdev=net0,mac=52:54:00:78:00:{slot:02x}"),
+        format!(
+            "{},netdev=net0,mac=52:54:00:78:00:{:02x}",
+            if v.guest_os == GuestOs::Windows {
+                "e1000e"
+            } else {
+                "vmxnet3"
+            },
+            usize::from(v.mac_slot_offset) + slot
+        ),
     ]);
+    if let Some(tpm) = &v.tpm {
+        args.extend([
+            "-chardev".into(),
+            format!(
+                "socket,id=chrtpm,path={}",
+                tpm.socket_dir.join(format!("{name}.sock")).display()
+            ),
+            "-tpmdev".into(),
+            "emulator,id=tpm0,chardev=chrtpm".into(),
+            "-device".into(),
+            "tpm-tis,tpmdev=tpm0".into(),
+        ]);
+    }
     args
 }
 

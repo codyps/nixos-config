@@ -35,7 +35,10 @@ fn config(temp: &TempDir) -> Config {
             qemu_img: root.join("qemu-img"),
             xorriso: root.join("xorriso"),
             base_disk: root.join("base.qcow2"),
-            opencore_disk: root.join("opencore.qcow2"),
+            opencore_disk: Some(root.join("opencore.qcow2")),
+            guest_os: crate::config::GuestOs::Macos,
+            tpm: None,
+            mac_slot_offset: 0,
             firmware_code: root.join("code.fd"),
             firmware_vars: root.join("vars.fd"),
             hardware_args: vec![
@@ -56,7 +59,7 @@ fn config(temp: &TempDir) -> Config {
     .unwrap();
     for file in [
         &c.vm.base_disk,
-        &c.vm.opencore_disk,
+        c.vm.opencore_disk.as_ref().unwrap(),
         &c.vm.firmware_code,
         &c.vm.firmware_vars,
     ] {
@@ -848,6 +851,87 @@ async fn listener_only_acknowledges_after_failed_provisioning_has_recovered() {
         .is_none());
     manager.stop_all().await;
     manager.reap(&mut api).await.unwrap();
+}
+
+fn windows_config(temp: &TempDir) -> Config {
+    let mut c = config(temp);
+    c.vm.guest_os = crate::config::GuestOs::Windows;
+    c.vm.opencore_disk = None;
+    c.vm.mac_slot_offset = 32;
+    let template = temp.path().join("tpm-template");
+    fs::create_dir(&template).unwrap();
+    fs::write(template.join("tpm2-00.permall"), "golden-tpm").unwrap();
+    let executable = temp.path().join("swtpm");
+    fs::write(&executable, "#!/bin/sh\nfor arg; do\ncase \"$arg\" in type=unixio,path=*) : > \"${arg#type=unixio,path=}\";; esac\ndone\nexec sleep 300\n").unwrap();
+    fs::set_permissions(&executable, fs::Permissions::from_mode(0o755)).unwrap();
+    c.vm.tpm = Some(crate::config::TpmConfig {
+        swtpm: executable,
+        state_template: template,
+        socket_dir: temp.path().join("sockets"),
+    });
+    c
+}
+
+#[test]
+fn windows_requires_tpm_without_opencore_and_uses_native_devices() {
+    let temp = TempDir::new().unwrap();
+    let mut c = windows_config(&temp);
+    c.validate().unwrap();
+    c.check_files().unwrap();
+    let args = qemu_args(
+        &c,
+        &temp.path().join("run"),
+        "test",
+        0,
+        uuid::Uuid::new_v4(),
+    );
+    assert!(!args
+        .iter()
+        .any(|a| a.contains("opencore") || a.contains("vmxnet3")));
+    assert!(args.iter().any(|a| a.starts_with("e1000e,netdev=net0,")));
+    assert!(args.iter().any(|a| a.contains("bootindex=1")));
+    assert!(args.contains(&"tpm-tis,tpmdev=tpm0".into()));
+    c.vm.tpm = None;
+    assert!(c.validate().is_err());
+    c.vm.guest_os = crate::config::GuestOs::Macos;
+    assert!(c.validate().is_err());
+}
+
+#[tokio::test]
+async fn windows_clones_tpm_and_cleans_up_it_with_the_job() {
+    let temp = TempDir::new().unwrap();
+    let c = windows_config(&temp);
+    let server = MockServer::start().await;
+    jit(&server).await;
+    empty_runners(&server).await;
+    let mut api = Api::fixture(c.clone(), &server.uri(), true);
+    let mut manager = Manager::new(c.clone()).unwrap();
+    manager.spawn(&mut api).await.unwrap();
+    let name = manager.vms.keys().next().unwrap().clone();
+    let dir = manager.dir(&name).unwrap();
+    let tpm_file = dir.join("tpm/tpm2-00.permall");
+    assert_eq!(fs::read_to_string(&tpm_file).unwrap(), "golden-tpm");
+    assert!(!dir.join("opencore.qcow2").exists());
+    fs::write(&tpm_file, "job-owned-state").unwrap();
+    let template = c.vm.tpm.as_ref().unwrap();
+    assert_eq!(
+        fs::read_to_string(template.state_template.join("tpm2-00.permall")).unwrap(),
+        "golden-tpm"
+    );
+    let socket = template.socket_dir.join(format!("{name}.sock"));
+    assert!(socket.exists());
+    // A failed GitHub cleanup retains the slot, but both local children stop.
+    server.reset().await;
+    manager.mark_completed(&name);
+    assert!(manager.reap(&mut api).await.is_err());
+    let vm = manager.vms.get_mut(&name).unwrap();
+    assert!(vm.child.try_wait().unwrap().is_some());
+    assert!(vm.tpm.as_mut().unwrap().try_wait().unwrap().is_some());
+    empty_runners(&server).await;
+    manager.reap(&mut api).await.unwrap();
+    assert!(!socket.exists());
+    assert!(!dir.exists());
+    assert_eq!(manager.count(), 0);
 }
 
 #[tokio::test]

@@ -376,6 +376,7 @@
             }).caddyFull.src;
           } // pkgs.lib.optionalAttrs (system == "x86_64-linux") {
             actions-vm-image = pkgs.callPackage ./nixpkgs/actions-vm-image.nix { };
+            actions-windows-image = pkgs.callPackage ./nixpkgs/actions-windows-image.nix { };
           };
           devShells.default = pkgs.mkShell ((import ./lib/ca-trust.nix { inherit pkgs; }).environment // {
             nativeBuildInputs = with pkgs; [

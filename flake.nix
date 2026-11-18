@@ -763,6 +763,7 @@
                   ./nix-darwin/home.nix
                   ./home-manager/home.nix
                   x86_64DarwinHomeModule
+                  ./home-manager/claude-glm.nix
                   ./hosts/u3/home.nix
                 ];
 

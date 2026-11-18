@@ -1,4 +1,4 @@
-{ config, lib, pkgs, ... }:
+{ config, pkgs, ... }:
 let
   shizuku-usb-watch = pkgs.writeShellApplication {
     name = "shizuku-usb-watch";
@@ -14,13 +14,6 @@ let
 
   pinentry-mac-app = "${config.home.homeDirectory}/.local/libexec/pinentry-mac.app";
   pinentry-mac-program = "${pinentry-mac-app}/Contents/MacOS/pinentry-mac";
-
-  # The newest valid Apple Development identity in the login Keychain. It is
-  # valid through 2027-07-31; update this fingerprint after renewing it.
-  pinentry-mac-signing-identity = "74BFF0F545B04980BDFBFF930E327BFC264A0F3C";
-  pinentry-mac-signing-requirement =
-    ''identifier "org.gpgtools.pinentry-mac" and anchor apple generic ''
-    + ''and certificate leaf[subject.CN] = "Apple Development: cpschafer@gmail.com (VND7B2K25N)"'';
 in
 {
 
@@ -53,31 +46,16 @@ in
   #  corepack() { _nvm_lazy_load || return; corepack "$@"; }
   #'';
 
-  # Keychain ACLs identify the executable reading a password by its designated
-  # code-signing requirement. Sign a mutable copy with a certificate-backed
-  # identity so "Always Allow" survives package rebuilds and agent restarts.
-  home.activation.installSignedPinentryMac =
-    lib.hm.dag.entryBetween [ "linkGeneration" ] [ "writeBoundary" ] ''
-      target=${lib.escapeShellArg pinentry-mac-app}
-      source=${pkgs.pinentry_mac}/Applications/pinentry-mac.app
-      source_marker="$target.source"
-      requirement=${lib.escapeShellArg pinentry-mac-signing-requirement}
-
-      if ! /usr/bin/codesign --verify --deep --strict \
-        -R="$requirement" "$target" 2>/dev/null \
-        || [[ "$(${pkgs.coreutils}/bin/readlink "$source_marker")" != "$source" ]]; then
-        run /bin/mkdir -p "$(/usr/bin/dirname "$target")"
-        run /bin/rm -rf "$target"
-        run /bin/cp -R "$source" "$target"
-        run /bin/chmod -R u+w "$target"
-        run /usr/bin/codesign --force --deep --timestamp=none \
-          --sign ${lib.escapeShellArg pinentry-mac-signing-identity} "$target"
-        run /usr/bin/codesign --verify --deep --strict \
-          -R="$requirement" "$target"
-        run /bin/rm -f "$source_marker"
-        run /bin/ln -s "$source" "$source_marker"
-      fi
-    '';
+  # Keep GPG's path stable without re-signing the Nix-built application. The
+  # previous Apple Development certificate was revoked, causing macOS to trash
+  # the signed copy. A structurally valid signature or find-identity output
+  # does not establish revocation status. Keychain permissions may need renewing
+  # after package upgrades until a valid persistent signing identity is available.
+  home.file.".local/libexec/pinentry-mac.app" = {
+    source = "${pkgs.pinentry_mac}/Applications/pinentry-mac.app";
+    # Adopt the path previously populated by installSignedPinentryMac.
+    force = true;
+  };
 
   home.file.".gnupg/gpg-agent.conf" = {
     text = ''

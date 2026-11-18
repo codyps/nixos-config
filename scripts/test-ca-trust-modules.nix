@@ -40,9 +40,10 @@ let
     ];
   }).config;
   checkSystem = version: c:
-    assert c.environment.variables.SSL_CERT_FILE == toString c.programs.caTrust.bundle;
+    assert c.environment.variables.SSL_CERT_FILE == "/run/current-system/etc/ssl/certs/ca-certificates.crt";
     assert c.environment.variables.NODE_OPTIONS == "--use-openssl-ca";
-    assert c.environment.variables.HEX_CACERTS_PATH == toString c.programs.caTrust.bundle;
+    assert c.environment.variables.NODE_EXTRA_CA_CERTS == "/run/current-system/etc/ssl/certs/ca-certificates.crt";
+    assert c.environment.variables.HEX_CACERTS_PATH == "/run/current-system/etc/ssl/certs/ca-certificates.crt";
     assert c.environment.variables.JAVA_TOOL_OPTIONS == "-Djavax.net.ssl.trustStore=${toString c.programs.caTrust.javaTrustStore} -Djavax.net.ssl.trustStoreType=PKCS12 -Djavax.net.ssl.trustStorePassword=changeit";
     assert c.environment.variables.ERL_AFLAGS == c.environment.variables.ERL_ZFLAGS;
     # Every environment writer must be able to pass the value through unquoted.
@@ -58,19 +59,24 @@ assert blacklist "3.132" == [ "Comodo AAA Services root" ];
 assert checkSystem flake.inputs.nixpkgs.legacyPackages.x86_64-linux.cacert.version linux;
 assert checkSystem flake.inputs.nixpkgs-darwin.legacyPackages.x86_64-darwin.cacert.version intel;
 assert checkSystem flake.inputs.nixpkgs.legacyPackages.aarch64-darwin.cacert.version arm;
-assert linux.systemd.globalEnvironment.SSL_CERT_FILE == toString linux.programs.caTrust.bundle;
+assert linux.systemd.globalEnvironment.SSL_CERT_FILE == "/run/current-system/etc/ssl/certs/ca-certificates.crt";
 assert !(linux.systemd.globalEnvironment ? NODE_OPTIONS);
+assert linux.systemd.globalEnvironment.NODE_EXTRA_CA_CERTS == "/run/current-system/etc/ssl/certs/ca-certificates.crt";
 assert linux.environment.sessionVariables.ERL_AFLAGS == linux.environment.variables.ERL_AFLAGS;
 assert linux.systemd.globalEnvironment.ERL_AFLAGS == linux.environment.variables.ERL_AFLAGS;
 assert linux.systemd.globalEnvironment.ERL_ZFLAGS == linux.environment.variables.ERL_ZFLAGS;
 assert intel.launchd.user.envVariables.ERL_AFLAGS == intel.environment.variables.ERL_AFLAGS;
 assert !(intel.launchd.user.envVariables ? NODE_OPTIONS);
+assert intel.launchd.user.envVariables.NODE_EXTRA_CA_CERTS == "/run/current-system/etc/ssl/certs/ca-certificates.crt";
+assert arm.launchd.user.envVariables.NODE_EXTRA_CA_CERTS == "/run/current-system/etc/ssl/certs/ca-certificates.crt";
 assert linux.systemd.globalEnvironment.JAVA_TOOL_OPTIONS == linux.environment.variables.JAVA_TOOL_OPTIONS;
 assert intel.launchd.user.envVariables.JAVA_TOOL_OPTIONS == intel.environment.variables.JAVA_TOOL_OPTIONS;
 assert arm.launchd.user.envVariables.JAVA_TOOL_OPTIONS == arm.environment.variables.JAVA_TOOL_OPTIONS;
 assert builtins.toJSON home.home.sessionVariables.JAVA_TOOL_OPTIONS == home.systemd.user.sessionVariables.JAVA_TOOL_OPTIONS;
 assert builtins.toJSON home.home.sessionVariables.SSL_CERT_FILE == home.systemd.user.sessionVariables.SSL_CERT_FILE;
 assert !(home.systemd.user.sessionVariables ? NODE_OPTIONS);
+assert home.home.sessionVariables.NODE_EXTRA_CA_CERTS == home.home.sessionVariables.SSL_CERT_FILE;
+assert home.systemd.user.sessionVariables.NODE_EXTRA_CA_CERTS == home.systemd.user.sessionVariables.SSL_CERT_FILE;
 {
   passed = true;
   linuxBundle = toString linux.programs.caTrust.bundle;

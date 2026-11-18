@@ -17,13 +17,19 @@ current package set and the older Intel Darwin pin's root data.
 Integrated Home Manager users share the host's generated bundle, including
 `security.pki.certificates` and `security.pki.certificateFiles`. Standalone
 homes and development shells use a filtered bundle from their own package set.
+System-integrated clients use
+`/run/current-system/etc/ssl/certs/ca-certificates.crt`, so new TLS contexts in
+existing shells follow the active configuration without retaining an old store
+path. Explicit `programs.caTrust.bundle` overrides retain their selected source.
 
 The environment selects this bundle for OpenSSL/Python, Nix, curl, Git,
 Requests, pip, npm, AWS clients, and gRPC clients that honor their standard
 CA-file variables. `SSL_CERT_DIR` points to an immutable empty directory to
 avoid adding an unrelated OpenSSL fallback store. Node uses
 `NODE_OPTIONS=--use-openssl-ca` so Vite+ and downloaded Node runtimes replace
-their embedded roots; `NODE_EXTRA_CA_CERTS` alone would only add trust.
+their embedded roots. `NODE_EXTRA_CA_CERTS` also points to the same filtered
+bundle for clients such as native Claude Code's updater that require it
+explicitly. Keep both settings: `NODE_EXTRA_CA_CERTS` alone only adds trust.
 
 For Erlang/Elixir, `ERL_AFLAGS` and `ERL_ZFLAGS` pass `-config` with a
 generated file that sets the `public_key` application's `cacerts_path` to the
@@ -67,7 +73,7 @@ An Electron app launched from a shell may need `env -u NODE_OPTIONS`.
 
 Build and activate the host configuration, then start a fresh shell. Existing
 applications and services retain their inherited environment until restarted.
-The bundle is immutable and rooted by the configuration, so no manual edits to
+The bundle is generated and rooted by the configuration, so no manual edits to
 MacPorts files or Nix store files are needed. Local MacPorts edits made earlier
 remain separate and may be overwritten by a MacPorts upgrade.
 

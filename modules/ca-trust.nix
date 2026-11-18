@@ -1,7 +1,14 @@
 { config, lib, pkgs, ... }:
 let
   cfg = config.programs.caTrust;
-  trust = import ../lib/ca-trust.nix { inherit pkgs; bundle = cfg.bundle; };
+  trust = import ../lib/ca-trust.nix {
+    inherit pkgs;
+    bundle = cfg.bundle;
+    # Custom bundle overrides still select their own runtime source.
+    runtimeBundle = if toString cfg.bundle == toString config.environment.etc."ssl/certs/ca-certificates.crt".source
+      then "/run/current-system/etc/ssl/certs/ca-certificates.crt"
+      else toString cfg.bundle;
+  };
 in
 {
   options.programs.caTrust = {

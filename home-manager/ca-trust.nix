@@ -5,6 +5,7 @@ let
   trust = import ../lib/ca-trust.nix {
     inherit pkgs;
     bundle = if args ? osConfig then args.osConfig.programs.caTrust.bundle else null;
+    runtimeBundle = if args ? osConfig then args.osConfig.programs.caTrust.environment.SSL_CERT_FILE else null;
   };
   defaults = lib.mapAttrs (_: lib.mkDefault) trust.environment;
 in

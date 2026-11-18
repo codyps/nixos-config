@@ -1,4 +1,4 @@
-{ lib, pkgs, ... }:
+{ config, lib, pkgs, ... }:
 {
   nixpkgs.hostPlatform = "aarch64-darwin";
   # Match the build group created by the Lix macOS installer.
@@ -13,6 +13,8 @@
     name = "cody";
     home = "/Users/cody";
   };
+
+  home-manager.users.cody.home.sessionPath = [ "${config.users.users.cody.home}/.omlx/bin" ];
 
   home-manager.users.cody.programs.git.signing = {
     format = lib.mkForce "ssh";

@@ -24,6 +24,10 @@ in
     ../warbler/account-passwords.nix
   ];
   networking.hostName = "crow";
+  services.btrfs.autoBalance = {
+    interval = "daily";
+    onPressure = true;
+  };
   services.dedupit.enable = true;
   services.dedupit.databaseStorage = "nocow";
   services.dedupit.device = "/dev/mapper/crow-root";

@@ -1,5 +1,7 @@
 """Reclaim Btrfs block groups once per mounted, writable filesystem."""
+import argparse
 import json
+import os
 import subprocess
 import sys
 
@@ -8,7 +10,51 @@ def log(message):
     print(message, flush=True)
 
 
-def balance(mountpoints):
+GIB = 1024 ** 3
+
+
+def unallocated_bytes(mountpoint):
+    usage = subprocess.run(
+        ["btrfs", "filesystem", "usage", "-b", mountpoint],
+        check=True, capture_output=True, text=True, env={**os.environ, "LC_ALL": "C"},
+    )
+    for line in usage.stdout.splitlines():
+        label, _, value = line.partition(":")
+        if label.strip() == "Device unallocated":
+            return int(value)
+    raise ValueError("missing Btrfs device unallocated space")
+
+
+def reclaim(mountpoint, on_pressure):
+    if on_pressure:
+        available = unallocated_bytes(mountpoint)
+        log(f"Btrfs unallocated space on {mountpoint!r}: {available / GIB:.2f} GiB")
+        if available >= 16 * GIB:
+            return
+    log(f"Reclaiming empty block groups on {mountpoint!r}")
+    subprocess.run(
+        ["btrfs", "balance", "start", "-dusage=0", "-musage=0", mountpoint],
+        check=True,
+    )
+    if on_pressure:
+        available = unallocated_bytes(mountpoint)
+    for _ in range(8 if on_pressure else 1):
+        if on_pressure and available >= 32 * GIB:
+            break
+        log(f"Balancing at most eight data groups up to 50% used on {mountpoint!r}")
+        subprocess.run(
+            ["btrfs", "balance", "start", "-dusage=50,limit=8", mountpoint],
+            check=True,
+        )
+        if on_pressure:
+            updated = unallocated_bytes(mountpoint)
+            log(f"Btrfs unallocated space on {mountpoint!r}: {updated / GIB:.2f} GiB")
+            if updated <= available:
+                break
+            available = updated
+
+
+def balance(mountpoints, on_pressure=False):
     seen = set()
     failed = False
     for mountpoint in mountpoints:
@@ -40,16 +86,7 @@ def balance(mountpoints):
                 log(f"Skipping existing balance on {mountpoint!r}")
                 continue
             status.check_returncode()
-            log(f"Reclaiming empty block groups on {mountpoint!r}")
-            subprocess.run(
-                ["btrfs", "balance", "start", "-dusage=0", "-musage=0", mountpoint],
-                check=True,
-            )
-            log(f"Balancing at most eight data groups up to 50% used on {mountpoint!r}")
-            subprocess.run(
-                ["btrfs", "balance", "start", "-dusage=50,limit=8", mountpoint],
-                check=True,
-            )
+            reclaim(mountpoint, on_pressure)
         except (OSError, ValueError, KeyError, subprocess.CalledProcessError) as error:
             log(f"Btrfs maintenance failed on {mountpoint!r}: {error}")
             failed = True
@@ -57,4 +94,8 @@ def balance(mountpoints):
 
 
 if __name__ == "__main__":
-    sys.exit(balance(sys.argv[1:]))
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--on-pressure", action="store_true")
+    parser.add_argument("mountpoints", nargs="*")
+    args = parser.parse_args()
+    sys.exit(balance(args.mountpoints, args.on_pressure))

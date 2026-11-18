@@ -21,6 +21,7 @@ in
       default = "weekly";
       description = "Calendar schedule for Btrfs block-group reclamation.";
     };
+    onPressure = lib.mkEnableOption "balancing only below 16 GiB of unallocated space, aiming for 32 GiB in up to eight passes";
   };
 
   config = lib.mkIf cfg.enable {
@@ -29,7 +30,7 @@ in
       after = [ "local-fs.target" ];
       path = [ pkgs.btrfs-progs pkgs.util-linux ];
       script = ''
-        exec ${pkgs.python3}/bin/python3 ${../scripts/btrfs-balance.py} ${lib.escapeShellArgs cfg.fileSystems}
+        exec ${pkgs.python3}/bin/python3 ${../scripts/btrfs-balance.py} ${lib.optionalString cfg.onPressure "--on-pressure"} -- ${lib.escapeShellArgs cfg.fileSystems}
       '';
       serviceConfig = {
         Type = "oneshot";

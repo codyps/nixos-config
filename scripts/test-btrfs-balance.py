@@ -14,8 +14,10 @@ spec.loader.exec_module(maintenance)
 
 
 class BalanceTests(unittest.TestCase):
-    def run_balance(self, mounts, statuses=None, fail_on=None):
+    def run_balance(self, mounts, statuses=None, fail_on=None, unallocated=None):
         calls = []
+        readings = iter(unallocated or [])
+
         def run(command, **kwargs):
             calls.append(command)
             if command[0] == "findmnt":
@@ -23,13 +25,33 @@ class BalanceTests(unittest.TestCase):
                 if mounted is None:
                     return subprocess.CompletedProcess(command, 1, "", "")
                 return subprocess.CompletedProcess(command, 0, json.dumps({"filesystems": [mounted]}), "")
+            if command[1:3] == ["filesystem", "usage"]:
+                stdout = f"    Device unallocated:\t{next(readings) * maintenance.GIB}\n"
+                return subprocess.CompletedProcess(command, 0, stdout, "")
             code = (statuses or {}).get(command[-1], 0) if command[2] == "status" else 0
             if fail_on and command[2] == "start" and command[-1] == fail_on:
                 raise subprocess.CalledProcessError(1, command)
             return subprocess.CompletedProcess(command, code)
         with mock.patch.object(maintenance.subprocess, "run", side_effect=run):
-            result = maintenance.balance(list(mounts))
+            result = maintenance.balance(list(mounts), on_pressure=unallocated is not None)
         return result, [c for c in calls if c[0] == "btrfs" and c[2] == "start"]
+
+    def test_pressure_passes_are_bounded_by_headroom_progress_and_count(self):
+        mount = {"/": {"fstype": "btrfs", "uuid": "fixture-a", "options": "rw"}}
+        cases = [
+            ([16], 0),
+            ([15, 32], 1),
+            ([15, 16, 24, 32], 3),
+            ([15, 16, 16], 2),
+            ([1, *range(2, 11)], 9),
+        ]
+        for readings, expected_starts in cases:
+            with self.subTest(readings=readings):
+                result, starts = self.run_balance(mount, unallocated=readings)
+                self.assertEqual(result, 0)
+                self.assertEqual(len(starts), expected_starts)
+                for command in starts[1:]:
+                    self.assertEqual(command, ["btrfs", "balance", "start", "-dusage=50,limit=8", "/"])
 
     def test_subvolume_mounts_are_balanced_once_with_limited_filters(self):
         fs = {"fstype": "btrfs", "uuid": "fixture-a", "options": "rw,subvolid=256"}

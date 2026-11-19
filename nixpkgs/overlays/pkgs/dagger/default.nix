@@ -27,6 +27,12 @@ buildGoModule rec {
 
   # The CLI tests import engine code that uses Linux-only syscalls.
   doCheck = stdenv.hostPlatform.isLinux;
+  # This integration suite connects to a running Dagger engine.
+  checkFlags = [ "-skip=^TestDaggerCMD$" ];
+  preCheck = ''
+    export HOME="$(mktemp -d)"
+    export _EXPERIMENTAL_DAGGER_CLI_BIN="$GOPATH/bin/dagger"
+  '';
 
   nativeBuildInputs = [ installShellFiles ];
 

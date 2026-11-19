@@ -3,6 +3,7 @@
 # Global git hooks that reject em-dashes (U+2014, "—") in commit messages and
 # in staged commit content, and point out where they are. Set GIT_ALLOW_EMDASH=1
 # to bypass for a single commit.
+# The commit-msg hook also checks Claude co-author attribution.
 #
 # NOTE: git only honours a single core.hooksPath, so this takes over global hook
 # dispatch. Per-repo hooks in .git/hooks are ignored while this is active.
@@ -41,6 +42,31 @@ let
   # scissors line) for em-dashes, reporting line: text.
   commitMsg = pkgs.writeShellScript "commit-msg" ''
     set -o pipefail
+    claude_attribution=$(${pkgs.gawk}/bin/awk '
+      BEGIN { IGNORECASE = 1 }
+      /^# ------------------------ >8 ------------------------$/ { exit }
+      /^[[:blank:]]*Co-authored-by:[[:blank:]]*/ {
+        sub(/^[[:blank:]]*Co-authored-by:[[:blank:]]*/, "")
+        if ($0 ~ /^Claude([[:blank:]<]|$)/ || $0 ~ /<noreply@anthropic\.com>[[:space:]]*$/) {
+          print FNR ": " $0
+        }
+      }
+    ' "$1") || exit 1
+    if [ -n "$claude_attribution" ] &&
+      [ "''${GIT_ALLOW_CLAUDE_COAUTHOR:-}" != 1 ] &&
+      [ "$(git config --local --type=bool --get hooks.allowClaudeCoAuthor)" != true ] &&
+      ! git grep --cached --quiet --basic-regexp \
+        -e '^Please include Claude co-author trailers\.$' -- \
+        ':(top,icase)AGENTS.md' ':(top,icase)CLAUDE.md' ':(top,glob,icase)README*' \
+        ':(top,glob,icase)docs/**/*.md'; then
+      echo "commit-msg: Claude co-author attribution requires repository opt-in:" >&2
+      printf '%s\n' "$claude_attribution" >&2
+      echo "Remove the trailer, or document the opt-in with the exact line 'Please include Claude co-author trailers.'" >&2
+      echo "For one commit, set GIT_ALLOW_CLAUDE_COAUTHOR=1 when running git commit." >&2
+      echo "To bypass for this repository, run: git config --local hooks.allowClaudeCoAuthor true" >&2
+      exit 1
+    fi
+
     if [ "''${GIT_ALLOW_EMDASH:-}" = "1" ]; then
       exit 0
     fi

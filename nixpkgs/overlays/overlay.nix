@@ -65,7 +65,7 @@
   opencode =
     if prev.stdenv.hostPlatform.system == "x86_64-darwin" then
       prev.opencode
-    else if prev.lib.versionOlder prev.opencode.version "2.2.7" then
+    else if prev.lib.versionOlder prev.opencode.version "2.3.2" then
       final.callPackage ../opencode.nix { }
     else prev.opencode;
 } // prev.lib.packagesFromDirectoryRecursive {

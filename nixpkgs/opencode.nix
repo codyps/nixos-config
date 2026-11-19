@@ -77,14 +77,14 @@ let
       # NOTE: Required else we get errors that our fixed-output derivation references store paths
       dontFixup = true;
 
-      # Computed against this repository's pins for v2.2.7: the Linux value
+      # Computed against this repository's pins for v2.3.2: the Linux value
       # on x86_64-linux and the Darwin value on aarch64-darwin. Upstream
       # nixpkgs also splits Linux/Darwin hashes.
       outputHash =
         if stdenv.hostPlatform.isLinux then
-          "sha256-qCpbtGPs+FWKHbxUlLAHvudspvUqd0pPJPa93pn837w="
+          "sha256-1mWmG+sGm7U8mkC8mF5DWq8kUrJYV6o+nFTdPJpPOsc="
         else if stdenv.hostPlatform.isDarwin then
-          "sha256-5Xem/BuaV9ZjeckUTPyoJXDSCgsKZVVImTOzmrRSlcM="
+          "sha256-s/PGE0dN3KoZEaF6x5oSmCx8MVh+TiQ45CquxNxHR8s="
         else
           throw "Unsupported platform";
       outputHashMode = "recursive";
@@ -92,7 +92,7 @@ let
 in
 stdenv.mkDerivation (finalAttrs: {
   pname = "opencode";
-  version = "2.2.7";
+  version = "2.3.2";
 
   __structuredAttrs = true;
   strictDeps = true;
@@ -101,7 +101,7 @@ stdenv.mkDerivation (finalAttrs: {
     owner = "anomalyco";
     repo = "opencode";
     tag = "v${finalAttrs.version}";
-    hash = "sha256-JPCR867ZoMbYNrCvAa3OnilsxVcktD3mHCGpR6o/nlw=";
+    hash = "sha256-yEdLD000KJPNkuowiy4g+sHV+7dm3xazKTEf15ZIYKs=";
   };
 
   postPatch =
@@ -185,7 +185,7 @@ stdenv.mkDerivation (finalAttrs: {
 
     install -Dm644 cli.json $out/share/cli.json
     install -Dm644 config.json $out/share/config.json
-    install -Dm644 ../web/public/theme.json $out/share/theme.json
+    install -Dm644 ../../services/site/public/v1/docs/theme.json $out/share/theme.json
 
     runHook postInstall
   '';

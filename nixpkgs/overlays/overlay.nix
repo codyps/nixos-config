@@ -1,4 +1,6 @@
 (final: prev: ({
+  gh = import ../gh-with-attribution-check.nix { pkgs = final; gh = prev.gh; };
+
   # The frozen Gen8/9/11 runtime predates GCC 16's incomplete-type SFINAE
   # diagnostic and treats it as an error. Keep this legacy package on GCC 15.
   intel-compute-runtime-legacy1 =

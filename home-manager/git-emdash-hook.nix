@@ -61,9 +61,12 @@ let
         ':(top,glob,icase)docs/**/*.md'; then
       echo "commit-msg: Claude co-author attribution requires repository opt-in:" >&2
       printf '%s\n' "$claude_attribution" >&2
-      echo "Remove the trailer, or document the opt-in with the exact line 'Please include Claude co-author trailers.'" >&2
-      echo "For one commit, set GIT_ALLOW_CLAUDE_COAUTHOR=1 when running git commit." >&2
-      echo "To bypass for this repository, run: git config --local hooks.allowClaudeCoAuthor true" >&2
+      echo "Remove the listed Co-authored-by lines from the commit message and rerun git commit." >&2
+      echo "Enable Claude co-author attribution only when the repository's documentation explicitly requests it." >&2
+      echo "For a documented opt-in, use the exact line 'Please include Claude co-author trailers.'" >&2
+      echo "If the repository explicitly requests attribution, use either override:" >&2
+      echo "  One commit: GIT_ALLOW_CLAUDE_COAUTHOR=1 git commit" >&2
+      echo "  This repository: git config --local hooks.allowClaudeCoAuthor true" >&2
       exit 1
     fi
 

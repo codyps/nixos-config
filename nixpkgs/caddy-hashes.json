@@ -1,4 +1,4 @@
 {
-  "nixpkgs": "sha256-oZYHX0NpQ8IFC+EsLn3Bz3wOcHEMqqep1ZPuNVeVX+I=",
-  "nixpkgs-darwin": "sha256-BjTL0NkLXSsU237WTO5xYxKebXhU3XJrv5WlcqS8EAo="
+  "nixpkgs": "sha256-HJxXZ5qXV6ZQtj3Bizb1VSuaEuOm0WoK766Ol5Jyf7U=",
+  "nixpkgs-darwin": "sha256-oZYHX0NpQ8IFC+EsLn3Bz3wOcHEMqqep1ZPuNVeVX+I="
 }

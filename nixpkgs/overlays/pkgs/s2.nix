@@ -5,13 +5,13 @@
 
 buildGoModule rec {
   pname = "s2";
-  version = "1.17.9";
+  version = "1.20.4";
 
   src = fetchFromGitHub {
     owner = "klauspost";
     repo = "compress";
     rev = "v${version}";
-    sha256 = "sha256-bvvOy1LspoBBNwPhv5hW7AyqWvEQ9BMP7B1I51izqkY=";
+    sha256 = "sha256-SYuWlBrb6uQEZjy2FMOUM4VIdad0kyd0SgF1RyAAOJw=";
   };
 
   vendorHash = null;

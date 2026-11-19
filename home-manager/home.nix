@@ -40,7 +40,6 @@ in
     pkgs.rust-bindgen
     pkgs.rustup
     pkgs.socat
-    #pkgs.targo
     pkgs.tmux
     pkgs.tokei
     pkgs.universal-ctags

@@ -1,13 +1,13 @@
 { lib, buildGoModule, fetchFromGitHub }:
 buildGoModule rec {
   pname = "redpanda-connect";
-  version = "4.37.0";
+  version = "4.117.0";
 
   src = fetchFromGitHub {
     owner = "redpanda-data";
     repo = "connect";
     rev = "v${version}";
-    hash = "sha256-N5v4ww7crEXAFqp0UgAXldDIONLTNmAqZsEF/aqz8xo=";
+    hash = "sha256-FtKI9Z0JReg0lDKqwkXmya49zIdvxS2h6Enzv4XoNgA=";
   };
 
   ldflags = [
@@ -23,5 +23,5 @@ buildGoModule rec {
   # otherwise vendorHash changes between macos & linux
   proxyVendor = true;
 
-  vendorHash = "sha256-uae39+V2WVZSPb35Sg+XMMMYyVpAqFxoVlS0n2tufCI=";
+  vendorHash = "sha256-TMgJdUz3Fkp8ZtsHuznr4tG8dTI33PNNhNBuxB3+ODU=";
 }

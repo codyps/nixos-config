@@ -2,23 +2,31 @@
 
 buildGoModule rec {
   pname = "dagger";
-  version = "0.12.5";
+  version = "0.21.12";
 
   src = fetchFromGitHub {
     owner = "dagger";
     repo = "dagger";
     rev = "v${version}";
-    hash = "sha256-vYFDpmQgGPcK48ikxxoSs2b0kSBH86CMD7KhTbWk94M=";
+    hash = "sha256-b3fUPfys7MoWGUW/6CbWld1Eg64VO20kxhxp70U7AOo=";
   };
 
-  vendorHash = "sha256-Lms/0Lz3IVkBbo2gWvU2AZpOr3ZapOrx0HrZA21oFVo=";
+  vendorHash = "sha256-p/tyNt19wUwzYA7uzRE8X4E1xWZ1/yiWCxknOlgHX+o=";
   proxyVendor = true;
 
   subPackages = [
     "cmd/dagger"
   ];
 
-  ldflags = [ "-s" "-w" "-X github.com/dagger/dagger/engine.Version=${version}" ];
+  ldflags = [
+    "-s"
+    "-w"
+    "-X github.com/dagger/dagger/engine.Version=v${version}"
+    "-X github.com/dagger/dagger/engine.Tag=v${version}"
+  ];
+
+  # The CLI tests import engine code that uses Linux-only syscalls.
+  doCheck = stdenv.hostPlatform.isLinux;
 
   nativeBuildInputs = [ installShellFiles ];
 

@@ -1,16 +1,16 @@
 { buildGoModule, fetchFromGitHub, lib }:
 buildGoModule rec {
   pname = "ethereal";
-  version = "2.8.7";
+  version = "2.12.0";
 
   src = fetchFromGitHub {
     owner = "wealdtech";
     repo = "ethereal";
     rev = "v${version}";
-    hash = "sha256-HVqC0w68Cdyh8YBVeQP5xAcrZX3jR010vHjbPF3plRY=";
+    hash = "sha256-XPXID0Q0fx/3yJ5LaUBj/xqhMsoOxCNwZOX9vNT7S+k=";
   };
 
-  vendorHash = "sha256-36r6+1jKqZYkt2aMS20UhjkBx2EJbFVSbm5zb6XPU78=";
+  vendorHash = "sha256-RLcnMVx64Xz+irOo5KPjgjv6XXttVPuzAr+jJkr5ev0=";
 
   # without this, fails to locate C header used via CGO
   proxyVendor = true;
@@ -21,7 +21,7 @@ buildGoModule rec {
   meta = {
     description = "A command-line tool for managing common tasks in Ethereum";
     homepage = "https://github.com/wealdtech/ethereal";
-    license = lib.licenses.apsl20;
+    license = lib.licenses.asl20;
   };
 }
 

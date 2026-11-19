@@ -10,10 +10,10 @@ let
   # upstream GNU release and patch its loader for NixOS.
   vitePlus = pkgs.stdenvNoCC.mkDerivation rec {
     pname = "vite-plus";
-    version = "0.3.3";
+    version = "1.7.0";
     src = pkgs.fetchurl {
       url = "https://github.com/voidzero-dev/vite-plus/releases/download/v${version}/vp-x86_64-unknown-linux-gnu.tar.gz";
-      hash = "sha256-Cs804xgtIPJFtY+wpMYRMpsED2TZ0rdrkbvZB7yfxPg=";
+      hash = "sha256-WcuPE9fzEsY0Byv29y18wC+3dZW4hudJrceXYfyExzc=";
     };
     sourceRoot = ".";
     nativeBuildInputs = [ pkgs.autoPatchelfHook ];
@@ -24,7 +24,7 @@ let
     installPhase = ''
       runHook preInstall
       mkdir -p "$out/bin" "$out/libexec/vite-plus"
-      cp -r vp toolchain.json sync-versions "$out/libexec/vite-plus/"
+      cp -r vp toolchain.json sync-versions vp-install-lock.yaml "$out/libexec/vite-plus/"
       ln -s "$out/libexec/vite-plus/vp" "$out/bin/vp"
       runHook postInstall
     '';

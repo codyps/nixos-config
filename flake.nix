@@ -34,9 +34,6 @@
     lanzaboote.url = "github:nix-community/lanzaboote";
     lanzaboote.inputs.nixpkgs.follows = "nixpkgs";
 
-    #targo.url = "github:codyps/targo";
-    #targo.inputs.nixpkgs.follows = "nixpkgs";
-    #targo.inputs.flake-utils.follows = "flake-utils";
     impermanence.url = "github:nix-community/impermanence";
     impermanence.inputs.nixpkgs.follows = "nixpkgs";
     sops-nix.url = "github:Mic92/sops-nix";
@@ -127,9 +124,12 @@
             };
             caddyFull = caddy.withPlugins {
               plugins = [
-                "github.com/caddy-dns/cloudflare@v0.2.2-0.20250506153119-35fb8474f57d"
-                "github.com/caddyserver/cache-handler@v0.14.0"
-                "github.com/darkweak/storages/badger/caddy@v0.0.10"
+                "github.com/caddy-dns/cloudflare@v0.2.4"
+                "github.com/caddyserver/cache-handler@v0.17.0"
+                # The Intel Darwin package set still uses Go 1.26.
+                (if nixpkgsSource.outPath == nixpkgs.outPath
+                  then "github.com/darkweak/storages/badger/caddy@v0.0.23"
+                  else "github.com/darkweak/storages/badger/caddy@v0.0.20")
                 "github.com/WeidiDeng/caddy-cloudflare-ip@v0.0.0-20231130002422-f53b62aa13cb"
               ];
               # The pinned Darwin package set has a separate Caddy source bundle.

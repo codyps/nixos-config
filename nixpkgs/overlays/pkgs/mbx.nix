@@ -1,17 +1,17 @@
-{ lib, rustPlatform, fetchFromGitHub, pkg-config, git, cacert, aws-lc, openssl, zstd }:
+{ lib, stdenv, rustPlatform, fetchFromGitHub, pkg-config, git, cacert, aws-lc, openssl, zstd }:
 
 rustPlatform.buildRustPackage rec {
   pname = "mbx";
-  version = "1.9.0";
+  version = "1.30.0";
 
   src = fetchFromGitHub {
     owner = "jdx";
     repo = "mr-boxington";
     tag = "v${version}";
-    hash = "sha256-yr5JsgGJJt8LMS7+qjlfoe++uigUTZYPyHrm4Zn3PYI=";
+    hash = "sha256-Smz5HWY8LWuwsE6dyJ1bjURF8kDmt9AevdIa0NM+awo=";
   };
 
-  cargoHash = "sha256-qkoWANkbFqkwW3BP6j16K0EOnYYMly6v9YgFnkuzQvA=";
+  cargoHash = "sha256-y6O6zdwqD0g5J5Z39pvnKLT8t/sr6N6fZG9n2K1RlrM=";
   nativeBuildInputs = [ pkg-config ];
   # nixpkgs' cargo setup hook now forces system libraries: zstd-sys probes
   # pkg-config instead of falling back, openssl-sys refuses to vendor, and
@@ -30,7 +30,9 @@ rustPlatform.buildRustPackage rec {
   '';
   # Nix's rustc does not bundle rust-lld in its sysroot. Runtime toolchains
   # come from Rustup; this test specifically assumes a Rustup-style sysroot.
-  checkFlags = [ "--skip=managed_linker::tests::rust_lld_repairs_a_dangling_cached_shim" ];
+  checkFlags = [ "--skip=managed_linker::tests::rust_lld_repairs_a_dangling_cached_shim" ]
+    # Spawning the test's shell through the PTY fails in the Darwin Nix sandbox.
+    ++ lib.optional stdenv.hostPlatform.isDarwin "--skip=cli::pretty::tests::pty_child_inherits_the_seeded_environment_not_the_registry";
 
   meta = {
     description = "Shared, self-pruning build cache for Rust projects";

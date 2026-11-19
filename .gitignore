@@ -2,6 +2,7 @@
 keys/
 result
 .direnv
+.claude
 .cloudflare
 __pycache__/
 .security-audit/

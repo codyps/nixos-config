@@ -81,6 +81,7 @@ in
       ".DS_Store"
       ".direnv"
       ".vim/"
+      ".claude"
     ];
 
     signing = {

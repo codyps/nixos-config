@@ -78,13 +78,16 @@ let
       dontFixup = true;
 
       # Computed against this repository's pins for v2.3.2: the Linux value
-      # on x86_64-linux and the Darwin value on aarch64-darwin. Upstream
-      # nixpkgs also splits Linux/Darwin hashes.
+      # on x86_64-linux and the per-arch Darwin values on aarch64-darwin and
+      # x86_64-darwin. Upstream nixpkgs splits Linux/Darwin hashes but does
+      # not build the Intel Darwin platform.
       outputHash =
         if stdenv.hostPlatform.isLinux then
           "sha256-1mWmG+sGm7U8mkC8mF5DWq8kUrJYV6o+nFTdPJpPOsc="
-        else if stdenv.hostPlatform.isDarwin then
+        else if stdenv.hostPlatform.system == "aarch64-darwin" then
           "sha256-s/PGE0dN3KoZEaF6x5oSmCx8MVh+TiQ45CquxNxHR8s="
+        else if stdenv.hostPlatform.system == "x86_64-darwin" then
+          "sha256-LfkQveKeohP89JOFqEgalgPGw6jxi7aOTZzahWuJw8Q="
         else
           throw "Unsupported platform";
       outputHashMode = "recursive";
@@ -240,6 +243,9 @@ stdenv.mkDerivation (finalAttrs: {
       "aarch64-linux"
       "x86_64-linux"
       "aarch64-darwin"
+      # Bun errors on Intel Macs whose CPUs lack AVX; the managed Intel
+      # Darwin hosts all have AVX2. See the overlay note.
+      "x86_64-darwin"
     ];
     mainProgram = "opencode";
   };

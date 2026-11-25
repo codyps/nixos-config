@@ -12,6 +12,7 @@ jobs:
     timeout-minutes: 90
     outputs:
       ref: ${{ steps.commit.outputs.commit_hash || github.sha }}
+      hashes_changed: ${{ steps.tracked.outputs.hashes_changed }}
     permissions:
       contents: write
     steps:
@@ -22,19 +23,88 @@ jobs:
         run: python3 scripts/update-hardware-fixtures.py
       - name: Refresh custom Caddy source hashes
         run: python3 scripts/update-caddy-hashes.py
+      - name: Update tracked package versions and Linux hashes
+        id: tracked_update
+        continue-on-error: true
+        run: nix shell --accept-flake-config .#nix-update -c python3 scripts/update-tracked-packages.py --update-versions --system x86_64-linux
+      - name: Report tracked package update failure
+        if: steps.tracked_update.outcome == 'failure'
+        run: echo "::warning title=Tracked package update failed::The updater restored its files; see the previous step and retry after fixing the upstream package."
+      - name: Detect platform hash changes
+        id: tracked
+        run: |
+          version=$(nix eval --accept-flake-config --raw .#packages.x86_64-linux.opencode.version)
+          recorded=$(jq -r '.version // ""' nixpkgs/opencode-hashes.json)
+          if [ "$version" != "$recorded" ] \
+              || ! git diff --quiet -- nixpkgs/opencode.nix nixpkgs/opencode-hashes.json; then
+            echo "hashes_changed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "hashes_changed=false" >> "$GITHUB_OUTPUT"
+          fi
       - uses: stefanzweifel/git-auto-commit-action@v5
         id: commit
         with:
           commit_message: nix flake update
-          file_pattern: flake.lock nixpkgs/caddy-hashes.json
+          file_pattern: flake.lock nixpkgs
+
+  hash_aarch64_darwin:
+    needs: build
+    if: needs.build.outputs.hashes_changed == 'true'
+    runs-on: macos-15
+    timeout-minutes: 120
+    permissions:
+      contents: write
+    outputs:
+      ref: ${{ steps.current.outputs.ref }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.build.outputs.ref }}
+      - uses: cachix/install-nix-action@v27
+      - name: Refresh tracked package hashes
+        run: python3 scripts/update-tracked-packages.py --system aarch64-darwin
+      - uses: stefanzweifel/git-auto-commit-action@v5
+        id: commit
+        with:
+          commit_message: Refresh tracked package hashes for aarch64-darwin
+          file_pattern: nixpkgs/opencode-hashes.json
+      - name: Record current commit
+        id: current
+        run: echo "ref=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+  hash_x86_64_darwin:
+    needs: [build, hash_aarch64_darwin]
+    if: needs.build.outputs.hashes_changed == 'true'
+    runs-on: macos-15-intel
+    timeout-minutes: 120
+    permissions:
+      contents: write
+    outputs:
+      ref: ${{ steps.current.outputs.ref }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.hash_aarch64_darwin.outputs.ref }}
+      - uses: cachix/install-nix-action@v27
+      - name: Refresh tracked package hashes
+        run: python3 scripts/update-tracked-packages.py --system x86_64-darwin --mark-version
+      - uses: stefanzweifel/git-auto-commit-action@v5
+        id: commit
+        with:
+          commit_message: Refresh tracked package hashes for x86_64-darwin
+          file_pattern: nixpkgs/opencode-hashes.json
+      - name: Record current commit
+        id: current
+        run: echo "ref=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
 
   # Commits made with GITHUB_TOKEN do not trigger push workflows.
   cache-outputs:
-    needs: build
+    needs: [build, hash_aarch64_darwin, hash_x86_64_darwin]
+    if: ${{ !cancelled() && needs.build.result == 'success' && !contains(needs.*.result, 'failure') }}
     permissions:
       contents: read
     uses: ./.github/workflows/configurations-pilot.yml
     with:
-      ref: ${{ needs.build.outputs.ref }}
+      ref: ${{ needs.hash_x86_64_darwin.outputs.ref || needs.hash_aarch64_darwin.outputs.ref || needs.build.outputs.ref }}
       publish: true
     secrets: inherit

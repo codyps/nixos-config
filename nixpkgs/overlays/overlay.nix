@@ -1,6 +1,26 @@
 (final: prev: ({
   gh = import ../gh-with-attribution-check.nix { pkgs = final; gh = prev.gh; };
 
+  # nix-update 1.16.0 fails on dirty flakes with current Nix because
+  # `nix flake metadata` no longer copies the tree to the store. 1.17.0 uses
+  # `nix flake prefetch` instead, so tracked package updates can rewrite the
+  # version before fetching hashes.
+  nix-update =
+    if prev.lib.versionOlder prev.nix-update.version "1.17.0" then
+      prev.nix-update.overridePythonAttrs
+        (_: {
+          version = "1.17.0";
+          src = prev.fetchFromGitHub {
+            owner = "Mic92";
+            repo = "nix-update";
+            tag = "v1.17.0";
+            hash = "sha256-TCOhUWb53V3nrJRD3JuADly1U9fNi0Z79QMcjhbefHg=";
+          };
+          build-system = [ prev.python3Packages.hatchling ];
+          dependencies = [ prev.python3Packages.ast-grep-py ];
+        })
+    else prev.nix-update;
+
   # The frozen Gen8/9/11 runtime predates GCC 16's incomplete-type SFINAE
   # diagnostic and treats it as an error. Keep this legacy package on GCC 15.
   intel-compute-runtime-legacy1 =
@@ -64,9 +84,10 @@
   # managed Intel Darwin host (and the macos-15-intel CI runners) has AVX2,
   # so the tracked expression keeps building the current tag there too.
   opencode =
-    if prev.lib.versionOlder prev.opencode.version "2.3.2" then
-      final.callPackage ../opencode.nix { }
-    else prev.opencode;
+    let
+      tracked = final.callPackage ../opencode.nix { };
+    in
+    if prev.lib.versionOlder prev.opencode.version tracked.version then tracked else prev.opencode;
 } // prev.lib.packagesFromDirectoryRecursive {
   inherit (final) callPackage;
   directory = ./pkgs;

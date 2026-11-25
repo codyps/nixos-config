@@ -309,9 +309,18 @@
           packages = {
             codex-configure = import ./nixpkgs/codex-configure.nix { inherit pkgs; };
             atuin = pkgs.atuin;
-            mbx = pkgs.mbx;
             caddyFull = pkgs.caddyFull;
+            dagger = pkgs.dagger;
+            ethdo = pkgs.ethdo;
+            ethereal = pkgs.ethereal;
+            mbx = pkgs.mbx;
             nix-dynamic-machines = pkgs.nix-dynamic-machines;
+            s2 = pkgs.s2;
+            # Always point at the tracked expression (not the overlay result) so
+            # scripts/update-tracked-packages.py can update it after nixpkgs
+            # catches up to the current tag.
+            opencode = pkgs.callPackage ./nixpkgs/opencode.nix { };
+            nix-update = pkgs.nix-update;
             nixos-rebuild-remote = pkgs.writeShellApplication {
               name = "nixos-rebuild-remote";
               runtimeInputs = [ pkgs.nix pkgs.openssh pkgs.jq pkgs.git ];
@@ -387,6 +396,7 @@
               ssh-to-pgp
               ssh-to-age
               sops
+              nix-update
             ];
 
           });

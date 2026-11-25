@@ -1,0 +1,6 @@
+{
+  "aarch64-darwin": "sha256-s/PGE0dN3KoZEaF6x5oSmCx8MVh+TiQ45CquxNxHR8s=",
+  "linux": "sha256-1mWmG+sGm7U8mkC8mF5DWq8kUrJYV6o+nFTdPJpPOsc=",
+  "version": "2.3.2",
+  "x86_64-darwin": "sha256-LfkQveKeohP89JOFqEgalgPGw6jxi7aOTZzahWuJw8Q="
+}

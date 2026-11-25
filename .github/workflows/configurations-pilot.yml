@@ -58,6 +58,8 @@ jobs:
         run: python3 scripts/test-crow-usb-mounts.py
       - name: Test Caddy hash updater
         run: python3 scripts/test-update-caddy-hashes.py
+      - name: Test tracked package updater
+        run: python3 scripts/test-update-tracked-packages.py
       - name: Test macOS image automation
         run: python3 scripts/test-actions-vm-image.py
       - name: Test mutable Codex configuration

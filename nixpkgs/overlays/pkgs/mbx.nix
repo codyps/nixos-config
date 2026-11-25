@@ -2,16 +2,16 @@
 
 rustPlatform.buildRustPackage rec {
   pname = "mbx";
-  version = "1.30.0";
+  version = "1.31.0";
 
   src = fetchFromGitHub {
     owner = "jdx";
     repo = "mr-boxington";
     tag = "v${version}";
-    hash = "sha256-Smz5HWY8LWuwsE6dyJ1bjURF8kDmt9AevdIa0NM+awo=";
+    hash = "sha256-82Sr5wxviQm21QonS5I/OyShjWXG+H1+XjDJiRfS1H4=";
   };
 
-  cargoHash = "sha256-y6O6zdwqD0g5J5Z39pvnKLT8t/sr6N6fZG9n2K1RlrM=";
+  cargoHash = "sha256-MAVmW8Ngo5szLaHw8M8HKfkgBMrphux/wfHAtbU0AOs=";
   postPatch = lib.optionalString stdenv.hostPlatform.isLinux ''
     substituteInPlace crates/mbx/src/target_lease_tests.rs \
       --replace-fail '"/bin/sleep", "/usr/bin/sleep"' '"${lib.getExe' coreutils "sleep"}"'

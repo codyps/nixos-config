@@ -1,0 +1,22 @@
+{
+  "dagger": {
+    "file": "nixpkgs/overlays/pkgs/dagger/package.nix"
+  },
+  "ethdo": {
+    "file": "nixpkgs/overlays/pkgs/ethdo.nix"
+  },
+  "ethereal": {
+    "file": "nixpkgs/overlays/pkgs/ethereal.nix"
+  },
+  "mbx": {
+    "file": "nixpkgs/overlays/pkgs/mbx.nix"
+  },
+  "opencode": {
+    "file": "nixpkgs/opencode.nix",
+    "hashAttribute": "node_modules",
+    "hashFile": "nixpkgs/opencode-hashes.json"
+  },
+  "s2": {
+    "file": "nixpkgs/overlays/pkgs/s2.nix"
+  }
+}

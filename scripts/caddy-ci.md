@@ -15,6 +15,9 @@ hash mismatch belonging to that exact source derivation, and rebuilds both
 sources with the discovered hashes. Other failures abort the update. It
 restores the original hash file if verification fails.
 
+The same workflow then refreshes pinned packages such as OpenCode on Linux and
+both Darwin architectures; see [tracked-packages.md](../docs/tracked-packages.md).
+
 Both hashes live in `nixpkgs/caddy-hashes.json`, because Intel macOS uses the
 separately pinned `nixpkgs-darwin` input. Source bundles are generated on Linux;
 the platform matrix checks that they work for each native Caddy build.

@@ -24,6 +24,6 @@ unsetopt SHARE_HISTORY
 HISTFILE=${ZDOTDIR:-$HOME}/.zsh_history
 
 source ~/.profile
-alias ls='ls --color'
+alias ls='ls --color=auto'
 
 [ -f "/etc/zshrc_Apple_Terminal" ] && . /etc/zshrc_Apple_Terminal

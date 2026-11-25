@@ -31,6 +31,9 @@ in
   # nix.package = pkgs.nix;
 
   #nix.enable = true;
+  # This is a flake-only setup, so do not add the legacy channels directory to
+  # NIX_PATH (it does not exist here and makes every Nix command warn).
+  nix.channel.enable = false;
   nix.settings = {
     experimental-features = "nix-command flakes";
     max-jobs = "auto";

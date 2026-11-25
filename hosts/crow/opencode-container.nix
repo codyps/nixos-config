@@ -49,6 +49,8 @@ let
     "/run/opencode-plugins/zai-quota"
     "/run/opencode-plugins/deepseek-balance"
     "/run/opencode-plugins/llmgateway-balance"
+    "/run/opencode-plugins/openrouter-balance"
+    "/run/opencode-plugins/fiftyx-balance"
     "/run/opencode-plugins/opencodego-quota"
     {
       package = "/run/opencode-plugins/provider-router";

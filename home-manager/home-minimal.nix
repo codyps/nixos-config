@@ -38,6 +38,16 @@ in
       if [ -x /opt/homebrew/bin/brew ]; then
         eval $(/opt/homebrew/bin/brew shellenv)
       fi
+
+      # Claude Code and Codex write bash-style commands but run them through
+      # zsh on macOS. Enable the matching expansion and glob behavior only in
+      # the non-interactive shells they spawn, leaving an interactive zsh
+      # unchanged.
+      # https://github.com/anthropics/claude-code/issues/103027
+      if [[ -n ''${ZSH_EXECUTION_STRING-} &&
+            -n "''${CLAUDECODE-}''${CODEX_THREAD_ID-}''${CODEX_CI-}''${CODEX_SANDBOX-}''${CODEX_HOME-}" ]]; then
+        setopt no_nomatch sh_word_split no_equals no_aliases
+      fi
     '';
 
     loginExtra = ''

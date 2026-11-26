@@ -1,4 +1,9 @@
 { config, pkgs, hardwareIdentities, ... }:
+let
+  sata = "/var/lib/warbler-sata";
+  sataContainers = "${sata}/containers";
+  sataData = "${sataContainers}/warbler-ai";
+in
 {
   # These controls are host-wide, not namespaced. Allow per-process profiling
   # (including kernel time) and debugger attachment to same-UID dumpable tasks.
@@ -39,6 +44,10 @@
       hostPath = "/var/lib/warbler-ai/tmp";
       isReadOnly = false;
     };
+    bindMounts."/mnt/sata" = {
+      hostPath = sataData;
+      isReadOnly = false;
+    };
     privateNetwork = true;
     macvlans = [ "eno1" ];
     # A private link avoids macvlan's host/guest isolation without
@@ -47,6 +56,7 @@
     config = {
       imports = [ ../../nixos-modules/ai-container ];
       networking.hostName = "warbler-ai";
+      systemd.tmpfiles.rules = [ "d /mnt/sata/work 0700 cody-ai cody-ai -" ];
       systemd.network = {
         enable = true;
         networks."10-lan" = {
@@ -65,11 +75,20 @@
   systemd.services."container@warbler-ai" = {
     # Activate guest changes in place; container boundary changes need a restart.
     reloadIfChanged = true;
-    unitConfig.RequiresMountsFor = [ "/var/lib/nixos-containers" ];
+    unitConfig.RequiresMountsFor = [ "/var/lib/nixos-containers" sata ];
     # Stop the old "ai" instance before the renamed unit starts so its state is
     # no longer in use when preStart moves it.
     conflicts = [ "container@ai.service" ];
     preStart = ''
+      # Only create the bind source once the SATA filesystem is mounted.
+      if ! ${pkgs.util-linux}/bin/mountpoint -q "${sata}"; then
+        echo "Warbler SATA storage is unavailable at ${sata}" >&2
+        exit 1
+      fi
+      # The legacy host account shares the guest UID, so restrict the host parent.
+      ${pkgs.coreutils}/bin/install -d -m 0700 "${sataContainers}"
+      ${pkgs.coreutils}/bin/install -d -m 0755 "${sataData}"
+
       # Preserve the old container state while renaming it away from the "ai"
       # machine name. Refuse to start a second copy if the old unit is live.
       if [ -d /var/lib/nixos-containers/ai ] && [ ! -e /var/lib/nixos-containers/warbler-ai ]; then

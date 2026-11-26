@@ -272,6 +272,11 @@ Host projects are available under `~/zpl`; container projects are under `~/p`
 
 ## Boundaries
 
+`/mnt/sata/work` gives `cody-ai` writable, persistent space on the host's
+[encrypted SATA SSD](storage.md#ai-container-storage). It shares disk capacity
+with the Actions VMs. The container requires the SATA mount at startup. The
+configured bind mount takes effect when the container starts.
+
 The container's `/tmp` is a writable bind mount of `/var/lib/warbler-ai/tmp`
 on the host's encrypted SSD. Its host parent is root-only; it is separate from
 both the host `/tmp` and the legacy host AI account. It shares the SSD's free

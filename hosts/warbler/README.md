@@ -75,10 +75,9 @@ recovery. Its Codex service is disabled.
 
 ## Disk space
 
-See [disk usage and recovery](storage.md) for read-only inspection commands,
-cleanup policy, and capacity recommendations. All persistent workloads
-share the encrypted system SSD except VM image storage and Windows runtime state on the separate
-SATA volume; subvolumes do not isolate free space.
+See [disk usage and recovery](storage.md) for inspection commands and cleanup
+policy. VM images, Windows runner state, and the AI container's `/mnt/sata/work`
+share the [encrypted SATA SSD](storage.md#encrypted-sata-storage).
 
 ## Hardware and firmware references
 

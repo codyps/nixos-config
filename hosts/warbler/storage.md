@@ -1,24 +1,37 @@
 # Disk space
 
-Warbler's root, `/nix`, `/home`, `/persist`, the AI container, and its `/tmp`
+Warbler's root, `/nix`, `/home`, `/persist`, the AI container root, and its `/tmp`
 share one encrypted 475 GiB Btrfs filesystem. Separate subvolumes and bind
 mounts do not reserve capacity. The root reset at boot does not clean persistent
 container homes, caches, or scratch storage.
 
-## Actions VM storage
+## Encrypted SATA storage
 
 The internal SATA SSD has a separate LUKS2 container labeled `warbler-actions`
-and Btrfs filesystem labeled `warbler-actions-data`. It mounts at
-`/var/lib/actions-vm`; `build/` holds trusted installer workspaces,
-`images/` holds immutable published Windows images and `images/macos/` holds
-macOS images (bind-mounted at their original `/var/lib/actions-vm-images` path), and `state/` is bind-mounted at
-`/var/lib/actions-vm-scaler-windows` for disposable job disks and controller state.
-This keeps both published OS images, Windows preparation, and Windows job growth
-off the system SSD. Existing macOS runtime state remains in `/var/lib/actions-vm-scaler`.
+and Btrfs filesystem labeled `warbler-actions-data`. Its host mount is
+`/var/lib/warbler-sata`. The existing filesystem layout and unlock key carry over
+without moving data.
 
-The mounts use `nofail`: losing the runner disk does not put the host in emergency
-mode. Scaler mount dependencies still prevent jobs from writing into the hidden
-system-disk directories when the SATA volume is unavailable.
+### Actions VM storage
+
+`/var/lib/actions-vm` is a compatibility bind mount of the SATA filesystem.
+`build/` holds installer workspaces and `images/` holds published images.
+`images/macos/` and `state/` are also bind-mounted at
+`/var/lib/actions-vm-images` and `/var/lib/actions-vm-scaler-windows`,
+respectively. macOS runtime state remains at `/var/lib/actions-vm-scaler`.
+
+### AI container storage
+
+`warbler-ai` mounts only its SATA directory, `containers/warbler-ai/`, at
+`/mnt/sata`. The guest account `cody-ai` can write persistent data under
+`/mnt/sata/work`, which shares free space with the Actions workloads. The
+container's home and `/tmp` still use the system SSD.
+
+### Unlock and recovery
+
+The mounts use `nofail` so the host can boot without the SATA disk. The Actions
+scalers and `warbler-ai` require their SATA storage before starting, so they
+cannot write into fallback directories on the system SSD.
 
 `actions-vm-storage.service` unlocks the volume after `/persist` is mounted,
 using the root-only `/persist/var/lib/actions-vm-storage/key`. The key was generated
@@ -26,14 +39,16 @@ on Warbler and is never part of the repository, Nix store, or initrd. Losing tha
 key loses access to the runner volume; preserve it in trusted encrypted recovery
 storage when backing up the host. The volume does not participate in early boot
 unlock, signing, or measurements. The OS installation's disko configuration still
-targets only the NVMe; it must not repartition the runner SSD during reinstalls.
+targets only the NVMe. Preserve the SATA SSD during reinstalls.
 
 ```sh
 systemctl status actions-vm-storage
+findmnt -M /var/lib/warbler-sata
 findmnt -T /var/lib/actions-vm
 findmnt -T /var/lib/actions-vm-images
 findmnt -T /var/lib/actions-vm-scaler-windows
-df -h /var/lib/actions-vm
+df -h /var/lib/warbler-sata
+sudo nixos-container run warbler-ai -- findmnt -M /mnt/sata
 ```
 
 ## Inspect usage

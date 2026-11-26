@@ -5,6 +5,11 @@ pkgs.testers.runNixOSTest {
   nodes = {
     host = { lib, ... }: {
       imports = [ ../../modules/hardware-identities.nix ./ai-container.nix ];
+      # Model the separate host filesystem without a production device or key.
+      virtualisation.fileSystems."/var/lib/warbler-sata" = {
+        device = "tmpfs";
+        fsType = "tmpfs";
+      };
       containers.warbler-ai.bindMounts."/run/hardware-identities".hostPath = lib.mkForce (toString (pkgs.writeTextDir "90-hardware.conf" "[Link]\nMACAddress=${hardwareIdentities "warbler" [ "network" "containers" "warbler-ai" "interfaces" "mv-eno1" "macAddress" ]}\n"));
       _module.args.hardwareIdentities = hardwareIdentities;
       # Model the trusted Tailscale interface separately from the other LAN.
@@ -88,6 +93,9 @@ pkgs.testers.runNixOSTest {
     host.succeed("grep scratch-proof /var/lib/warbler-ai/tmp/ai-disk-proof")
     host.fail("test -e /tmp/ai-disk-proof")
     host.fail("runuser -u cody-ai -- test -r /var/lib/warbler-ai/tmp/ai-disk-proof")
+    client.succeed(ssh + shlex.quote("echo sata-proof > /mnt/sata/work/probe"))
+    host.succeed("grep sata-proof /var/lib/warbler-sata/containers/warbler-ai/work/probe")
+    host.fail("runuser -u cody-ai -- test -r /var/lib/warbler-sata/containers/warbler-ai/work/probe")
     # A disposable interface models tailscaled deleting and recreating its TUN.
     def create_vpn():
         host.succeed("ip link add testvpn link eth1 type macvlan mode bridge")
@@ -178,6 +186,7 @@ pkgs.testers.runNixOSTest {
     host.succeed(inside + "test -f /home/cody-ai/workspaces/service-proof")
     host.succeed(inside + "test -f /home/cody-ai/workspaces/codex-proof")
     host.succeed(inside + "grep scratch-proof /tmp/ai-disk-proof")
+    client.wait_until_succeeds(ssh + shlex.quote("grep sata-proof /mnt/sata/work/probe"))
     client.wait_until_succeeds(proxy_ssh + "true")
     host.succeed("test -f /home/cody-ai/host-only")
   '';

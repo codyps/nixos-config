@@ -71,14 +71,14 @@ jobs:
       - name: Check persistent cache settings for every configuration
         run: |
           nix eval --accept-flake-config --no-update-lock-file --impure --json \
-            --expr 'let flake = builtins.getFlake ("path:" + toString ./.); in import (flake.outPath + "/scripts/check-nix-caches.nix") flake'
+            --expr 'let flake = builtins.getFlake ("git+file://" + toString ./.); in import (flake.outPath + "/scripts/check-nix-caches.nix") flake'
       - name: Check volume pins and fixture activation guards
         run: nix eval --json .#lib.hardwareIdentityChecks
       - name: Discover configuration and package targets
         id: matrix
         run: |
           nix eval --accept-flake-config --no-update-lock-file --impure --json \
-            --expr 'let flake = builtins.getFlake ("path:" + toString ./.); in import (flake.outPath + "/scripts/configuration-matrix.nix") flake' > "$RUNNER_TEMP/matrix.json"
+            --expr 'let flake = builtins.getFlake ("git+file://" + toString ./.); in import (flake.outPath + "/scripts/configuration-matrix.nix") flake' > "$RUNNER_TEMP/matrix.json"
           jq -e '.include | length > 0' "$RUNNER_TEMP/matrix.json"
           echo "configurations=$(jq -c . "$RUNNER_TEMP/matrix.json")" >> "$GITHUB_OUTPUT"
           {

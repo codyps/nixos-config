@@ -28,8 +28,7 @@ def main():
         raise RuntimeError("Cannot determine the native Nix system")
     if not system.stdout.endswith("-linux"):
         raise RuntimeError("Run the hash updater on Linux, as in the flake-update workflow")
-    # A path flake includes newly created files during local development too.
-    flake = "path:" + str(ROOT)
+    flake = "git+" + ROOT.as_uri()
     hashes = json.loads(HASHES.read_text())
     for key, package in SOURCES.items():
         expression = (
@@ -62,7 +61,7 @@ def main():
         for package in SOURCES.values():
             result = nix(
                 "build", "--accept-flake-config", "--no-update-lock-file", "--no-link",
-                "--print-build-logs", f"{flake}#packages.{system.stdout}.{package}",
+                "--print-build-logs", f".#packages.{system.stdout}.{package}",
             )
             if result.returncode:
                 raise RuntimeError(f"Verification failed for {package}")

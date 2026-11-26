@@ -3,7 +3,7 @@
 
 Usage: python3 scripts/test-crow-unmask-proc.py /nix/store/...-crow-ai-unmask-proc
 Build Crow first, then obtain the argument from
-nix eval --raw path:.#nixosConfigurations.crow.config.containers.crow-ai.config.systemd.services.crow-ai-unmask-proc.serviceConfig.ExecStart
+nix eval --raw .#nixosConfigurations.crow.config.containers.crow-ai.config.systemd.services.crow-ai-unmask-proc.serviceConfig.ExecStart
 """
 
 import subprocess

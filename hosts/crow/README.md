@@ -564,7 +564,7 @@ mount/unmount test using tmpfs in disposable user/mount namespaces, without
 physical disks. The kernel test skips if unprivileged namespaces are unavailable.
 Runtime regression tests can be run after building with
 `python3 scripts/test-crow-container-runtime.py /nix/store/...-crow-ai-start`,
-using the `ExecStart` path from `nix eval --raw path:.#nixosConfigurations.crow.config.systemd.services.container@crow-ai.serviceConfig.ExecStart`.
+using the `ExecStart` path from `nix eval --raw .#nixosConfigurations.crow.config.systemd.services.container@crow-ai.serviceConfig.ExecStart`.
 The same pattern applies to
 `python3 scripts/test-crow-unmask-proc.py /nix/store/...-crow-ai-unmask-proc`
 with the `ExecStart` from
@@ -602,7 +602,7 @@ Ethernet is not required. Firmware menus may differ from Warbler's HP machine.
    local input's `hardware-identities.json` so it cannot reuse the previous disk identity.
    Provision the live installer from that inventory using the host hardwareProvisioner
    (without `--root`) to establish its installation disk selector. Build and review the disk script. Running it is the destructive operation:
-   `nix build --no-link --print-out-paths path:.#nixosConfigurations.crow.config.system.build.diskoScript`.
+   `nix build --no-link --print-out-paths .#nixosConfigurations.crow.config.system.build.diskoScript`.
    Only after approval, run that exact script on the installer. Verify `/mnt`,
    `/mnt/nix`, `/mnt/home`, `/mnt/persist`, and `/mnt/boot` mount the intended
    devices. `lvs` must show the root and swap LVs; `vgs` must show free extents.
@@ -617,7 +617,7 @@ Ethernet is not required. Firmware menus may differ from Warbler's HP machine.
    `/mnt/persist/var/lib/sbctl/GUID`, as in Warbler's procedure. Copy this
    checkout into `/mnt/persist/nixos-config`. Provision hardware state again with
    `--root /mnt --inventory /LOCAL/INPUT/hardware-identities.json`, then install with
-   `nixos-install --no-root-passwd --flake path:.#crow`.
+   `nixos-install --no-root-passwd --flake .#crow`.
 5. Boot with local console access, unlock LUKS, and verify Wi-Fi, SOPS,
    persistent files, swap, and container connectivity. Back up existing firmware
    keys with `sudo sys backup-secure-boot`, then complete the documented manual
@@ -645,9 +645,9 @@ From this checkout (the `path:` form includes newly created, untracked files):
 ```sh
 nix eval --impure --json --file scripts/test-crow.nix
 python3 scripts/test-secure-unlock-setup.py
-nix build --no-link path:.#nixosConfigurations.crow.config.system.build.toplevel
-nix build --no-link path:.#nixosConfigurations.crow.config.system.build.diskoScript
-nix flake check --no-build path:.
+nix build --no-link .#nixosConfigurations.crow.config.system.build.toplevel
+nix build --no-link .#nixosConfigurations.crow.config.system.build.diskoScript
+nix flake check --no-build .
 ```
 
 The configuration test checks LVM/swap wiring, reset ordering, the absence of a

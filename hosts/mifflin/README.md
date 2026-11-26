@@ -120,9 +120,8 @@ sudo nixos-rebuild boot --flake .#mifflin
 Select the entry containing `reclaim-space` in the systemd-boot menu for that
 boot, leaving the ordinary entry as the default. Switching to the specialisation
 at runtime does not run its initrd. No periodic or normal-boot zeroing is enabled.
-Commit or stage the new module/script/test files before using the Git flake
-reference above; untracked files are excluded by Nix. Alternatively use
-`--flake path:/home/cody/nixos-config#mifflin` while reviewing an unstaged change.
+Add new module, script, and test files to Git before building so Nix can include
+them in the flake source.
 
 Progress is printed to the console and journal. After boot:
 
@@ -146,8 +145,8 @@ command success is not a measurement of reclaimed bytes.
 Validation commands (no activation):
 
 ```sh
-nix build path:$PWD#checks.x86_64-linux.mifflin-reclaim-space --no-link
-nix build path:$PWD#nixosConfigurations.mifflin.config.system.build.toplevel --no-link
+nix build .#checks.x86_64-linux.mifflin-reclaim-space --no-link
+nix build .#nixosConfigurations.mifflin.config.system.build.toplevel --no-link
 ```
 
 The VM test boots the production initrd service on a disposable ext4 root with

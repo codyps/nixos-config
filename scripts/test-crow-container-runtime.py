@@ -3,7 +3,7 @@
 
 Usage: python3 scripts/test-crow-container-runtime.py /nix/store/...-crow-ai-start
 Build Crow first, then obtain the argument from
-nix eval --raw path:.#nixosConfigurations.crow.config.systemd.services.container@crow-ai.serviceConfig.ExecStart
+nix eval --raw .#nixosConfigurations.crow.config.systemd.services.container@crow-ai.serviceConfig.ExecStart
 """
 
 import json

@@ -33,7 +33,7 @@ From the repository root, with OrbStack running:
 
 ```sh
 python3 scripts/docker-linux-builder/setup.py
-sudo darwin-rebuild switch --flake path:/Volumes/dev/p/nixos-config#u3
+sudo darwin-rebuild switch --flake .#u3
 nix store ping --store ssh-ng://root@docker-linux-builder
 ```
 

@@ -3,7 +3,7 @@
 On Linux, obtain the public ID used by systemd's `fixate-volume-key=` option:
 
 ```sh
-sudo nix run path:.#luks-volume-key-id -- --device /dev/nvme0n1p2 --name cryptroot
+sudo nix run .#luks-volume-key-id -- --device /dev/nvme0n1p2 --name cryptroot
 ```
 
 Both arguments are required. `--device` accepts any LUKS1 or LUKS2 device path
@@ -18,7 +18,7 @@ The command prompts for the LUKS passphrase and prints only the 64-character
 public ID to stdout. For automation with an existing passphrase file:
 
 ```sh
-sudo nix run path:.#luks-volume-key-id -- \
+sudo nix run .#luks-volume-key-id -- \
   --device /dev/disk/by-uuid/YOUR-LUKS-UUID --name data \
   --key-file /run/luks-passphrase
 ```
@@ -36,7 +36,7 @@ Systems using [the secure-unlock module](secure-unlock.md) get a
 ## Validation
 
 ```sh
-nix build path:.#checks.x86_64-linux.luks-volume-key-id --no-link
+nix build .#checks.x86_64-linux.luks-volume-key-id --no-link
 ```
 
 The check uses disposable LUKS1 and LUKS2 images to verify the known ID,

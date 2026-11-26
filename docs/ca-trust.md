@@ -92,5 +92,5 @@ nix build .#checks.x86_64-darwin.java-ca-trust --no-link
 nix build .#darwinConfigurations.u3.system --no-link
 ```
 
-For a checkout with new, untracked module files, use `path:.#...` until those
-files are added to Git so the flake includes them.
+Add new module files to Git before building so Nix can include them in the
+flake source.

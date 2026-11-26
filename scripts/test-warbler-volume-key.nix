@@ -1,6 +1,6 @@
 # nix eval --impure --json --file scripts/test-warbler-volume-key.nix
 let
-  flake = builtins.getFlake ("path:" + toString ../.);
+  flake = builtins.getFlake ("git+file://" + toString ../.);
   base = flake.nixosConfigurations.warbler;
   lib = flake.inputs.nixpkgs.lib;
   configured = module: (base.extendModules { modules = [ module ]; }).config;

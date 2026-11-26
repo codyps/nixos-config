@@ -89,7 +89,7 @@ def update_version(name, package):
 
 
 def hash_expression(name, package, system):
-    flake = json.dumps("path:" + str(ROOT))
+    flake = json.dumps("git+" + ROOT.as_uri())
     return (
         f'(builtins.getFlake {flake}).packages.{system}.{name}.'
         f'{package["hashAttribute"]}.overrideAttrs '
@@ -124,7 +124,7 @@ def discover_hash(name, package, system):
 def verify_hash(name, package, system):
     result = nix(
         "build", "--accept-flake-config", "--no-update-lock-file", "--no-link",
-        f"path:{ROOT}#packages.{system}.{name}.{package['hashAttribute']}",
+        f".#packages.{system}.{name}.{package['hashAttribute']}",
     )
     if result.returncode:
         raise RuntimeError(
@@ -135,7 +135,7 @@ def verify_hash(name, package, system):
 def package_version(name, system):
     result = nix(
         "eval", "--impure", "--raw", "--expr",
-        f'(builtins.getFlake {json.dumps("path:" + str(ROOT))})'
+        f'(builtins.getFlake {json.dumps("git+" + ROOT.as_uri())})'
         f'.packages.{system}.{name}.version',
     )
     if result.returncode:

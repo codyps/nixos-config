@@ -1,6 +1,6 @@
 # nix eval --impure --json --file scripts/test-actions-vm-scaler.nix
 let
-  flake = builtins.getFlake ("path:" + toString ../.);
+  flake = builtins.getFlake ("git+file://" + toString ../.);
   lib = flake.inputs.nixpkgs.lib;
   evaluate = extra: (lib.nixosSystem {
     system = "x86_64-linux";

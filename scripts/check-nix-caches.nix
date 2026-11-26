@@ -1,4 +1,4 @@
-# nix eval --impure --json --expr 'let f = builtins.getFlake ("path:" + toString ./.); in import ./scripts/check-nix-caches.nix f'
+# nix eval --impure --json --expr 'let f = builtins.getFlake ("git+file://" + toString ./.); in import ./scripts/check-nix-caches.nix f'
 flake:
 let
   expected = (import ../flake.nix).nixConfig;

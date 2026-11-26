@@ -1,6 +1,6 @@
 # nix eval --impure --json --file scripts/test-ca-trust-modules.nix
 let
-  flake = builtins.getFlake ("path:" + toString ../.);
+  flake = builtins.getFlake ("git+file://" + toString ../.);
   blacklist = version: import ../lib/ca-blacklist.nix {
     inherit version;
     inherit (flake.inputs.nixpkgs) lib;

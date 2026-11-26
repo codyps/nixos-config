@@ -1,6 +1,6 @@
 # nix eval --impure --json --file scripts/test-secure-unlock.nix
 let
-  flake = builtins.getFlake ("path:" + toString ../.);
+  flake = builtins.getFlake ("git+file://" + toString ../.);
 in
 import ../nixos-modules/secure-unlock/test.nix {
   nixpkgs = flake.inputs.nixpkgs;

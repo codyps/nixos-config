@@ -1,3 +1,3 @@
 import ./check-hardware-configurations.nix {
-  flake = builtins.getFlake ("path:" + toString ../.);
+  flake = builtins.getFlake ("git+file://" + toString ../.);
 }

@@ -50,7 +50,7 @@ pub struct VmConfig {
     pub firmware_code: PathBuf,
     pub firmware_vars: PathBuf,
     /// Root-managed QEMU device options, one argument per entry. Never a shell command.
-    /// Must supply machine, CPU and SMC settings appropriate for the golden image.
+    /// Must supply machine and CPU settings appropriate for the golden image.
     pub hardware_args: Vec<String>,
     /// One pre-created, isolated TAP interface per slot. This is the capacity limit.
     pub taps: Vec<String>,
@@ -65,6 +65,7 @@ pub enum GuestOs {
     #[default]
     Macos,
     Windows,
+    Linux,
 }
 
 #[derive(Clone, Deserialize, Serialize)]
@@ -195,6 +196,10 @@ impl Config {
                 self.vm.opencore_disk.is_none() && self.vm.tpm.is_some(),
                 "Windows requires a TPM and no OpenCore"
             ),
+            GuestOs::Linux => ensure!(
+                self.vm.opencore_disk.is_none() && self.vm.tpm.is_none(),
+                "Linux requires no OpenCore or TPM"
+            ),
         }
         for path in [
             &self.private_key_file,
@@ -237,6 +242,10 @@ impl Config {
                 pair[0]
             );
             if pair[0] == "-device" {
+                ensure!(
+                    self.vm.guest_os != GuestOs::Linux,
+                    "Linux does not use the Apple SMC device"
+                );
                 ensure!(
                     pair[1].starts_with("isa-applesmc,"),
                     "only the Apple SMC device may be added through hardware_args"

@@ -504,6 +504,11 @@ pub fn qemu_args(config: &Config, dir: &Path, name: &str, slot: usize, id: Uuid)
             "ide-hd,bus=sata.2,drive=opencore".into(),
         ]);
     }
+    let (os_device, nic) = match v.guest_os {
+        GuestOs::Macos => ("ide-hd,bus=sata.4,drive=os", "vmxnet3"),
+        GuestOs::Windows => ("ide-hd,bus=sata.4,drive=os,bootindex=1", "e1000e"),
+        GuestOs::Linux => ("virtio-blk-pci,drive=os,bootindex=1", "virtio-net-pci"),
+    };
     args.extend([
         "-drive".into(),
         format!(
@@ -518,11 +523,7 @@ pub fn qemu_args(config: &Config, dir: &Path, name: &str, slot: usize, id: Uuid)
             dir.join("disk.qcow2").display()
         ),
         "-device".into(),
-        if v.guest_os == GuestOs::Windows {
-            "ide-hd,bus=sata.4,drive=os,bootindex=1".into()
-        } else {
-            "ide-hd,bus=sata.4,drive=os".into()
-        },
+        os_device.into(),
         "-device".into(),
         "VGA".into(),
         "-netdev".into(),
@@ -532,12 +533,7 @@ pub fn qemu_args(config: &Config, dir: &Path, name: &str, slot: usize, id: Uuid)
         ),
         "-device".into(),
         format!(
-            "{},netdev=net0,mac=52:54:00:78:00:{:02x}",
-            if v.guest_os == GuestOs::Windows {
-                "e1000e"
-            } else {
-                "vmxnet3"
-            },
+            "{nic},netdev=net0,mac=52:54:00:78:00:{:02x}",
             usize::from(v.mac_slot_offset) + slot
         ),
     ]);

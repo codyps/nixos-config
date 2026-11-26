@@ -897,6 +897,40 @@ fn windows_requires_tpm_without_opencore_and_uses_native_devices() {
     assert!(c.validate().is_err());
 }
 
+#[test]
+fn linux_config_uses_virtio_devices_and_the_read_only_seed() {
+    let temp = TempDir::new().unwrap();
+    let mut json = serde_json::to_value(config(&temp)).unwrap();
+    json["vm"]["guest_os"] = "linux".into();
+    let macos_disk = json["vm"].as_object_mut().unwrap().remove("opencore_disk");
+    let mut c: Config = serde_json::from_value(json).unwrap();
+    c.validate().unwrap();
+    c.check_files().unwrap();
+    let run = temp.path().join("run");
+    let args = qemu_args(&c, &run, "test", 1, uuid::Uuid::new_v4());
+    assert!(args.contains(&"virtio-blk-pci,drive=os,bootindex=1".into()));
+    assert!(args.contains(&"virtio-net-pci,netdev=net0,mac=52:54:00:78:00:01".into()));
+    assert!(args.contains(&"tap,id=net0,ifname=avm1,script=no,downscript=no".into()));
+    assert!(args.contains(&format!(
+        "id=seed,if=none,format=raw,readonly=on,media=cdrom,file={}",
+        run.join("seed.iso").display()
+    )));
+    assert!(args.contains(&"ide-cd,bus=sata.3,drive=seed".into()));
+    assert!(!args
+        .iter()
+        .any(|arg| arg.contains("opencore") || arg == "-tpmdev"));
+
+    c.vm.opencore_disk = serde_json::from_value(macos_disk.unwrap()).unwrap();
+    assert!(c.validate().is_err());
+    c.vm.opencore_disk = None;
+    c.vm.tpm = windows_config(&temp).vm.tpm;
+    assert!(c.validate().is_err());
+    c.vm.tpm = None;
+    c.vm.hardware_args
+        .extend(["-device".into(), "isa-applesmc,osk=example".into()]);
+    assert!(c.validate().is_err());
+}
+
 #[tokio::test]
 async fn windows_clones_tpm_and_cleans_up_it_with_the_job() {
     let temp = TempDir::new().unwrap();

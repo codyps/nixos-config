@@ -1,4 +1,4 @@
-# Disposable GitHub Actions VMs on Linux
+# Disposable GitHub Actions VMs with QEMU/KVM
 
 `actions-vm-scaler` is a Rust scale-set client and single-host QEMU/KVM lifecycle
 manager. It serves GitHub Actions jobs, not Nix remote-build requests. It uses
@@ -27,9 +27,9 @@ registration namespace and persistent state under `repositories/<id>/`.
 
 The scope remains one App installation on github.com and one Linux host per
 process. GHES, multiple installations, multi-host placement and rolling image builds are not implemented. The companion
-[image builder](../actions-vm-image/README.md) automates image preparation,
-installation, first-boot setup, provisioning, sealing, and publication. Keep GARM handling the
-existing Linux scale sets. Supplying a nonempty `github_url` explicitly selects
+[macOS image builder](../actions-vm-image/README.md) automates image preparation,
+installation, first-boot setup, provisioning, sealing, and publication.
+Supplying a nonempty `github_url` explicitly selects
 legacy single-repository/organization mode; **omit it for all granted repositories**.
 
 ## Windows scale sets
@@ -55,7 +55,96 @@ image settings through `imageConfigFile`.
 Warbler uses one Windows slot (`warbler-windows`) and one macOS slot
 (`warbler-macos-intel`). Windows state is on its dedicated encrypted SSD.
 
-## Image contract
+## Linux scale sets
+
+Set `vm.guest_os = "linux"` for an x86_64 Linux guest. The controller boots the
+guest through UEFI with a virtio block disk, a virtio network interface, and a
+read-only SATA seed ISO. Use a standalone qcow2 base disk, a matching OVMF
+code/variables pair, and `q35`. Omit `opencore_disk` and `tpm`.
+
+### Build the NixOS image
+
+The flake builds a self-contained NixOS guest with the packaged GitHub Actions
+runner, Git, Nix flakes, and Docker for container jobs. From the repository root:
+
+```sh
+nix build .#actions-linux-image
+```
+
+The output contains `base.qcow2` and `vm.json`. Set the scaler instance's
+`imageConfigFile` to the immutable `vm.json` store path. For example, inside
+this flake with `self` in scope:
+
+```nix
+services.actions-vm-scaler.instances.linux.imageConfigFile =
+  "${self.packages.x86_64-linux.actions-linux-image}/vm.json";
+```
+
+Use the canary example below for the instance's GitHub App, label, and network
+settings. Omit its `settings.vm` block when using the bundled manifest.
+The runner reads its JIT configuration at boot. The image build takes no
+GitHub credentials.
+
+### Prepare a different Linux image
+
+Install a systemd-based distribution such as Ubuntu Server in QEMU using those
+devices. Set up IPv4 DHCP for the virtio interface and configure the network
+manager's wait-online service. Use filesystem UUIDs or labels for disk mounts
+and ensure the UEFI loader works with the variables template you publish.
+
+Inside the guest, create a local `runner` user with a home directory. Extract a
+[Linux x64 GitHub Actions runner release](https://github.com/actions/runner/releases)
+to `/opt/actions-runner`, install its dependencies with `bin/installdependencies.sh`,
+and give `runner` ownership of the directory. Install any workflow dependencies
+in the image, including Docker and access to its daemon for container jobs.
+Leave the runner unregistered and install the bootstrap from this directory:
+
+```sh
+sudo install -D -m 0755 guest/linux-bootstrap.sh /usr/local/libexec/actions-vm-linux-bootstrap
+sudo install -D -m 0644 guest/actions-vm-linux-runner.service /etc/systemd/system/actions-vm-linux-runner.service
+sudo systemctl enable actions-vm-linux-runner.service
+sudo poweroff
+```
+
+The unit reads the job's JIT configuration from the seed ISO, unmounts it,
+starts the runner as `runner`, and powers off the guest when the runner exits
+or bootstrap fails. Keep the runner out of groups with raw access to the CD
+device. For image maintenance, add `actions-vm-image-maintenance` to the guest
+kernel command line for that boot. Remove any provisioning credentials before
+publishing the powered-off image and firmware variables template.
+
+For example, use a separate canary scale set on a host with those network and
+slot ranges available:
+
+```nix
+services.actions-vm-scaler.instances.linux = {
+  enable = true;
+  networkOctet = 81;
+  macSlotOffset = 64;
+  privateKeyFile = "/run/secrets/actions-app-key";
+  settings = {
+    github_url = "https://github.com/example/repo";
+    scale_set = "linux-canary";
+    app_id = "123";
+    installation_id = 456;
+    vm = {
+      guest_os = "linux";
+      base_disk = "/var/lib/actions-vm-images/linux/base.qcow2";
+      firmware_code = "/var/lib/actions-vm-images/linux/code.fd";
+      firmware_vars = "/var/lib/actions-vm-images/linux/vars.fd";
+      hardware_args = [ "-machine" "q35" "-cpu" "host" ];
+    };
+  };
+};
+```
+
+Make the image files readable by `actions-vm-scaler-linux` and select the
+canary with `runs-on: linux-canary`. You can also supply the VM paths and
+hardware settings via `imageConfigFile`. On Warbler, GARM serves the existing
+`warbler-linux` scale sets, and its private cache endpoint is specific to its
+Incus network.
+
+## macOS image contract
 
 Prepare a working x86_64 macOS installation using your tested OSX-KVM/OpenCore
 configuration. The controller never runs the installer. The runtime requires:
@@ -263,7 +352,7 @@ creating a session with the same listener identity invalidates its existing sess
 ```sh
 cargo test --manifest-path scripts/actions-vm-scaler/Cargo.toml --locked
 cargo clippy --manifest-path scripts/actions-vm-scaler/Cargo.toml --all-targets --locked -- -D warnings
-nix build path:.#packages.x86_64-linux.actions-vm-scaler --no-link
+nix build .#packages.x86_64-linux.actions-vm-scaler --no-link
 ```
 
 Tests exercise paginated installation discovery, grants/removals/renames,

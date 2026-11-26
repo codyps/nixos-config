@@ -1,0 +1,17 @@
+[Unit]
+Description=Disposable GitHub Actions runner
+Wants=network-online.target
+After=network-online.target
+ConditionKernelCommandLine=!actions-vm-image-maintenance
+SuccessAction=poweroff
+FailureAction=poweroff
+
+[Service]
+Type=exec
+RuntimeDirectory=actions-vm-bootstrap
+RuntimeDirectoryMode=0700
+PrivateMounts=yes
+ExecStart=/usr/local/libexec/actions-vm-linux-bootstrap
+
+[Install]
+WantedBy=multi-user.target

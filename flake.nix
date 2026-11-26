@@ -370,6 +370,13 @@
             };
           } // pkgs.lib.optionalAttrs pkgs.stdenv.hostPlatform.isDarwin {
             claude-quota-bar = pkgs.claude-quota-bar;
+          } // pkgs.lib.optionalAttrs (system == "x86_64-linux") {
+            actions-linux-image = pkgs.callPackage ./nixpkgs/actions-linux-image.nix {
+              guest = (nixpkgs.lib.nixosSystem {
+                inherit system;
+                modules = [ ./nixos-modules/actions-linux-image.nix ];
+              }).config;
+            };
           } // pkgs.lib.optionalAttrs pkgs.stdenv.hostPlatform.isLinux {
             dedupit = pkgs.dedupit;
             actions-vm-scaler = pkgs.callPackage ./nixpkgs/actions-vm-scaler.nix { };

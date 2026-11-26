@@ -51,6 +51,19 @@ def require(condition, message):
         raise RuntimeError(message)
 
 
+def acquire_setup_lock(lock, timeout=30):
+    deadline = time.monotonic() + timeout
+    while True:
+        try:
+            fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            return
+        except BlockingIOError:
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                raise RuntimeError("Timed out waiting for the secure-unlock setup lock.") from None
+            time.sleep(min(0.25, remaining))
+
+
 def verify_state_backing(config):
     source = run("findmnt", "--evaluate", "-n", "-o", "SOURCE", "--target", config["stateDirectory"]).decode().strip()
     mapper = f"/dev/mapper/{config['mapperName']}"
@@ -563,7 +576,7 @@ def main():
         require(config.get("rootVolumeKeyId") is not None, "Pin the root volume identity and reboot before provisioning unlock state.")
         preflight(config, require_current_generation=args.command == "enroll-disk")
     with open("/run/secure-unlock-setup.lock", "w") as lock:
-        fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        acquire_setup_lock(lock)
         with tempfile.TemporaryDirectory(prefix="secure-unlock-", dir="/run") as directory:
             work = Path(directory)
             if args.command == "retain-booted-measurement":

@@ -51,7 +51,8 @@ in
       description = "Provision persistent TPM-sealed initrd SSH credentials";
       wantedBy = [ "multi-user.target" ];
       wants = [ "tpm2.target" ];
-      after = [ "tpm2.target" ];
+      # Preserve boot ordering when both units also restart during a live switch.
+      after = [ "tpm2.target" ] ++ lib.optional config.boot.lanzaboote.measuredBoot.enable "systemd-pcrlock-make-policy.service";
       unitConfig = {
         RequiresMountsFor = [ cfg.stateDirectory ];
         # Never seal a newly generated key to a disabled Secure Boot policy.

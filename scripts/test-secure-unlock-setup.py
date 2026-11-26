@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Provisioning control-flow tests; no real TPM, disk or credentials are touched."""
 import contextlib
+import fcntl
 import importlib.util
 import io
 import json
@@ -48,6 +49,23 @@ class ProvisioningTests(unittest.TestCase):
         stdout = contextlib.redirect_stdout(io.StringIO())
         stdout.__enter__()
         self.addCleanup(stdout.__exit__, None, None, None)
+
+    def test_setup_lock_waits_until_released(self):
+        lock = self.root / "setup.lock"
+        with lock.open("w") as owner, lock.open("w") as waiter:
+            fcntl.flock(owner, fcntl.LOCK_EX)
+            with patch.object(setup.time, "sleep", side_effect=lambda _: fcntl.flock(owner, fcntl.LOCK_UN)) as sleep:
+                setup.acquire_setup_lock(waiter)
+            sleep.assert_called_once()
+            with self.assertRaises(BlockingIOError):
+                fcntl.flock(owner, fcntl.LOCK_EX | fcntl.LOCK_NB)
+
+    def test_setup_lock_times_out_when_held(self):
+        lock = self.root / "setup.lock"
+        with lock.open("w") as owner, lock.open("w") as waiter:
+            fcntl.flock(owner, fcntl.LOCK_EX)
+            with self.assertRaisesRegex(RuntimeError, "Timed out waiting for the secure-unlock setup lock"):
+                setup.acquire_setup_lock(waiter, timeout=0)
 
     def test_missing_pcr_refuses_enrollment_before_password_prompt(self):
         self.policy.write_text(json.dumps({"pcrValues": [{"pcr": 0}, {"pcr": 7}]}))

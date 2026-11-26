@@ -42,10 +42,6 @@ in
     linkConfig.RequiredForOnline = false;
   };
   services.codex-remote-control.enable = true;
-  # ChatGPT's Unix file viewer invokes /bin/cat directly rather than using PATH.
-  systemd.tmpfiles.rules = [
-    "L+ /bin/cat - - - - ${pkgs.coreutils}/bin/cat"
-  ];
   sops.secrets.opencode-password = {
     sopsFile = ./secrets.yaml;
     mode = "0400";

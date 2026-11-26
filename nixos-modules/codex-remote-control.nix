@@ -5,7 +5,7 @@ let
   python = pkgs.python3.withPackages (p: [ p.websockets ]);
 in
 {
-  imports = [ ../modules/admin-commands.nix ];
+  imports = [ ../modules/admin-commands.nix ./remote-ai.nix ];
   options.services.codex-remote-control = {
     enable = lib.mkEnableOption "remote control recovery for an existing Codex server";
     user = lib.mkOption {

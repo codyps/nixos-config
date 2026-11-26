@@ -172,9 +172,9 @@ Both `warbler-ai` and `crow-ai` import the [shared AI container module](../../ni
 Guest tools, compatibility paths, account defaults, and Codex services belong
 there so fixes apply to both hosts. Host networking stays under `hosts/`.
 
-The desktop Files pane streams remote Unix files through `/bin/cat`. The
-container provides that compatibility link through tmpfiles; having `cat`
-only on `PATH` is insufficient and causes “Could not open file” in the app.
+The ChatGPT Files pane streams remote Unix files through `/bin/cat`. The
+[shared remote AI module](../../nixos-modules/remote-ai.nix) provides that
+link through tmpfiles on `crow`, `crow-ai`, `warbler`, and `warbler-ai`.
 
 Codex runs in the foreground as a **user** service. Systemd tracks the actual
 app-server process; there is no detached-daemon PID-file watchdog or native

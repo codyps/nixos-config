@@ -72,7 +72,7 @@ in
   programs.adminCommands.commands.codex-storage-status = [ "${pkgs.python3}/bin/python3" "${./codex-storage.py}" "${home}/.codex" ];
   programs.adminCommands.commands.update-codex = [ "${pkgs.systemd}/bin/systemctl" "--user" "start" "codex-ai-update.service" ];
   programs.adminCommands.commands.restart-codex = [ "${pkgs.systemd}/bin/systemctl" "--user" "reload" "codex-ai.service" ];
-  imports = [ ../../modules/admin-commands.nix ../../modules/terminfo.nix ./ai-user-config.nix ./ai-git.nix ./ai-rust.nix ../git-gh-credentials.nix ];
+  imports = [ ../../modules/admin-commands.nix ../../modules/terminfo.nix ./ai-user-config.nix ./ai-git.nix ./ai-rust.nix ../git-gh-credentials.nix ../remote-ai.nix ];
   system.stateVersion = "26.05";
   time.timeZone = "America/New_York";
   documentation.enable = false;
@@ -213,8 +213,6 @@ in
     # Hermes-generated units may omit the Nix profile from their PATH.
     "L+ /usr/local/bin - - - - /run/current-system/sw/bin"
     "L+ /bin/bash - - - - ${pkgs.bashInteractive}/bin/bash"
-    # The desktop file viewer streams Unix files through this absolute path.
-    "L+ /bin/cat - - - - ${pkgs.coreutils}/bin/cat"
     "L+ /bin/kill - - - - ${pkgs.coreutils}/bin/kill"
   ] ++ map (command: "L+ /usr/bin/${command} - - - - /run/current-system/sw/bin/${command}") [
     "bash"

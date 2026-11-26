@@ -29,14 +29,16 @@ pkgs.testers.runNixOSTest {
         "assert '/home/coder/.cache/uv' in c['sandbox_workspace_write']['writable_roots']"
     ))
     # Simulate Codex changing the file, then activate again: leave it intact.
-    original = '# keep me\nsandbox_mode = "read-only"\n[sandbox_workspace_write]\nwritable_roots = ["/custom"]\n'
+    original = '# keep me\nsandbox_mode = "read-only"\napproval_policy = "never"\napprovals_reviewer = "user"\n[sandbox_workspace_write]\nwritable_roots = ["/custom"]\n'
     machine.succeed("printf %s " + shlex.quote(original) + " > " + path)
     machine.succeed("/run/current-system/activate")
     assert machine.succeed("cat " + path) == original
-    machine.succeed("runuser -u coder -- codex-configure")
+    machine.succeed("runuser -u coder -- sys configure-codex")
     machine.succeed("python3 -c " + shlex.quote(
         "import tomllib; c=tomllib.load(open('" + path + "','rb')); "
         "assert c['sandbox_mode']=='workspace-write'; "
+        "assert c['approval_policy']=='on-request'; "
+        "assert c['approvals_reviewer']=='auto_review'; "
         "assert '/custom' in c['sandbox_workspace_write']['writable_roots']; "
         "assert '/home/coder/.cache/uv' in c['sandbox_workspace_write']['writable_roots']"
     ))
@@ -52,6 +54,8 @@ pkgs.testers.runNixOSTest {
         "import pathlib, tomllib; p=pathlib.Path('" + ai_path + "'); "
         "c=tomllib.loads(p.read_text()); assert '# keep me' in p.read_text(); "
         "assert c['sandbox_mode']=='workspace-write'; "
+        "assert c['approval_policy']=='never'; "
+        "assert c['approvals_reviewer']=='user'; "
         "assert c['sandbox_workspace_write']['network_access']; "
         "assert '/custom' in c['sandbox_workspace_write']['writable_roots']; "
         "assert '/home/cody-ai/.cache/uv' in c['sandbox_workspace_write']['writable_roots']; "

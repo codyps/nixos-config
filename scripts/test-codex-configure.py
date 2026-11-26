@@ -95,6 +95,20 @@ trust_level = "trusted"
                 self.assertEqual(document["approvals_reviewer"], "auto_review")
                 self.assertFalse(configure.configure(self.path, self.cache))
 
+    def test_activation_update_preserves_saved_approvals_and_fills_missing_defaults(self):
+        self.write('approval_policy = "never"\n')
+        self.assertTrue(configure.configure(self.path, self.cache, preserve_approvals=True))
+        document = tomlkit.parse(self.path.read_text())
+        self.assertEqual(document["approval_policy"], "never")
+        self.assertEqual(document["approvals_reviewer"], "auto_review")
+
+        self.write('approvals_reviewer = "user"\n')
+        self.assertTrue(configure.configure(self.path, self.cache, preserve_approvals=True))
+        document = tomlkit.parse(self.path.read_text())
+        self.assertEqual(document["approval_policy"], "on-request")
+        self.assertEqual(document["approvals_reviewer"], "user")
+        self.assertFalse(configure.configure(self.path, self.cache, preserve_approvals=True))
+
     def test_bad_input_is_not_overwritten(self):
         for text in ('invalid [', 'sandbox_workspace_write = false', '[sandbox_workspace_write]\nwritable_roots = "oops"'):
             with self.subTest(text=text):
@@ -135,7 +149,8 @@ trust_level = "trusted"
                     environment["XDG_CACHE_HOME"] = str(self.home / xdg)
                 with patch.dict(os.environ, environment, clear=True), patch.object(configure.sys, 'platform', platform), patch.object(configure.sys, 'argv', ['codex-configure']), patch.object(configure, 'configure') as update:
                     configure.main()
-                update.assert_called_once_with(self.home / 'custom-codex/config.toml', self.home / suffix, if_missing=False)
+                update.assert_called_once_with(self.home / 'custom-codex/config.toml', self.home / suffix,
+                                               if_missing=False, preserve_approvals=False)
 
 
 if __name__ == "__main__":

@@ -12,7 +12,7 @@ in
       description = "Users whose mutable Codex configuration is configured at activation.";
     };
     updateExisting = lib.mkEnableOption
-      "applying Codex defaults to existing configs on every activation, preserving unrelated settings";
+      "applying Codex defaults to existing configs on every activation, preserving saved approval choices and unrelated settings";
   };
   config = lib.mkIf (cfg.users != [ ]) {
     programs.adminCommands.commands.configure-codex = [ "${configure}/bin/codex-configure" ];
@@ -25,7 +25,7 @@ in
           let home = config.users.users.${user}.home;
           in ''
             ${pkgs.util-linux}/bin/runuser -u ${lib.escapeShellArg user} -- \
-              ${configure}/bin/codex-configure ${lib.optionalString (!cfg.updateExisting) "--if-missing"} \
+              ${configure}/bin/codex-configure ${if cfg.updateExisting then "--preserve-approvals" else "--if-missing"} \
               --config ${lib.escapeShellArg "${home}/.codex/config.toml"} \
               --cache-home ${lib.escapeShellArg "${home}/.cache"}
           '')

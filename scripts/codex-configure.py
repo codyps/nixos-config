@@ -12,7 +12,7 @@ import tomlkit
 CACHES = ("bazel", "bazelisk", "gh", "mbx", "nix", "uv")
 
 
-def configure(path, cache_home, *, if_missing=False):
+def configure(path, cache_home, *, if_missing=False, preserve_approvals=False):
     # Even a dangling symlink counts as an existing config during activation.
     if if_missing and os.path.lexists(path):
         return False
@@ -35,8 +35,12 @@ def configure(path, cache_home, *, if_missing=False):
     while legacy_root in roots:
         roots.remove(legacy_root)
     document["sandbox_mode"] = "workspace-write"
-    document["approval_policy"] = "on-request"
-    document["approvals_reviewer"] = "auto_review"
+    if preserve_approvals:
+        document.setdefault("approval_policy", "on-request")
+        document.setdefault("approvals_reviewer", "auto_review")
+    else:
+        document["approval_policy"] = "on-request"
+        document["approvals_reviewer"] = "auto_review"
     sandbox["network_access"] = True
     for cache in CACHES:
         root = str(cache_home / cache)
@@ -77,6 +81,7 @@ def configure(path, cache_home, *, if_missing=False):
 def main():
     parser = argparse.ArgumentParser(prog="codex-configure", description=__doc__)
     parser.add_argument("--if-missing", action="store_true", help="Seed only; never edit an existing file")
+    parser.add_argument("--preserve-approvals", action="store_true", help=argparse.SUPPRESS)
     parser.add_argument("--config", type=Path, help="Default: $CODEX_HOME/config.toml or ~/.codex/config.toml")
     parser.add_argument("--cache-home", type=Path, help="Override the platform's cache directory")
     args = parser.parse_args()
@@ -88,7 +93,8 @@ def main():
     if not path.is_absolute() or not cache_home.is_absolute():
         parser.error("Config and cache directories must be absolute paths")
     try:
-        changed = configure(path, cache_home, if_missing=args.if_missing)
+        changed = configure(path, cache_home, if_missing=args.if_missing,
+                            preserve_approvals=args.preserve_approvals)
     except (OSError, ValueError, tomlkit.exceptions.ParseError) as error:
         parser.exit(1, f"codex-configure: {error}\n")
     print(f"{'Updated' if changed else 'Unchanged'} {path}")

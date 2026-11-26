@@ -1,0 +1,43 @@
+name: Windows builder canary
+
+on:
+  workflow_dispatch:
+    inputs:
+      runner:
+        description: Scale set with the candidate image
+        type: string
+        default: warbler-windows-canary
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  canary:
+    runs-on: ${{ inputs.runner }}
+    timeout-minutes: 30
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          lfs: true
+      - name: Validate runtime account and toolchains
+        run: '& C:\ProgramData\ActionsVm\smoke-test.ps1 -Canary'
+      - name: Validate Bash shell
+        shell: bash
+        run: |
+          set -euo pipefail
+          git --version
+          python --version
+          node --version
+          cargo --version
+      - name: Collect software inventory
+        run: Copy-Item C:\ProgramData\ActionsVm\software-inventory.json software-inventory.json
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: windows-builder-software-inventory
+          path: software-inventory.json
+          if-no-files-found: error

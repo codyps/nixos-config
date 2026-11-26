@@ -23,6 +23,31 @@ import xml.etree.ElementTree as ET
 HERE = Path(__file__).resolve().parent
 
 
+def package_manifest():
+    manifest = json.loads((HERE / 'packages.json').read_text())
+    if manifest['schema_version'] != 1:
+        raise ValueError('Unsupported Windows package manifest')
+    names = set()
+    for asset in manifest['github_releases']:
+        name = asset['filename']
+        if Path(name).name != name or name in names or not asset['tag']:
+            raise ValueError('Invalid or duplicate release asset')
+        names.add(name)
+    ids = set()
+    for package in manifest['winget_packages']:
+        if package['id'] in ids or not package['version'] or package['scope'] not in ('user', 'machine'):
+            raise ValueError('Invalid or duplicate WinGet package')
+        ids.add(package['id'])
+    return manifest
+
+
+def download_packages(seed, manifest):
+    return [release_asset(
+        asset['repository'],
+        lambda name, asset=asset: name.startswith(asset.get('prefix', '')) and name.endswith(asset['suffix']),
+        seed / asset['filename'], tag=asset['tag']) for asset in manifest['github_releases']]
+
+
 def run(*args, **kwargs):
     return subprocess.run([str(a) for a in args], check=True, **kwargs)
 
@@ -138,8 +163,8 @@ def answer_file(image_index, password):
     <component name="Microsoft-Windows-International-Core" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS"><InputLocale>en-US</InputLocale><SystemLocale>en-US</SystemLocale><UILanguage>en-US</UILanguage><UserLocale>en-US</UserLocale></component>
     <component name="Microsoft-Windows-Shell-Setup" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS">
       <OOBE><HideEULAPage>true</HideEULAPage><HideOnlineAccountScreens>true</HideOnlineAccountScreens><HideWirelessSetupInOOBE>true</HideWirelessSetupInOOBE><ProtectYourPC>3</ProtectYourPC></OOBE>
-      <UserAccounts><LocalAccounts><LocalAccount wcm:action="add"><Name>builder</Name><Group>Administrators</Group><Password><Value>BUILD_PASSWORD</Value><PlainText>true</PlainText></Password></LocalAccount></LocalAccounts></UserAccounts>
-      <AutoLogon><Username>builder</Username><Enabled>true</Enabled><LogonCount>1</LogonCount><Password><Value>BUILD_PASSWORD</Value><PlainText>true</PlainText></Password></AutoLogon>
+      <UserAccounts><LocalAccounts><LocalAccount wcm:action="add"><Name>runner</Name><Group>Administrators</Group><Password><Value>BUILD_PASSWORD</Value><PlainText>true</PlainText></Password></LocalAccount></LocalAccounts></UserAccounts>
+      <AutoLogon><Username>runner</Username><Enabled>true</Enabled><LogonCount>1</LogonCount><Password><Value>BUILD_PASSWORD</Value><PlainText>true</PlainText></Password></AutoLogon>
       <FirstLogonCommands><SynchronousCommand wcm:action="add"><Order>1</Order><Description>Provision disposable runner image</Description><CommandLine>powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -Command "$v=Get-Volume | Where-Object FileSystemLabel -eq 'IMAGE_BUILD'; &amp; ($v.DriveLetter + ':\provision.ps1')"</CommandLine><RequiresUserInput>false</RequiresUserInput></SynchronousCommand></FirstLogonCommands>
     </component>
   </settings>
@@ -192,12 +217,9 @@ def build(args):
             raise ValueError('At least 100 GiB free is required for image preparation and publication')
         seed = work / 'seed'
         seed.mkdir(mode=0o700)
-        print('Downloading and verifying the Windows runner, Git, and PowerShell', flush=True)
-        assets = [
-            release_asset('actions/runner', lambda n: n.startswith('actions-runner-win-x64-') and n.endswith('.zip'), seed / 'runner.zip'),
-            release_asset('git-for-windows/git', lambda n: n.startswith('Git-') and n.endswith('-64-bit.exe'), seed / 'git.exe'),
-            release_asset('PowerShell/PowerShell', lambda n: n.endswith('-win-x64.msi'), seed / 'powershell.msi', tag='v7.6.10'),
-        ]
+        manifest = package_manifest()
+        print('Downloading and verifying pinned Windows bootstrap packages', flush=True)
+        assets = download_packages(seed, manifest)
         # The selected source image must be Windows 11 Pro (the installation key
         # and local-account unattended profile are specific to that edition).
         print('Inspecting Windows installation images', flush=True)
@@ -219,7 +241,9 @@ def build(args):
         shutil.rmtree(installation)
         print(f'Installing Windows 11 Pro (image {index}) in a private {args.disk_gib} GiB disk', flush=True)
         (seed / 'Autounattend.xml').write_text(answer_file(index, secrets.token_urlsafe(32) + '!9aA'))
-        shutil.copyfile(HERE / 'guest/provision.ps1', seed / 'provision.ps1')
+        for script in (HERE / 'guest').glob('*.ps1'):
+            shutil.copyfile(script, seed / script.name)
+        shutil.copyfile(HERE / 'packages.json', seed / 'packages.json')
         shutil.copyfile(Path(os.environ.get('ACTIONS_VM_SCALER_GUEST', str(HERE.parent / 'actions-vm-scaler/guest'))) / 'windows-bootstrap.ps1', seed / 'windows-bootstrap.ps1')
         token = secrets.token_urlsafe(32)
         receipt = {}
@@ -303,7 +327,14 @@ def build(args):
                         qmp.call('screendump', {'filename': str(work / 'screen.ppm')})
                         raise RuntimeError('Installation timed out; inspect the saved console')
                     if time.monotonic() - last_status > 60:
-                        qmp.call('screendump', {'filename': str(work / 'screen.ppm')})
+                        try:
+                            qmp.call('screendump', {'filename': str(work / 'screen.ppm')})
+                        except (OSError, ValueError):
+                            # QEMU can close QMP just before poll observes its
+                            # normal shutdown. Still require its exit status and
+                            # the final guest receipt below before publication.
+                            vm.wait(timeout=10)
+                            break
                         print('Waiting for Windows installation/provisioning' if not receipt else f"Guest receipt: {receipt}", flush=True)
                         last_status = time.monotonic()
                     time.sleep(2)
@@ -323,10 +354,10 @@ def build(args):
             server.server_close()
         # Never publish credentials/install media, and never mutate an existing image.
         (work / 'build.iso').unlink()
-        publish(args, assets)
+        publish(args, assets, manifest)
 
 
-def publish(args, assets):
+def publish(args, assets, packages=None):
     work, destination = args.work_dir, args.destination
     run('qemu-img', 'check', work / 'disk.qcow2')
     destination.mkdir(parents=True, mode=0o755, exist_ok=False)
@@ -340,6 +371,7 @@ def publish(args, assets):
               'hardware_args': hardware_args(), 'memory_mib': args.memory_mib, 'cpus': args.cpus,
               'tpm': {'state_template': str(destination / 'tpm')}}
         (destination / 'vm.json').write_text(json.dumps(vm, indent=2) + '\n')
+        (destination / 'packages.json').write_text(json.dumps(packages or package_manifest(), indent=2) + '\n')
         manifest = {'source_iso_sha256': digest(args.iso), 'assets': assets,
                     'files': {str(p.relative_to(destination)): digest(p) for p in sorted(destination.rglob('*')) if p.is_file()}}
         (destination / 'manifest.json').write_text(json.dumps(manifest, indent=2) + '\n')

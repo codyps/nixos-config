@@ -1,90 +1,166 @@
+param([switch]$Finalize)
 $ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue'
-$seed = Get-Volume | Where-Object FileSystemLabel -eq 'IMAGE_BUILD' | Select-Object -First 1
-if (-not $seed.DriveLetter) { throw 'Missing image build seed' }
-$source = "$($seed.DriveLetter):\"
-$meta = Get-Content -LiteralPath (Join-Path $source 'build.json') -Raw | ConvertFrom-Json
+$root = 'C:\ProgramData\ActionsImage'
+$reboot = $false
 $receipt = @{ success = $false; stage = 'starting' }
-Start-Transcript -Path C:\Windows\Temp\actions-image-provision.log -Force | Out-Null
+function Invoke-Checked([string]$File, [string[]]$Arguments, [int[]]$SuccessCodes = @(0)) {
+    & $File @Arguments
+    if ($LASTEXITCODE -notin $SuccessCodes) { throw "$File failed ($LASTEXITCODE)" }
+}
 function Install-Program([string]$File, [string]$Arguments) {
     $process = Start-Process -FilePath $File -ArgumentList $Arguments -Wait -PassThru
     if ($process.ExitCode -notin @(0, 3010)) { throw "Installer failed: $([IO.Path]::GetFileName($File)) ($($process.ExitCode))" }
 }
+if (-not $Finalize) {
+    $seed = Get-Volume | Where-Object FileSystemLabel -eq 'IMAGE_BUILD' | Select-Object -First 1
+    if (-not $seed.DriveLetter) { throw 'Missing image build seed' }
+    $source = "$($seed.DriveLetter):\"
+    New-Item -ItemType Directory -Path $root -Force | Out-Null
+    Invoke-Checked icacls.exe @($root, '/inheritance:r', '/grant:r', '*S-1-5-18:(OI)(CI)F', '*S-1-5-32-544:(OI)(CI)F')
+    foreach ($name in @('build.json', 'packages.json', 'provision.ps1', 'smoke-test.ps1')) {
+        Copy-Item -LiteralPath (Join-Path $source $name) $root -Force
+    }
+}
+$meta = Get-Content -LiteralPath "$root\build.json" -Raw | ConvertFrom-Json
+$packages = Get-Content -LiteralPath "$root\packages.json" -Raw | ConvertFrom-Json
+Start-Transcript -Path C:\Windows\Temp\actions-image-provision.log -Append | Out-Null
 try {
-    powercfg.exe /hibernate off
-    powercfg.exe /change standby-timeout-ac 0
-    Set-ItemProperty HKLM:\SYSTEM\CurrentControlSet\Control\FileSystem LongPathsEnabled 1
-    # Keep image installation independent of interactive update/reboot prompts.
-    New-Item -Path HKLM:\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate\AU -Force | Out-Null
-    New-ItemProperty -Path HKLM:\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate\AU -Name NoAutoUpdate -Value 1 -PropertyType DWord -Force | Out-Null
-    $receipt.stage = 'git'
-    Install-Program (Join-Path $source 'git.exe') '/VERYSILENT /NORESTART /SP-'
-    $receipt.stage = 'powershell'
-    Install-Program msiexec.exe "/i `"$(Join-Path $source 'powershell.msi')`" /qn /norestart"
-    $receipt.stage = 'build-tools'
-    $tools = Join-Path $env:TEMP 'vs-buildtools.exe'
-    Invoke-WebRequest -Uri 'https://aka.ms/vs/17/release/vs_buildtools.exe' -OutFile $tools
-    $signature = Get-AuthenticodeSignature -LiteralPath $tools
-    if ($signature.Status -ne 'Valid' -or $signature.SignerCertificate.Subject -notmatch 'O=Microsoft Corporation') {
-        throw 'Build Tools installer signature did not verify as Microsoft'
+    if ($env:USERNAME -ne 'runner') { throw 'Image preparation must run as runner' }
+    if (-not $Finalize) {
+        Invoke-Checked powercfg.exe @('/hibernate', 'off')
+        Invoke-Checked powercfg.exe @('/change', 'standby-timeout-ac', '0')
+        Set-ItemProperty HKLM:\SYSTEM\CurrentControlSet\Control\FileSystem LongPathsEnabled 1
+        # Updates are applied deliberately during image maintenance, never mid-job.
+        New-Item -Path HKLM:\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate\AU -Force | Out-Null
+        New-ItemProperty -Path HKLM:\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate\AU -Name NoAutoUpdate -Value 1 -PropertyType DWord -Force | Out-Null
+        $receipt.stage = 'git'
+        Install-Program (Join-Path $source 'git.exe') '/VERYSILENT /NORESTART /SP- /ALLUSERS'
+        $receipt.stage = 'powershell'
+        Install-Program msiexec.exe "/i `"$(Join-Path $source 'powershell.msi')`" /qn /norestart"
+        $receipt.stage = 'winget'
+        $dependencies = Join-Path $env:TEMP 'winget-dependencies'
+        Expand-Archive -LiteralPath (Join-Path $source 'winget-dependencies.zip') -DestinationPath $dependencies -Force
+        # The official release contains separate architecture directories.
+        $appx = @(Get-ChildItem "$dependencies\x64" -Recurse -File | Where-Object Extension -in @('.appx', '.msix'))
+        if (-not $appx.Count) { throw 'Missing x64 WinGet dependencies' }
+        Add-AppxPackage -Path (Join-Path $source 'winget.msixbundle') -DependencyPath $appx.FullName -ForceApplicationShutdown
+        $winget = Join-Path (Get-AppxPackage Microsoft.DesktopAppInstaller).InstallLocation 'winget.exe'
+        Invoke-Checked $winget @('--info')
+        Invoke-Checked $winget @('source', 'update', '--name', 'winget', '--disable-interactivity')
+        $receipt.stage = 'build-tools'
+        $tools = Join-Path $env:TEMP 'vs-buildtools.exe'
+        Invoke-WebRequest -Uri $packages.visual_studio.bootstrapper -OutFile $tools
+        $signature = Get-AuthenticodeSignature -LiteralPath $tools
+        if ($signature.Status -ne 'Valid' -or $signature.SignerCertificate.Subject -notmatch 'O=Microsoft Corporation') {
+            throw 'Build Tools installer signature did not verify as Microsoft'
+        }
+        $components = ($packages.visual_studio.components | ForEach-Object { "--add $_" }) -join ' '
+        Install-Program $tools "--quiet --wait --norestart --nocache --installPath C:\BuildTools $components"
+        Remove-Item -LiteralPath $tools -Force
+        # Pin the Rust toolchain independently of the rustup installer. Avoid
+        # downloading a moving stable toolchain as part of rustup installation.
+        $env:RUSTUP_INIT_SKIP_PATH_CHECK = 'yes'
+        foreach ($package in $packages.winget_packages) {
+            # Installers update the registry PATH, not this existing shell.
+            # Git LFS in particular needs the Git installed earlier in this run.
+            $env:Path = [Environment]::GetEnvironmentVariable('Path', 'Machine') + ';' + [Environment]::GetEnvironmentVariable('Path', 'User')
+            $receipt.stage = $package.id
+            $arguments = @('install', '--id', $package.id, '--exact', '--version', $package.version,
+                '--source', 'winget', '--silent', '--disable-interactivity',
+                '--accept-source-agreements', '--accept-package-agreements')
+            # Some upstream manifests omit Scope even though the installer has
+            # fixed behavior. A strict --scope filter rejects those installers.
+            if ($package.scope_filter -ne $false) { $arguments += @('--scope', $package.scope) }
+            if ($package.custom) { $arguments += @('--custom', $package.custom) }
+            if ($package.architecture) { $arguments += @('--architecture', $package.architecture) }
+            else { $arguments += @('--architecture', 'x64') }
+            if ($package.installer_type) { $arguments += @('--installer-type', $package.installer_type) }
+            if ($package.id -eq 'Rustlang.Rustup') {
+                $arguments += @('--override', '-y --default-host x86_64-pc-windows-msvc --default-toolchain none --profile minimal --no-modify-path')
+            }
+            Invoke-Checked $winget $arguments @(0, 3010)
+        }
+        $receipt.stage = 'rust-toolchain'
+        $cargoBin = Join-Path $env:USERPROFILE '.cargo\bin'
+        Invoke-Checked "$cargoBin\rustup.exe" @('toolchain', 'install', $packages.rust_toolchain, '--profile', 'minimal', '--component', 'rustfmt', '--component', 'clippy')
+        Invoke-Checked "$cargoBin\rustup.exe" @('toolchain', 'install', $packages.rust_gnu_toolchain, '--profile', 'minimal')
+        Invoke-Checked "$cargoBin\rustup.exe" @('default', $packages.rust_toolchain)
+        [Environment]::SetEnvironmentVariable('Path', "$cargoBin;" + [Environment]::GetEnvironmentVariable('Path', 'User'), 'User')
+        $receipt.stage = 'runner'
+        New-Item -ItemType Directory -Path C:\actions-runner -Force | Out-Null
+        Expand-Archive -LiteralPath (Join-Path $source 'runner.zip') -DestinationPath C:\actions-runner
+        if (-not (Test-Path C:\actions-runner\bin\Runner.Listener.exe)) { throw 'Runner extraction failed' }
+        New-Item -ItemType Directory -Path C:\ProgramData\ActionsVm -Force | Out-Null
+        Copy-Item -LiteralPath (Join-Path $source 'windows-bootstrap.ps1') C:\ProgramData\ActionsVm\bootstrap.ps1
+        Copy-Item "$root\packages.json" C:\ProgramData\ActionsVm\packages.json
+        Copy-Item "$root\smoke-test.ps1" C:\ProgramData\ActionsVm\smoke-test.ps1
+        $machinePath = [Environment]::GetEnvironmentVariable('Path', 'Machine')
+        [Environment]::SetEnvironmentVariable('Path', "C:\Program Files\Git\bin;C:\Program Files\LLVM\bin;C:\Program Files\7-Zip;$machinePath", 'Machine')
+        Invoke-Checked icacls.exe @('C:\ProgramData\ActionsVm', '/inheritance:r', '/grant:r', '*S-1-5-18:(OI)(CI)F', '*S-1-5-32-544:(OI)(CI)F')
+        # Remove interactive logon before the deliberate reboot. The random task
+        # password is stored by Task Scheduler, never in a file or command line.
+        $logon = 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon'
+        Set-ItemProperty $logon AutoAdminLogon '0'
+        foreach ($name in @('DefaultPassword', 'DefaultUserName', 'AutoLogonCount')) {
+            Remove-ItemProperty $logon $name -ErrorAction SilentlyContinue
+        }
+        $password = [Guid]::NewGuid().ToString() + [Guid]::NewGuid().ToString() + '!9aA'
+        Set-LocalUser -Name runner -Password (ConvertTo-SecureString $password -AsPlainText -Force) -PasswordNeverExpires $true
+        $user = "$env:COMPUTERNAME\runner"
+        $settings = New-ScheduledTaskSettingsSet -ExecutionTimeLimit (New-TimeSpan -Hours 8) -StartWhenAvailable
+        $trigger = New-ScheduledTaskTrigger -AtStartup
+        $trigger.Delay = 'PT30S'
+        $pwsh = 'C:\Program Files\PowerShell\7\pwsh.exe'
+        $action = New-ScheduledTaskAction -Execute $pwsh -Argument '-NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File C:\ProgramData\ActionsVm\bootstrap.ps1'
+        Register-ScheduledTask -TaskName ActionsVmRunner -Action $action -Trigger $trigger -User $user -Password $password -RunLevel Highest -Settings $settings -Force | Out-Null
+        Disable-ScheduledTask -TaskName ActionsVmRunner | Out-Null
+        $action = New-ScheduledTaskAction -Execute $pwsh -Argument '-NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File C:\ProgramData\ActionsImage\provision.ps1 -Finalize'
+        Register-ScheduledTask -TaskName ActionsImageFinalize -Action $action -Trigger $trigger -User $user -Password $password -RunLevel Highest -Settings $settings -Force | Out-Null
+        $password = $null
+        $receipt.stage = 'rebooting'
+        $reboot = $true
+    } else {
+        $receipt.stage = 'smoke-test'
+        # This runs after a real reboot, as the runtime account, without a desktop.
+        & "$root\smoke-test.ps1" -WriteInventory
+        Invoke-Checked 'C:\Program Files\Git\cmd\git.exe' @('config', '--system', 'core.longpaths', 'true')
+        Invoke-Checked 'C:\Program Files\Git\cmd\git.exe' @('lfs', 'install', '--system', '--skip-repo')
+        $receipt.stage = 'sealing'
+        foreach ($name in @('.runner', '.credentials', '.credentials_rsaparams', '_work')) {
+            if (Test-Path "C:\actions-runner\$name") { throw 'Image contains runner registration or job state' }
+        }
+        Unregister-ScheduledTask -TaskName ActionsImageFinalize -Confirm:$false
+        Remove-Item C:\Windows\Panther\unattend.xml,C:\Windows\Panther\Unattend\unattend.xml,C:\Windows\System32\Sysprep\unattend.xml -Force -ErrorAction SilentlyContinue
+        Clear-History
+        Remove-Item "$env:APPDATA\Microsoft\Windows\PowerShell\PSReadLine\ConsoleHost_history.txt" -Force -ErrorAction SilentlyContinue
+        Enable-ScheduledTask -TaskName ActionsVmRunner | Out-Null
+        $receipt.success = $true
+        $receipt.stage = 'sealed'
     }
-    Install-Program $tools '--quiet --wait --norestart --nocache --installPath C:\BuildTools --add Microsoft.VisualStudio.Workload.VCTools --includeRecommended'
-    Remove-Item -LiteralPath $tools -Force
-    $receipt.stage = 'runner'
-    New-Item -ItemType Directory -Path C:\actions-runner -Force | Out-Null
-    Expand-Archive -LiteralPath (Join-Path $source 'runner.zip') -DestinationPath C:\actions-runner
-    if (-not (Test-Path C:\actions-runner\bin\Runner.Listener.exe)) { throw 'Runner extraction failed' }
-    New-Item -ItemType Directory -Path C:\ProgramData\ActionsVm -Force | Out-Null
-    Copy-Item -LiteralPath (Join-Path $source 'windows-bootstrap.ps1') C:\ProgramData\ActionsVm\bootstrap.ps1
-    icacls.exe C:\ProgramData\ActionsVm /inheritance:r /grant:r '*S-1-5-18:(OI)(CI)F' '*S-1-5-32-544:(OI)(CI)F' | Out-Null
-    # The startup task is installed disabled: the image builder enables it only
-    # immediately before the final shutdown. No GitHub registration is baked in.
-    $action = New-ScheduledTaskAction -Execute 'C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe' -Argument '-NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File C:\ProgramData\ActionsVm\bootstrap.ps1'
-    $settings = New-ScheduledTaskSettingsSet -ExecutionTimeLimit (New-TimeSpan -Hours 8) -StartWhenAvailable
-    Register-ScheduledTask -TaskName ActionsVmRunner -Action $action -Trigger (New-ScheduledTaskTrigger -AtStartup) -User SYSTEM -RunLevel Highest -Settings $settings -Force | Out-Null
-    Disable-ScheduledTask -TaskName ActionsVmRunner | Out-Null
-    $receipt.stage = 'smoke-test'
-    $vs = & 'C:\Program Files (x86)\Microsoft Visual Studio\Installer\vswhere.exe' -latest -products '*' -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
-    if (-not $vs) { throw 'C++ toolchain is missing' }
-    'int main(void) { return 0; }' | Set-Content C:\Windows\Temp\runner-smoke.c -Encoding ascii
-    & cmd.exe /d /c "`"$vs\VC\Auxiliary\Build\vcvars64.bat`" && cl /nologo C:\Windows\Temp\runner-smoke.c /Fo:C:\Windows\Temp\runner-smoke.obj /Fe:C:\Windows\Temp\runner-smoke.exe && C:\Windows\Temp\runner-smoke.exe"
-    if ($LASTEXITCODE -ne 0) { throw 'C++ compiler smoke test failed' }
-    & 'C:\Program Files\Git\cmd\git.exe' --version
-    if ($LASTEXITCODE -ne 0) { throw 'Git smoke test failed' }
-    & 'C:\Program Files\PowerShell\7\pwsh.exe' -NoProfile -Command '$PSVersionTable.PSVersion.ToString()'
-    if ($LASTEXITCODE -ne 0) { throw 'PowerShell smoke test failed' }
-    if (Test-Path C:\actions-runner\.runner) { throw 'Image contains a registered runner' }
-    if (Test-Path C:\actions-runner\_work) { throw 'Image contains a job workspace' }
-    $receipt.stage = 'sealing'
-    & 'C:\Program Files\Git\cmd\git.exe' config --system core.longpaths true
-    if ($LASTEXITCODE -ne 0) { throw 'Git long path configuration failed' }
-    $logon = 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon'
-    Set-ItemProperty $logon AutoAdminLogon '0'
-    foreach ($name in @('DefaultPassword', 'DefaultUserName', 'AutoLogonCount')) {
-        Remove-ItemProperty $logon $name -ErrorAction SilentlyContinue
-    }
-    Disable-LocalUser -Name builder
-    $password = ConvertTo-SecureString ([Guid]::NewGuid().ToString() + [Guid]::NewGuid().ToString()) -AsPlainText -Force
-    Set-LocalUser -Name builder -Password $password
-    Remove-Item C:\Windows\Panther\unattend.xml,C:\Windows\Panther\Unattend\unattend.xml,C:\Windows\System32\Sysprep\unattend.xml -Force -ErrorAction SilentlyContinue
-    Remove-Item C:\Windows\Temp\runner-smoke.* -Force -ErrorAction SilentlyContinue
-    Clear-History
-    $history = "$env:APPDATA\Microsoft\Windows\PowerShell\PSReadLine\ConsoleHost_history.txt"
-    Remove-Item -LiteralPath $history -Force -ErrorAction SilentlyContinue
-    Enable-ScheduledTask -TaskName ActionsVmRunner | Out-Null
-    Stop-Transcript | Out-Null
-    Remove-Item C:\Windows\Temp\actions-image-provision.log -Force
-    $receipt.success = $true
-    $receipt.stage = 'sealed'
 } catch {
-    # Error text may contain download URLs; return only the stage to the host.
-    $receipt.success = $false
+    $reboot = $false
     $_ | Out-File C:\Windows\Temp\actions-image-error.log
-    Stop-Transcript -ErrorAction SilentlyContinue | Out-Null
 } finally {
-    try {
-        Invoke-RestMethod -Method Post -Uri $meta.receipt_url -ContentType application/json -Body ($receipt | ConvertTo-Json -Compress) | Out-Null
-    } finally {
-        Stop-Computer -Force
+    Stop-Transcript -ErrorAction SilentlyContinue | Out-Null
+    if ($reboot) {
+        Restart-Computer -Force
+    } else {
+        if ($receipt.success) {
+            try {
+                if (Test-Path C:\Windows\Temp\actions-image-error.log) { Remove-Item C:\Windows\Temp\actions-image-error.log -Force }
+                Remove-Item C:\Windows\Temp\actions-image-provision.log -Force
+                Remove-Item $root -Recurse -Force
+            } catch {
+                $receipt.success = $false
+                $receipt.stage = 'cleanup-failed'
+                $_ | Out-File C:\Windows\Temp\actions-image-error.log
+            }
+        }
+        try {
+            Invoke-RestMethod -Method Post -Uri $meta.receipt_url -ContentType application/json -Body ($receipt | ConvertTo-Json -Compress) | Out-Null
+        } finally {
+            Stop-Computer -Force
+        }
     }
 }

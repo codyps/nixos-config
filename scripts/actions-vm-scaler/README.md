@@ -39,8 +39,9 @@ Prepare an image using the [Windows image tool](../actions-windows-image/README.
 Windows uses native SATA/e1000e devices, UEFI Secure Boot firmware and a software
 TPM. Omit `opencore_disk` and supply `tpm.state_template`; the NixOS module supplies
 `swtpm` and a private short socket directory. OS disk, firmware variables and TPM
-state are private copies for every job. Windows jobs run as guest SYSTEM through
-the startup bootstrap and shut down after their JIT runner exits.
+state are private copies for every job. V2 Windows images run the startup bootstrap
+as the dedicated local administrator `runner`, preserving the WinGet/Rust profile;
+v1 images use SYSTEM. Both shut down after their JIT runner exits.
 
 `services.actions-vm-scaler.instances.NAME` adds a separate controller alongside
 the existing default instance. Each instance needs a distinct `networkOctet`,

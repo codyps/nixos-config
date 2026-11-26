@@ -50,8 +50,11 @@ Windows jobs use `runs-on: warbler-windows`, with one independently capped VM
 slot and the same App repository discovery. Its controller is
 `actions-vm-scaler-windows.service`; its isolated network is `10.80.0.0/24`.
 The [Windows image tool](../../scripts/actions-windows-image/README.md) prepares
-Windows 11 Pro, Git, PowerShell 7, and Visual Studio C++ Build Tools from the local
-installation ISO. Images, workspaces, and disposable disks live on the
+Windows 11 Pro from the local installation ISO. The v2 image adds WinGet,
+Chocolatey, common CLI tools, CMake/Ninja/LLVM, Node, Python/uv, Rust, and .NET
+to Git, PowerShell, and Visual Studio C++ Build Tools. Windows jobs use the
+dedicated `runner` account so WinGet and user-scoped tools work in startup tasks.
+The v1 image is retained for rollback. Images, workspaces, and disposable disks live on the
 [separate encrypted SATA volume](storage.md#actions-vm-storage).
 
 See the [scaler validation procedure](../../scripts/actions-vm-scaler/README.md#validation)

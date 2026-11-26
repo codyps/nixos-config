@@ -1,6 +1,9 @@
-# Runs as SYSTEM inside a disposable guest. No controller credential enters it.
+# V2 runs as the dedicated runner account; v1 images still use SYSTEM.
+# No controller credential enters the disposable guest.
 $ErrorActionPreference = 'Stop'
 try {
+    # Read persisted installer changes rather than inheriting a stale task PATH.
+    $env:Path = [Environment]::GetEnvironmentVariable('Path', 'Machine') + ';' + [Environment]::GetEnvironmentVariable('Path', 'User')
     $seed = $null
     for ($i = 0; $i -lt 120; $i++) {
         $volume = Get-Volume | Where-Object FileSystemLabel -eq 'RUNNER_SEED' | Select-Object -First 1

@@ -1,7 +1,7 @@
 { lib, stdenvNoCC, makeWrapper, python3, qemu_kvm, swtpm, OVMFFull, xorriso, _7zz, wimlib }:
 stdenvNoCC.mkDerivation {
   pname = "actions-windows-image";
-  version = "0.1.0";
+  version = "0.2.0";
   src = lib.cleanSourceWith {
     src = ../scripts/actions-windows-image;
     filter = path: _type: baseNameOf path != "__pycache__";

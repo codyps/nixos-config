@@ -13,7 +13,7 @@
       networkOctet = 80;
       macSlotOffset = 32;
       privateKeyFile = config.sops.secrets.garm-app-key.path;
-      imageConfigFile = "/var/lib/actions-vm/images/windows11-v1/vm.json";
+      imageConfigFile = "/var/lib/actions-vm/images/windows11-v2/vm.json";
       settings = {
         scale_set = "warbler-windows";
         app_id = "5099875";

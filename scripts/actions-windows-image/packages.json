@@ -1,0 +1,38 @@
+{
+  "schema_version": 1,
+  "image_version": "windows11-v2",
+  "github_releases": [
+    { "repository": "actions/runner", "tag": "v2.338.2", "filename": "runner.zip", "prefix": "actions-runner-win-x64-", "suffix": ".zip" },
+    { "repository": "git-for-windows/git", "tag": "v2.56.1.windows.1", "filename": "git.exe", "prefix": "Git-", "suffix": "-64-bit.exe" },
+    { "repository": "PowerShell/PowerShell", "tag": "v7.6.10", "filename": "powershell.msi", "suffix": "-win-x64.msi" },
+    { "repository": "microsoft/winget-cli", "tag": "v1.29.380", "filename": "winget.msixbundle", "prefix": "Microsoft.DesktopAppInstaller_", "suffix": ".msixbundle" },
+    { "repository": "microsoft/winget-cli", "tag": "v1.29.380", "filename": "winget-dependencies.zip", "prefix": "DesktopAppInstaller_Dependencies", "suffix": ".zip" }
+  ],
+  "visual_studio": {
+    "bootstrapper": "https://aka.ms/vs/17/release/vs_buildtools.exe",
+    "components": [
+      "Microsoft.VisualStudio.Workload.VCTools",
+      "Microsoft.VisualStudio.Component.VC.Tools.x86.x64",
+      "Microsoft.VisualStudio.Component.Windows11SDK.26100"
+    ]
+  },
+  "rust_toolchain": "1.100.0-x86_64-pc-windows-msvc",
+  "rust_gnu_toolchain": "1.100.0-x86_64-pc-windows-gnu",
+  "winget_packages": [
+    { "id": "Chocolatey.Chocolatey", "version": "2.7.4.0", "scope": "machine", "architecture": "x86" },
+    { "id": "GitHub.cli", "version": "2.104.0", "scope": "machine" },
+    { "id": "GitHub.GitLFS", "version": "3.8.0", "scope": "machine", "architecture": "x86" },
+    { "id": "7zip.7zip", "version": "26.06", "scope": "machine" },
+    { "id": "jqlang.jq", "version": "1.8.2", "scope": "machine" },
+    { "id": "BurntSushi.ripgrep.MSVC", "version": "15.2.0", "scope": "machine" },
+    { "id": "Kitware.CMake", "version": "4.4.4", "scope": "machine", "installer_type": "wix" },
+    { "id": "Ninja-build.Ninja", "version": "1.13.2", "scope": "machine" },
+    { "id": "LLVM.LLVM", "version": "23.1.6", "scope": "machine", "scope_filter": false, "custom": "ALLUSERS=1" },
+    { "id": "BrechtSanders.WinLibs.POSIX.UCRT", "version": "16.2.0-14.0.0-r3", "scope": "user" },
+    { "id": "OpenJS.NodeJS.LTS", "version": "26.13.1", "scope": "machine" },
+    { "id": "Python.Python.3.13", "version": "3.13.17", "scope": "machine" },
+    { "id": "astral-sh.uv", "version": "0.13.9", "scope": "machine" },
+    { "id": "Rustlang.Rustup", "version": "1.29.3", "scope": "user", "scope_filter": false },
+    { "id": "Microsoft.DotNet.SDK.10", "version": "10.0.404", "scope": "machine" }
+  ]
+}

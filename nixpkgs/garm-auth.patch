@@ -1,0 +1,971 @@
+diff --git a/params/app_pacing.go b/params/app_pacing.go
+new file mode 100644
+index 0000000..4475af0
+--- /dev/null
++++ b/params/app_pacing.go
+@@ -0,0 +1,96 @@
++package params
++
++import (
++	"context"
++	"net/http"
++	"strconv"
++	"sync"
++	"time"
++)
++
++// Keep aggregate App traffic below GitHub's secondary point budget, including
++// per-repository tools queries during startup. GET costs one point; writes five.
++type pacedAppTransport struct {
++	inner    http.RoundTripper
++	interval time.Duration
++	mu       sync.Mutex
++	turn     chan struct{}
++	next     time.Time
++}
++
++func (p *pacedAppTransport) wait(ctx context.Context, cost int) error {
++	// A single waiter owns the next slot. Other callers queue without racing
++	// every timer tick, and cancellation also works while waiting for a turn.
++	p.mu.Lock()
++	if p.turn == nil {
++		p.turn = make(chan struct{}, 1)
++	}
++	turn := p.turn
++	p.mu.Unlock()
++	select {
++	case turn <- struct{}{}:
++	case <-ctx.Done():
++		return ctx.Err()
++	}
++	defer func() { <-turn }()
++
++	for {
++		if err := ctx.Err(); err != nil {
++			return err
++		}
++		p.mu.Lock()
++		now := time.Now()
++		delay := p.next.Sub(now)
++		if delay <= 0 {
++			p.next = now.Add(time.Duration(cost) * p.interval)
++			p.mu.Unlock()
++			return nil
++		}
++		p.mu.Unlock()
++		timer := time.NewTimer(delay)
++		select {
++		case <-ctx.Done():
++			timer.Stop()
++			return ctx.Err()
++		case <-timer.C:
++		}
++	}
++}
++func (p *pacedAppTransport) RoundTrip(req *http.Request) (*http.Response, error) {
++	cost := 5
++	if req.Method == http.MethodGet || req.Method == http.MethodHead || req.Method == http.MethodOptions {
++		cost = 1
++	}
++	if err := p.wait(req.Context(), cost); err != nil {
++		return nil, err
++	}
++	resp, err := p.inner.RoundTrip(req)
++	if err != nil {
++		return resp, err
++	}
++	delay := time.Duration(0)
++	if resp.StatusCode == 429 || (resp.StatusCode == 403 && resp.Header.Get("Retry-After") != "") {
++		delay = time.Minute
++		if seconds, e := strconv.Atoi(resp.Header.Get("Retry-After")); e == nil && seconds > 0 {
++			delay = time.Duration(seconds) * time.Second
++		} else if deadline, e := http.ParseTime(resp.Header.Get("Retry-After")); e == nil && time.Until(deadline) > 0 {
++			delay = time.Until(deadline)
++		}
++	}
++	if resp.Header.Get("X-RateLimit-Remaining") == "0" {
++		if reset, e := strconv.ParseInt(resp.Header.Get("X-RateLimit-Reset"), 10, 64); e == nil && time.Until(time.Unix(reset, 0)) > delay {
++			delay = time.Until(time.Unix(reset, 0))
++		} else if delay == 0 {
++			delay = time.Minute
++		}
++	}
++	if delay > 0 {
++		p.mu.Lock()
++		until := time.Now().Add(delay)
++		if until.After(p.next) {
++			p.next = until
++		}
++		p.mu.Unlock()
++	}
++	return resp, nil
++}
+diff --git a/params/app_pacing_test.go b/params/app_pacing_test.go
+new file mode 100644
+index 0000000..d888904
+--- /dev/null
++++ b/params/app_pacing_test.go
+@@ -0,0 +1,45 @@
++package params
++
++import (
++	"context"
++	"errors"
++	"net/http"
++	"strconv"
++	"testing"
++	"time"
++)
++
++type transportFunc func(*http.Request) (*http.Response, error)
++
++func (f transportFunc) RoundTrip(r *http.Request) (*http.Response, error) { return f(r) }
++func TestPrimaryResetPausesSharedAppTraffic(t *testing.T) {
++	calls := 0
++	tr := &pacedAppTransport{inner: transportFunc(func(r *http.Request) (*http.Response, error) {
++		calls++
++		return &http.Response{StatusCode: 403, Header: http.Header{"X-Ratelimit-Remaining": []string{"0"}, "X-Ratelimit-Reset": []string{strconv.FormatInt(time.Now().Add(time.Hour).Unix(), 10)}}}, nil
++	})}
++	req, _ := http.NewRequest("GET", "https://example.invalid", nil)
++	if _, e := tr.RoundTrip(req); e != nil {
++		t.Fatal(e)
++	}
++	if time.Until(tr.next) < 59*time.Minute {
++		t.Fatal("primary reset not honored")
++	}
++	ctx, cancel := context.WithCancel(context.Background())
++	cancel()
++	if _, e := tr.RoundTrip(req.WithContext(ctx)); !errors.Is(e, context.Canceled) {
++		t.Fatalf("cancellation lost: %v", e)
++	}
++	if calls != 1 {
++		t.Fatal("request sent despite cooldown")
++	}
++}
++func TestWritesUseFivePointSlots(t *testing.T) {
++	tr := &pacedAppTransport{interval: time.Second}
++	if err := tr.wait(context.Background(), 5); err != nil {
++		t.Fatal(err)
++	}
++	if time.Until(tr.next) < 4*time.Second {
++		t.Fatal("write request was not weighted")
++	}
++}
+diff --git a/params/app_transport_test.go b/params/app_transport_test.go
+new file mode 100644
+index 0000000..d664f6a
+--- /dev/null
++++ b/params/app_transport_test.go
+@@ -0,0 +1,76 @@
++package params
++
++import (
++	"context"
++	"crypto/rand"
++	"crypto/rsa"
++	"crypto/x509"
++	"encoding/json"
++	"encoding/pem"
++	"fmt"
++	"net/http"
++	"net/http/httptest"
++	"sync"
++	"sync/atomic"
++	"testing"
++	"time"
++)
++
++func TestAppClientsShareTokensAndRespectCredentialRotation(t *testing.T) {
++	var minted atomic.Int32
++	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
++		w.Header().Set("Content-Type", "application/json")
++		if r.Method == "POST" {
++			minted.Add(1)
++			fmt.Fprintf(w, `{"token":"fixture","expires_at":%q}`, time.Now().Add(time.Hour).UTC().Format(time.RFC3339))
++			return
++		}
++		w.Write([]byte(`{}`))
++	}))
++	defer server.Close()
++	key, err := rsa.GenerateKey(rand.Reader, 2048)
++	if err != nil {
++		t.Fatal(err)
++	}
++	payload, _ := json.Marshal(GithubApp{AppID: 1, InstallationID: 1, PrivateKeyBytes: pem.EncodeToMemory(&pem.Block{Type: "RSA PRIVATE KEY", Bytes: x509.MarshalPKCS1PrivateKey(key)})})
++	cred := ForgeCredentials{AuthType: ForgeAuthTypeApp, APIBaseURL: server.URL, CredentialsPayload: payload}
++	clients := make([]*http.Client, 12)
++	var wg sync.WaitGroup
++	for i := range clients {
++		wg.Add(1)
++		go func(i int) {
++			defer wg.Done()
++			c, e := cred.GetHTTPClient(context.Background())
++			if e != nil {
++				t.Error(e)
++				return
++			}
++			clients[i] = c
++		}(i)
++	}
++	wg.Wait()
++	for _, c := range clients {
++		if c != clients[0] {
++			t.Fatal("installation client not shared")
++		}
++		r, e := c.Get(server.URL)
++		if e != nil {
++			t.Fatal(e)
++		}
++		r.Body.Close()
++	}
++	if minted.Load() != 1 {
++		t.Fatalf("minted %d installation tokens", minted.Load())
++	}
++	var app GithubApp
++	json.Unmarshal(payload, &app)
++	app.InstallationID = 2
++	cred.CredentialsPayload, _ = json.Marshal(app)
++	rotated, e := cred.GetHTTPClient(context.Background())
++	if e != nil {
++		t.Fatal(e)
++	}
++	if rotated == clients[0] {
++		t.Fatal("credential change reused stale transport")
++	}
++}
+diff --git a/params/params.go b/params/params.go
+index 49b237d..08d7e49 100644
+--- a/params/params.go
++++ b/params/params.go
+@@ -16,6 +16,7 @@ package params
+ 
+ import (
+ 	"context"
++	"crypto/sha256"
+ 	"crypto/tls"
+ 	"crypto/x509"
+ 	"encoding/json"
+@@ -24,6 +25,7 @@ import (
+ 	"net"
+ 	"net/http"
+ 	"strings"
++	"sync"
+ 	"time"
+ 
+ 	"github.com/bradleyfalzon/ghinstallation/v2"
+@@ -1134,6 +1136,13 @@ func (g ForgeCredentials) GetID() uint {
+ 	return g.ID
+ }
+ 
++// Share installation-token caches across repositories using the same credential.
++// Include endpoint, CA and key material so credential rotation creates a new client.
++var appHTTPClients = struct {
++	sync.Mutex
++	clients map[[32]byte]*http.Client
++}{clients: make(map[[32]byte]*http.Client)}
++
+ func (g ForgeCredentials) GetHTTPClient(ctx context.Context) (*http.Client, error) {
+ 	var roots *x509.CertPool
+ 	if g.CABundle != nil {
+@@ -1165,6 +1174,16 @@ func (g ForgeCredentials) GetHTTPClient(ctx context.Context) (*http.Client, erro
+ 	var tc *http.Client
+ 	switch g.AuthType {
+ 	case ForgeAuthTypeApp:
++		material, err := json.Marshal([]any{g.APIBaseURL, g.CABundle, g.CredentialsPayload})
++		if err != nil {
++			return nil, err
++		}
++		cacheKey := sha256.Sum256(material)
++		appHTTPClients.Lock()
++		defer appHTTPClients.Unlock()
++		if client := appHTTPClients.clients[cacheKey]; client != nil {
++			return client, nil
++		}
+ 		var app GithubApp
+ 		if err := json.Unmarshal(g.CredentialsPayload, &app); err != nil {
+ 			return nil, fmt.Errorf("failed to unmarshal github app credentials: %w", err)
+@@ -1178,7 +1197,8 @@ func (g ForgeCredentials) GetHTTPClient(ctx context.Context) (*http.Client, erro
+ 		}
+ 		itr.BaseURL = g.APIBaseURL
+ 
+-		tc = &http.Client{Transport: itr}
++		tc = &http.Client{Transport: &pacedAppTransport{inner: itr, interval: 200 * time.Millisecond}}
++		appHTTPClients.clients[cacheKey] = tc
+ 	default:
+ 		var pat GithubPAT
+ 		if err := json.Unmarshal(g.CredentialsPayload, &pat); err != nil {
+diff --git a/util/github/client.go b/util/github/client.go
+index 1c1a1a3..101f1ef 100644
+--- a/util/github/client.go
++++ b/util/github/client.go
+@@ -691,13 +691,8 @@ func Client(ctx context.Context, entity params.ForgeEntity) (common.GithubClient
+ 		entity:         entity,
+ 	}
+ 
+-	limits, err := cli.RateLimit(ctx)
+-	if err == nil && limits != nil {
+-		core := limits.GetCore()
+-		if core != nil {
+-			cli.recordLimits(*core)
+-		}
+-	}
++	// The credential monitor queries rate limits centrally. Avoid one extra
++	// API request per repository during a large controller startup.
+ 
+ 	return cli, nil
+ }
+diff --git a/util/github/scalesets/auth_cache.go b/util/github/scalesets/auth_cache.go
+new file mode 100644
+index 0000000..1c23e91
+--- /dev/null
++++ b/util/github/scalesets/auth_cache.go
+@@ -0,0 +1,42 @@
++package scalesets
++
++import (
++	"crypto/sha256"
++	"encoding/json"
++	"sync"
++
++	"github.com/cloudbase/garm/params"
++	"github.com/cloudbase/garm/runner/common"
++	"github.com/google/go-github/v84/github"
++)
++
++// Listeners, reconciliation and legacy pool managers authenticate to the same
++// repository. Share their token cache, while keeping client/request state local.
++type repositoryAuth struct {
++	sync.Mutex
++	registration *github.RegistrationToken
++	actions      *params.ActionsServiceAdminInfoResponse
++}
++
++var repositoryAuthCache = struct {
++	sync.Mutex
++	entries map[[32]byte]*repositoryAuth
++}{entries: make(map[[32]byte]*repositoryAuth)}
++
++func sharedRepositoryAuth(cli common.GithubClient) (*repositoryAuth, error) {
++	entity := cli.GetEntity()
++	credential := entity.Credentials
++	material, err := json.Marshal([]any{entity.ForgeURL(), credential.AuthType, credential.APIBaseURL, credential.CABundle, credential.CredentialsPayload})
++	if err != nil {
++		return nil, err
++	}
++	key := sha256.Sum256(material)
++	repositoryAuthCache.Lock()
++	defer repositoryAuthCache.Unlock()
++	state := repositoryAuthCache.entries[key]
++	if state == nil {
++		state = &repositoryAuth{}
++		repositoryAuthCache.entries[key] = state
++	}
++	return state, nil
++}
+diff --git a/util/github/scalesets/auth_pacing.go b/util/github/scalesets/auth_pacing.go
+new file mode 100644
+index 0000000..b4ca0ca
+--- /dev/null
++++ b/util/github/scalesets/auth_pacing.go
+@@ -0,0 +1,65 @@
++package scalesets
++
++import (
++	"context"
++	"sync"
++	"time"
++)
++
++// RemoteAuth exchanges use at most 400 points/minute. Combined with the App
++// REST limiter (300 points/minute), this leaves headroom below 900 points/minute.
++var registrationRequests = &authPacer{interval: 750 * time.Millisecond}
++
++type authPacer struct {
++	mu       sync.Mutex
++	turn     chan struct{}
++	next     time.Time
++	interval time.Duration
++}
++
++func (p *authPacer) deferFor(delay time.Duration) {
++	p.mu.Lock()
++	defer p.mu.Unlock()
++	until := time.Now().Add(delay)
++	if until.After(p.next) {
++		p.next = until
++	}
++}
++func (p *authPacer) wait(ctx context.Context) error {
++	// A single waiter owns the next slot. Other callers queue without racing
++	// every timer tick, and cancellation also works while waiting for a turn.
++	p.mu.Lock()
++	if p.turn == nil {
++		p.turn = make(chan struct{}, 1)
++	}
++	turn := p.turn
++	p.mu.Unlock()
++	select {
++	case turn <- struct{}{}:
++	case <-ctx.Done():
++		return ctx.Err()
++	}
++	defer func() { <-turn }()
++
++	for {
++		if err := ctx.Err(); err != nil {
++			return err
++		}
++		p.mu.Lock()
++		now := time.Now()
++		delay := p.next.Sub(now)
++		if delay <= 0 {
++			p.next = now.Add(p.interval)
++			p.mu.Unlock()
++			return nil
++		}
++		p.mu.Unlock()
++		timer := time.NewTimer(delay)
++		select {
++		case <-ctx.Done():
++			timer.Stop()
++			return ctx.Err()
++		case <-timer.C:
++		}
++	}
++}
+diff --git a/util/github/scalesets/auth_pacing_test.go b/util/github/scalesets/auth_pacing_test.go
+new file mode 100644
+index 0000000..a080c2c
+--- /dev/null
++++ b/util/github/scalesets/auth_pacing_test.go
+@@ -0,0 +1,208 @@
++package scalesets
++
++import (
++	"context"
++	"encoding/base64"
++	"errors"
++	"fmt"
++	runnerErrors "github.com/cloudbase/garm-provider-common/errors"
++	"github.com/cloudbase/garm/params"
++	"github.com/cloudbase/garm/runner/common"
++	"github.com/google/go-github/v84/github"
++	"net/http"
++	"net/http/httptest"
++	"net/url"
++	"testing"
++	"time"
++)
++
++func TestAuthPacerCancellationAndCooldown(t *testing.T) {
++	p := &authPacer{interval: time.Millisecond}
++	if err := p.wait(context.Background()); err != nil {
++		t.Fatal(err)
++	}
++	p.deferFor(time.Hour)
++	ctx, cancel := context.WithCancel(context.Background())
++	cancel()
++	if !errors.Is(p.wait(ctx), context.Canceled) {
++		t.Fatal("cooldown ignored cancellation")
++	}
++	if time.Until(p.next) < 59*time.Minute {
++		t.Fatal("cooldown lost")
++	}
++}
++func TestRateLimitIsNotUnauthorized(t *testing.T) {
++	old := registrationRequests
++	registrationRequests = &authPacer{}
++	defer func() { registrationRequests = old }()
++	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
++		w.Header().Set("Retry-After", "120")
++		w.WriteHeader(403)
++		w.Write([]byte(`{"message":"secondary rate limit"}`))
++	}))
++	defer server.Close()
++	s := &ScaleSetClient{httpClient: server.Client()}
++	req, _ := http.NewRequest("GET", server.URL, nil)
++	_, err := s.Do(req)
++	if err == nil || errors.Is(err, runnerErrors.ErrUnauthorized) {
++		t.Fatalf("rate limit classified as credential failure: %v", err)
++	}
++	if time.Until(registrationRequests.next) < 119*time.Second {
++		t.Fatal("Retry-After ignored")
++	}
++}
++
++type registrationFake struct {
++	common.GithubClient
++	u       *url.URL
++	calls   int
++	err     error
++	payload string
++}
++
++func (f *registrationFake) CreateEntityRegistrationToken(context.Context) (*github.RegistrationToken, *github.Response, error) {
++	f.calls++
++	if f.err != nil {
++		return nil, nil, f.err
++	}
++	s := "fixture"
++	return &github.RegistrationToken{Token: &s, ExpiresAt: &github.Timestamp{Time: time.Now().Add(time.Hour)}}, nil, nil
++}
++func (f *registrationFake) GithubBaseURL() *url.URL { return f.u }
++func (f *registrationFake) GetEntity() params.ForgeEntity {
++	return params.ForgeEntity{Owner: "example", Name: "repo", EntityType: params.ForgeEntityTypeRepository, Credentials: params.ForgeCredentials{BaseURL: "https://github.com", CredentialsPayload: []byte(f.payload)}}
++}
++func TestRejectedRegistrationTokenIsDiscarded(t *testing.T) {
++	resetRepositoryAuth(t)
++	old := registrationRequests
++	registrationRequests = &authPacer{}
++	defer func() { registrationRequests = old }()
++	attempts := 0
++	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
++		attempts++
++		if attempts == 1 {
++			w.WriteHeader(401)
++			return
++		}
++		w.Header().Set("Content-Type", "application/json")
++		w.Write([]byte(`{"url":"https://example.invalid/","token":"fixture"}`))
++	}))
++	defer server.Close()
++	u, _ := url.Parse(server.URL)
++	fake := &registrationFake{u: u}
++	s := &ScaleSetClient{httpClient: server.Client(), ghCli: fake}
++	if !errors.Is(s.ensureAdminInfo(context.Background()), runnerErrors.ErrUnauthorized) {
++		t.Fatal("expected rejection")
++	}
++	if s.runnerRegistrationToken != nil {
++		t.Fatal("rejected credential retained")
++	}
++	if err := s.ensureAdminInfo(context.Background()); err != nil {
++		t.Fatal(err)
++	}
++	if fake.calls != 2 {
++		t.Fatal("token was not refreshed")
++	}
++}
++
++func TestRegistrationPrimaryLimitDefersAllRepositories(t *testing.T) {
++	resetRepositoryAuth(t)
++	old := registrationRequests
++	registrationRequests = &authPacer{}
++	defer func() { registrationRequests = old }()
++	req, _ := http.NewRequest("POST", "https://example.invalid", nil)
++	fake := &registrationFake{err: &github.RateLimitError{Rate: github.Rate{Reset: github.Timestamp{Time: time.Now().Add(time.Hour)}}, Response: &http.Response{StatusCode: 403, Request: req}}}
++	s := &ScaleSetClient{ghCli: fake}
++	if s.ensureAdminInfo(context.Background()) == nil {
++		t.Fatal("expected rate limit")
++	}
++	if time.Until(registrationRequests.next) < 59*time.Minute {
++		t.Fatal("primary reset ignored")
++	}
++}
++
++func TestCredentialClientChangeInvalidatesCachedActionsCredentials(t *testing.T) {
++	first := &registrationFake{}
++	second := &registrationFake{}
++	s := &ScaleSetClient{ghCli: first, runnerRegistrationToken: &github.RegistrationToken{}, actionsServiceInfo: &params.ActionsServiceAdminInfoResponse{}}
++	s.SetGithubClient(first)
++	if s.runnerRegistrationToken == nil || s.actionsServiceInfo == nil {
++		t.Fatal("unchanged credential discarded reusable tokens")
++	}
++	s.SetGithubClient(second)
++	if s.runnerRegistrationToken != nil || s.actionsServiceInfo != nil {
++		t.Fatal("changed credential retained old tokens")
++	}
++}
++
++func resetRepositoryAuth(t *testing.T) {
++	old := repositoryAuthCache.entries
++	repositoryAuthCache.entries = make(map[[32]byte]*repositoryAuth)
++	t.Cleanup(func() { repositoryAuthCache.entries = old })
++}
++
++func TestRepositoryClientsShareActionsTokensAndRotateCredentials(t *testing.T) {
++	resetRepositoryAuth(t)
++	old := registrationRequests
++	registrationRequests = &authPacer{}
++	defer func() { registrationRequests = old }()
++	exchanges := 0
++	jwt := "eyJhbGciOiJSUzI1NiJ9." + base64.RawURLEncoding.EncodeToString([]byte(fmt.Sprintf(`{"exp":%d}`, time.Now().Add(time.Hour).Unix()))) + ".fixture"
++	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
++		exchanges++
++		fmt.Fprintf(w, `{"url":"https://example.invalid/","token":%q}`, jwt)
++	}))
++	defer server.Close()
++	u, _ := url.Parse(server.URL)
++	first, second := &registrationFake{u: u}, &registrationFake{u: u}
++	for _, fake := range []*registrationFake{first, second} {
++		client := &ScaleSetClient{ghCli: fake, httpClient: server.Client()}
++		if err := client.ensureAdminInfo(context.Background()); err != nil {
++			t.Fatal(err)
++		}
++	}
++	if first.calls != 1 || second.calls != 0 || exchanges != 1 {
++		t.Fatal("repository clients did not share authentication")
++	}
++	second.payload = `{"key":"rotated-fixture"}`
++	client := &ScaleSetClient{ghCli: second, httpClient: server.Client()}
++	if err := client.ensureAdminInfo(context.Background()); err != nil {
++		t.Fatal(err)
++	}
++	if second.calls != 1 || exchanges != 2 {
++		t.Fatal("credential rotation reused old authentication")
++	}
++}
++
++func TestQueuedAuthWaitCanBeCancelled(t *testing.T) {
++	p := &authPacer{interval: time.Hour}
++	if err := p.wait(context.Background()); err != nil {
++		t.Fatal(err)
++	}
++	owner, cancelOwner := context.WithCancel(context.Background())
++	defer cancelOwner()
++	done := make(chan error, 1)
++	go func() { done <- p.wait(owner) }()
++	deadline := time.Now().Add(time.Second)
++	for {
++		p.mu.Lock()
++		queued := len(p.turn) == 1
++		p.mu.Unlock()
++		if queued {
++			break
++		}
++		if time.Now().After(deadline) {
++			t.Fatal("waiter failed to acquire queue slot")
++		}
++		time.Sleep(time.Millisecond)
++	}
++	ctx, cancel := context.WithCancel(context.Background())
++	cancel()
++	if !errors.Is(p.wait(ctx), context.Canceled) {
++		t.Fatal("queued request ignored cancellation")
++	}
++	cancelOwner()
++	if !errors.Is(<-done, context.Canceled) {
++		t.Fatal("queue owner ignored cancellation")
++	}
++}
+diff --git a/util/github/scalesets/client.go b/util/github/scalesets/client.go
+index 9583d41..8b5b1d0 100644
+--- a/util/github/scalesets/client.go
++++ b/util/github/scalesets/client.go
+@@ -18,7 +18,10 @@ import (
+ 	"fmt"
+ 	"io"
+ 	"net/http"
++	"strconv"
++	"strings"
+ 	"sync"
++	"time"
+ 
+ 	"github.com/google/go-github/v84/github"
+ 
+@@ -69,6 +72,10 @@ func (s *ScaleSetClient) recordFailedOperation(operation string) {
+ func (s *ScaleSetClient) SetGithubClient(cli common.GithubClient) {
+ 	s.mux.Lock()
+ 	defer s.mux.Unlock()
++	if s.ghCli != cli {
++		s.runnerRegistrationToken = nil
++		s.actionsServiceInfo = nil
++	}
+ 	s.ghCli = cli
+ }
+ 
+@@ -104,6 +111,23 @@ func (s *ScaleSetClient) Do(req *http.Request) (*http.Response, error) {
+ 		}
+ 	}
+ 
++	// Rate-limit responses must not be reported as invalid credentials.
++	if resp.StatusCode == 429 || (resp.StatusCode == 403 &&
++		(resp.Header.Get("Retry-After") != "" || resp.Header.Get("X-RateLimit-Remaining") == "0" || strings.Contains(strings.ToLower(string(body)), "rate limit"))) {
++		delay := time.Minute
++		if seconds, err := strconv.Atoi(resp.Header.Get("Retry-After")); err == nil && seconds > 0 {
++			delay = time.Duration(seconds) * time.Second
++		} else if deadline, err := http.ParseTime(resp.Header.Get("Retry-After")); err == nil && time.Until(deadline) > 0 {
++			delay = time.Until(deadline)
++		}
++		if resp.Header.Get("X-RateLimit-Remaining") == "0" {
++			if reset, err := strconv.ParseInt(resp.Header.Get("X-RateLimit-Reset"), 10, 64); err == nil && time.Until(time.Unix(reset, 0)) > delay {
++				delay = time.Until(time.Unix(reset, 0))
++			}
++		}
++		registrationRequests.deferFor(delay)
++		return nil, fmt.Errorf("GitHub rate limited Actions request (HTTP %d); authentication deferred for %s", resp.StatusCode, delay.Round(time.Second))
++	}
+ 	switch resp.StatusCode {
+ 	case 404:
+ 		return nil, runnerErrors.NewNotFoundError("resource %s not found: %q", req.URL.String(), string(body))
+diff --git a/util/github/scalesets/scalesets.go b/util/github/scalesets/scalesets.go
+index c5da66e..8961299 100644
+--- a/util/github/scalesets/scalesets.go
++++ b/util/github/scalesets/scalesets.go
+@@ -20,7 +20,6 @@ import (
+ 	"encoding/json"
+ 	"fmt"
+ 	"net/http"
+-	"net/http/httputil"
+ 
+ 	runnerErrors "github.com/cloudbase/garm-provider-common/errors"
+ 	"github.com/cloudbase/garm/params"
+@@ -109,10 +108,6 @@ func (s *ScaleSetClient) ListRunnerScaleSets(ctx context.Context) (_ *params.Run
+ 	if err != nil {
+ 		return nil, err
+ 	}
+-	data, err := httputil.DumpRequest(req, false)
+-	if err == nil {
+-		fmt.Println(string(data))
+-	}
+ 	resp, err := s.Do(req)
+ 	if err != nil {
+ 		return nil, fmt.Errorf("failed to list runner scale sets: %w", err)
+diff --git a/util/github/scalesets/token.go b/util/github/scalesets/token.go
+index 87c1348..0dad620 100644
+--- a/util/github/scalesets/token.go
++++ b/util/github/scalesets/token.go
+@@ -18,12 +18,15 @@ import (
+ 	"bytes"
+ 	"context"
+ 	"encoding/json"
++	"errors"
+ 	"fmt"
++	runnerErrors "github.com/cloudbase/garm-provider-common/errors"
+ 	"io"
+ 	"net/http"
+ 	"time"
+ 
+ 	"github.com/cloudbase/garm/params"
++	"github.com/google/go-github/v84/github"
+ )
+ 
+ func (s *ScaleSetClient) getActionServiceInfo(ctx context.Context) (_ params.ActionsServiceAdminInfoResponse, err error) {
+@@ -85,6 +88,16 @@ func (s *ScaleSetClient) getActionServiceInfo(ctx context.Context) (_ params.Act
+ func (s *ScaleSetClient) ensureAdminInfo(ctx context.Context) error {
+ 	s.mux.Lock()
+ 	defer s.mux.Unlock()
++	state, err := sharedRepositoryAuth(s.ghCli)
++	if err != nil {
++		return err
++	}
++	state.Lock()
++	defer state.Unlock()
++	s.runnerRegistrationToken, s.actionsServiceInfo = state.registration, state.actions
++	defer func() {
++		state.registration, state.actions = s.runnerRegistrationToken, s.actionsServiceInfo
++	}()
+ 
+ 	var expiresAt time.Time
+ 	if s.runnerRegistrationToken != nil {
+@@ -95,14 +108,31 @@ func (s *ScaleSetClient) ensureAdminInfo(ctx context.Context) error {
+ 	if now.After(expiresAt) || s.runnerRegistrationToken == nil {
+ 		token, _, err := s.ghCli.CreateEntityRegistrationToken(ctx)
+ 		if err != nil {
++			var primary *github.RateLimitError
++			var secondary *github.AbuseRateLimitError
++			if errors.As(err, &primary) {
++				registrationRequests.deferFor(time.Until(primary.Rate.Reset.Time))
++			} else if errors.As(err, &secondary) {
++				delay := time.Minute
++				if secondary.RetryAfter != nil && *secondary.RetryAfter > 0 {
++					delay = *secondary.RetryAfter
++				}
++				registrationRequests.deferFor(delay)
++			}
+ 			return fmt.Errorf("failed to fetch runner registration token: %w", err)
+ 		}
+ 		s.runnerRegistrationToken = token
+ 	}
+ 
+ 	if s.actionsServiceInfo == nil || s.actionsServiceInfo.ExpiresIn(2*time.Minute) {
++		if err := registrationRequests.wait(ctx); err != nil {
++			return err
++		}
+ 		info, err := s.getActionServiceInfo(ctx)
+ 		if err != nil {
++			if errors.Is(err, runnerErrors.ErrUnauthorized) {
++				s.runnerRegistrationToken = nil
++			}
+ 			return fmt.Errorf("failed to get action service info: %w", err)
+ 		}
+ 		s.actionsServiceInfo = &info
+diff --git a/workers/entity/auth_client_test.go b/workers/entity/auth_client_test.go
+new file mode 100644
+index 0000000..4b4abe7
+--- /dev/null
++++ b/workers/entity/auth_client_test.go
+@@ -0,0 +1,37 @@
++package entity
++
++import (
++	"github.com/cloudbase/garm/runner/common"
++	"testing"
++)
++
++type fixtureGithubClient struct{ common.GithubClient }
++
++func TestWorkerReusesActionsClientAndUpdatesCredentials(t *testing.T) {
++	first := &fixtureGithubClient{}
++	w := &Worker{ghCli: first}
++	a, err := w.getScaleSetClient()
++	if err != nil {
++		t.Fatal(err)
++	}
++	b, err := w.getScaleSetClient()
++	if err != nil {
++		t.Fatal(err)
++	}
++	if a != b {
++		t.Fatal("worker discarded its Actions token cache")
++	}
++	second := &fixtureGithubClient{}
++	w.ghCli = second
++	c, err := w.getScaleSetClient()
++	if err != nil {
++		t.Fatal(err)
++	}
++	if c != a {
++		t.Fatal("worker replaced cache instead of updating credentials")
++	}
++	client, err := c.GetGithubClient()
++	if err != nil || client != second {
++		t.Fatal("updated credential client not used")
++	}
++}
+diff --git a/workers/entity/worker.go b/workers/entity/worker.go
+index 856ca1c..bf46f7c 100644
+--- a/workers/entity/worker.go
++++ b/workers/entity/worker.go
+@@ -54,9 +54,10 @@ type Worker struct {
+ 	ctx        context.Context
+ 	consumerID string
+ 
+-	consumer dbCommon.Consumer
+-	store    dbCommon.Store
+-	ghCli    common.GithubClient
++	consumer       dbCommon.Consumer
++	store          dbCommon.Store
++	ghCli          common.GithubClient
++	scaleSetClient *scalesets.ScaleSetClient
+ 
+ 	Entity             params.ForgeEntity
+ 	providers          map[string]common.Provider
+@@ -172,8 +173,23 @@ func (w *Worker) IsRunning() bool {
+ // they should be responsible for. The workers will then cross check the current state
+ // from github with their local state and reconcile any differences. This cleans up
+ // any runners that have been removed out of band in either the provider or github.
++func (w *Worker) getScaleSetClient() (*scalesets.ScaleSetClient, error) {
++	w.mux.Lock()
++	defer w.mux.Unlock()
++	if w.scaleSetClient != nil {
++		w.scaleSetClient.SetGithubClient(w.ghCli)
++		return w.scaleSetClient, nil
++	}
++	cli, err := scalesets.NewClient(w.ghCli)
++	if err != nil {
++		return nil, err
++	}
++	w.scaleSetClient = cli
++	return cli, nil
++}
++
+ func (w *Worker) consolidateRunnerState() error {
+-	scaleSetCli, err := scalesets.NewClient(w.ghCli)
++	scaleSetCli, err := w.getScaleSetClient()
+ 	if err != nil {
+ 		return fmt.Errorf("creating scaleset client: %w", err)
+ 	}
+diff --git a/workers/scaleset/auth_client_test.go b/workers/scaleset/auth_client_test.go
+new file mode 100644
+index 0000000..bcb3870
+--- /dev/null
++++ b/workers/scaleset/auth_client_test.go
+@@ -0,0 +1,42 @@
++package scaleset
++
++import (
++	"github.com/cloudbase/garm/cache"
++	"github.com/cloudbase/garm/params"
++	"github.com/cloudbase/garm/runner/common"
++	"testing"
++)
++
++type fixtureGithubClient struct{ common.GithubClient }
++
++func TestWorkerReusesActionsClientAndUpdatesCredentials(t *testing.T) {
++	id := "fixture-auth-client-reuse"
++	first := &fixtureGithubClient{}
++	cache.SetGithubClient(id, first)
++	defer cache.DeleteGithubClient(id)
++	w := &Worker{scaleSet: params.ScaleSet{RepoID: id}}
++	a, err := w.GetScaleSetClient()
++	if err != nil {
++		t.Fatal(err)
++	}
++	b, err := w.GetScaleSetClient()
++	if err != nil {
++		t.Fatal(err)
++	}
++	if a != b {
++		t.Fatal("worker discarded its Actions token cache")
++	}
++	second := &fixtureGithubClient{}
++	cache.SetGithubClient(id, second)
++	c, err := w.GetScaleSetClient()
++	if err != nil {
++		t.Fatal(err)
++	}
++	if c != a {
++		t.Fatal("worker replaced cache instead of updating credentials")
++	}
++	client, err := c.GetGithubClient()
++	if err != nil || client != second {
++		t.Fatal("updated credential client not used")
++	}
++}
+diff --git a/workers/scaleset/scaleset.go b/workers/scaleset/scaleset.go
+index abc2426..fb3845a 100644
+--- a/workers/scaleset/scaleset.go
++++ b/workers/scaleset/scaleset.go
+@@ -32,6 +32,7 @@ import (
+ 	"github.com/cloudbase/garm/params"
+ 	"github.com/cloudbase/garm/runner/common"
+ 	garmUtil "github.com/cloudbase/garm/util"
++	"github.com/cloudbase/garm/util/github/scalesets"
+ )
+ 
+ func NewWorker(ctx context.Context, store dbCommon.Store, scaleSet params.ScaleSet, provider common.Provider) (*Worker, error) {
+@@ -65,6 +66,8 @@ func NewWorker(ctx context.Context, store dbCommon.Store, scaleSet params.ScaleS
+ }
+ 
+ type Worker struct {
++	clientMu       sync.Mutex
++	scaleSetClient *scalesets.ScaleSetClient
+ 	ctx            context.Context
+ 	consumerID     string
+ 	controllerInfo params.ControllerInfo
+diff --git a/workers/scaleset/scaleset_helper.go b/workers/scaleset/scaleset_helper.go
+index e0871d1..9c5ddc7 100644
+--- a/workers/scaleset/scaleset_helper.go
++++ b/workers/scaleset/scaleset_helper.go
+@@ -37,11 +37,20 @@ func (w *Worker) GetScaleSetClient() (*scalesets.ScaleSetClient, error) {
+ 	if !ok {
+ 		return nil, fmt.Errorf("getting github client: %w", err)
+ 	}
++	// Reuse the Actions JWT and registration token across polling, listener
++	// startup and runner operations. Credential updates invalidate that cache.
++	w.clientMu.Lock()
++	defer w.clientMu.Unlock()
++	if w.scaleSetClient != nil {
++		w.scaleSetClient.SetGithubClient(ghCli)
++		return w.scaleSetClient, nil
++	}
+ 	scaleSetClient, err := scalesets.NewClient(ghCli)
+ 	if err != nil {
+ 		return nil, fmt.Errorf("creating scale set client: %w", err)
+ 	}
+ 
++	w.scaleSetClient = scaleSetClient
+ 	return scaleSetClient, nil
+ }
+ 

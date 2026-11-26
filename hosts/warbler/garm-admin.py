@@ -35,11 +35,12 @@ def b64url(data):
     return base64.urlsafe_b64encode(data).rstrip(b"=").decode()
 
 
-def github(method, path, token, scheme="token"):
+def github(method, path, token, scheme="Bearer"):
     req = Request(GITHUB_API + path, method=method, headers={
         "Accept": "application/vnd.github+json",
         "Authorization": f"{scheme} {token}",
         "X-GitHub-Api-Version": "2022-11-28",
+        "User-Agent": "warbler-garm-repo-sync",
     })
     with urlopen(req, timeout=30) as response:
         return json.loads(response.read())
@@ -105,6 +106,10 @@ def sync_repos(token):
             failed += 1
             detail = error.read().decode(errors="replace")[:300]
             print(f"failed {owner}/{name}: HTTP {error.code} {detail}", file=sys.stderr, flush=True)
+            if error.code in (401, 403, 429) or error.code >= 500:
+                print("Stopping repository sync after an authentication or service error; "
+                      "the next run resumes completed registrations.", file=sys.stderr, flush=True)
+                break
     for k, repo in sorted(garm_repos.items()):
         if repo.get("credentials_name") == credentials and k not in wanted_keys:
             print(f"warning: {repo['owner']}/{repo['name']} is registered but no longer "

@@ -218,7 +218,10 @@ in
     environment = config.programs.caTrust.environment;
     serviceConfig = {
       Type = "oneshot";
+      # The controller starts listeners gradually before opening its admin API.
+      ExecStartPre = "${pkgs.curl}/bin/curl --silent --show-error --output /dev/null --retry 180 --retry-delay 5 --retry-connrefused --connect-timeout 3 --max-time 5 http://127.0.0.1:9997/api/v1/controller";
       ExecStart = "${admin} sync-repos";
+      TimeoutStartSec = "30min";
       UMask = "0077";
     };
   };

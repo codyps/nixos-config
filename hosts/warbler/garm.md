@@ -1,6 +1,17 @@
 # GitHub Actions runners
 
-Warbler runs GARM 0.2.1 with the Incus provider 0.1.5. Each runner is a
+Warbler runs GARM 0.2.1 with the Incus provider 0.1.5. The controller is built
+from pinned upstream source with the local `nixpkgs/garm-auth.patch`: App
+installation tokens and a request limiter are shared between repositories, and
+each scale-set worker reuses its Actions client across polling and runner work.
+Repository reconciliation also retains its client between five-minute checks.
+All clients for a repository and credential share registration and Actions tokens;
+credential rotation selects a new cache. Request queues preserve waiter order.
+App REST traffic is limited to five secondary-limit points per second, registration
+exchanges are spaced by at least 750 ms (up to 400 secondary-limit points/minute,
+700 combined with App traffic), and rate-limit responses defer requests
+according to `Retry-After` or the primary rate-limit reset. The patch also removes
+an upstream debug dump of authenticated requests. Each runner is a
 disposable KVM VM. GitHub scale sets allow zero idle VMs without a public webhook.
 The Incus `garm` project is configured for three runner VMs in total, with each
 repository scale set allowed to use all three slots. Each VM has 4 vCPUs,
@@ -49,6 +60,10 @@ It never deletes; repositories no longer granted to the App are logged as
 warnings for manual removal. Run it on demand with `sudo sys garm sync-repos` and
 inspect it with `journalctl -u garm-repo-sync`. Existing scale sets are not
 modified, so changing `syncScaleSet` affects only newly created ones.
+Authentication, throttling, and server errors stop a sync rather than repeating
+the same failure for every remaining repository. Completed registrations are
+reused by the next run. A large installation takes several minutes to initialize
+all listeners after a controller restart; this pacing prevents a GitHub API burst.
 
 The original manual registrations:
 

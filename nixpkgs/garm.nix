@@ -1,4 +1,4 @@
-{ lib, stdenvNoCC, fetchurl }:
+{ lib, stdenvNoCC, fetchurl, buildGoModule, fetchFromGitHub }:
 let
   # Upstream publishes static binaries, including the embedded web UI.
   release = { name, version, repo, hash }: stdenvNoCC.mkDerivation {
@@ -24,11 +24,31 @@ let
   };
 in
 {
-  garm = release {
-    name = "garm";
+  garm = buildGoModule {
+    pname = "garm";
     version = "0.2.1";
-    repo = "garm";
-    hash = "sha256-ERdqy4pyX5FLm5R4kbSDfTdPthYZVWLMCtRae+i2x0Y=";
+    src = fetchFromGitHub {
+      owner = "cloudbase";
+      repo = "garm";
+      rev = "154638445c3949c1958b01812f69d9a1e4d82684";
+      hash = "sha256-Eqa0gnPm/puaxVqODJ+nwphYgt0crN6D/OmRijzmZ/M=";
+    };
+    vendorHash = null;
+    patches = [ ./garm-auth.patch ];
+    subPackages = [ "cmd/garm" ];
+    tags = [ "osusergo" "netgo" "sqlite_omit_load_extension" ];
+    ldflags = [ "-s" "-w" "-X github.com/cloudbase/garm/util/appdefaults.Version=0.2.1" ];
+    checkPhase = ''
+      runHook preCheck
+      go test ./params ./util/github/scalesets
+      go test ./workers/entity ./workers/scaleset -run TestWorkerReusesActionsClientAndUpdatesCredentials
+      runHook postCheck
+    '';
+    meta = {
+      license = lib.licenses.asl20;
+      platforms = [ "x86_64-linux" ];
+      mainProgram = "garm";
+    };
   };
   cli = release {
     name = "garm-cli";

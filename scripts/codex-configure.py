@@ -35,8 +35,8 @@ def configure(path, cache_home, *, if_missing=False):
     while legacy_root in roots:
         roots.remove(legacy_root)
     document["sandbox_mode"] = "workspace-write"
-    document.setdefault("approval_policy", "on-request")
-    document.setdefault("approvals_reviewer", "auto_review")
+    document["approval_policy"] = "on-request"
+    document["approvals_reviewer"] = "auto_review"
     sandbox["network_access"] = True
     for cache in CACHES:
         root = str(cache_home / cache)

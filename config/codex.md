@@ -40,10 +40,10 @@ selects a different file. `--if-missing` performs the seed-only
 operation.
 
 It sets top-level `sandbox_mode = "workspace-write"` and
-`sandbox_workspace_write.network_access = true`. It defaults to “Approve for me”
-by adding `approval_policy = "on-request"` and
-`approvals_reviewer = "auto_review"` only when each key is absent; explicit
-approval policies and reviewers are preserved. It appends missing cache
+`sandbox_workspace_write.network_access = true`. Whenever the configurator
+seeds or updates a file, it sets “Approve for me” with
+`approval_policy = "on-request"` and `approvals_reviewer = "auto_review"`.
+The command also appends missing cache
 paths to `sandbox_workspace_write.writable_roots`, retaining existing entries,
 unrelated settings, and TOML comments. Repeating the command adds no duplicates.
 Malformed configs and symlinks are rejected rather than replaced. Avoid running

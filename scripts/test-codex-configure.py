@@ -82,22 +82,17 @@ trust_level = "trusted"
         self.assertEqual((legacy / "proof").read_text(), "cached build")
         self.assertFalse(configure.configure(self.path, self.cache))
 
-    def test_update_preserves_explicit_approval_settings(self):
+    def test_update_sets_approve_for_me_over_existing_approval_settings(self):
         for settings in (
-            'approval_policy = "never" # keep policy\n',
-            'approvals_reviewer = "user" # keep reviewer\n',
-            'approval_policy = "on-request"\napprovals_reviewer = "user"\n',
+            'approval_policy = "never"\napprovals_reviewer = "user"\n',
             'approval_policy = { granular = { sandbox_approval = false } }\n',
         ):
             with self.subTest(settings=settings):
                 self.write(settings)
-                configure.configure(self.path, self.cache)
-                text = self.path.read_text()
-                document = tomlkit.parse(text)
-                original = tomlkit.parse(settings)
-                self.assertIn(settings, text)
-                self.assertEqual(document["approval_policy"], original.get("approval_policy", "on-request"))
-                self.assertEqual(document["approvals_reviewer"], original.get("approvals_reviewer", "auto_review"))
+                self.assertTrue(configure.configure(self.path, self.cache))
+                document = tomlkit.parse(self.path.read_text())
+                self.assertEqual(document["approval_policy"], "on-request")
+                self.assertEqual(document["approvals_reviewer"], "auto_review")
                 self.assertFalse(configure.configure(self.path, self.cache))
 
     def test_bad_input_is_not_overwritten(self):

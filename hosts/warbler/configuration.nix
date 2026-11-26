@@ -50,6 +50,8 @@ in
       efi.canTouchEfiVariables = true;
     };
     boot.lanzaboote = {
+      # Leave room for the booted image within the TPM's PCR alternative limit.
+      configurationLimit = 3;
       pkiBundle = "/persist/var/lib/sbctl";
       measuredBoot = {
         pcrlockDirectory = "/persist/var/lib/pcrlock.d";

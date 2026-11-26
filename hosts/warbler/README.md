@@ -645,7 +645,8 @@ separately sealed SSH/Wi-Fi credentials to remain decryptable. Do not clear the
 TPM or remove the passphrase slot as a test.
 
 Lanzaboote maintains the managed PCR 0, 4, and 7 policy on subsequent bootloader
-updates; four boot generations are retained. If using an older installation
+updates; three boot generations are retained to keep image approvals within
+the TPM's per-PCR alternative limit. If using an older installation
 with `boot.secureUnlock.tpmUnlock.enable = false`, enable it, rebuild, and boot that
 configuration before enrollment. The helper never rebuilds, changes firmware,
 or reboots the machine itself.

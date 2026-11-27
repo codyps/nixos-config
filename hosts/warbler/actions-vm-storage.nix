@@ -1,29 +1,18 @@
-{ pkgs, utils, ... }:
+{ ... }:
 let
-  deviceUnit = "${utils.escapeSystemdPath "/dev/disk/by-label/warbler-actions"}.device";
   sata = "/var/lib/warbler-sata";
 in
 {
-  # Keep the existing LUKS label, mapper name, and key location.
-  systemd.services.actions-vm-storage = {
-    description = "Unlock Warbler SATA storage";
-    requires = [ deviceUnit ];
-    after = [ deviceUnit ];
-    unitConfig.RequiresMountsFor = [ "/persist/var/lib/actions-vm-storage" ];
-    script = ''
-      ${pkgs.cryptsetup}/bin/cryptsetup status warbler-actions >/dev/null 2>&1 || \
-        ${pkgs.cryptsetup}/bin/cryptsetup open --key-file /persist/var/lib/actions-vm-storage/key /dev/disk/by-label/warbler-actions warbler-actions
+  environment.etc.crypttab = {
+    mode = "0600";
+    text = ''
+      warbler-actions /dev/disk/by-label/warbler-actions /persist/var/lib/actions-vm-storage/key luks,noauto,nofail,headless=yes
     '';
-    serviceConfig = {
-      Type = "oneshot";
-      RemainAfterExit = true;
-      ExecStop = "${pkgs.cryptsetup}/bin/cryptsetup close warbler-actions";
-    };
   };
   fileSystems.${sata} = {
     device = "/dev/mapper/warbler-actions";
     fsType = "btrfs";
-    options = [ "compress=zstd" "noatime" "nodev" "nosuid" "nofail" "x-systemd.requires=actions-vm-storage.service" ];
+    options = [ "compress=zstd" "noatime" "nodev" "nosuid" "nofail" ];
   };
   # Keep build, media, and published Windows image paths valid.
   fileSystems."/var/lib/actions-vm" = {

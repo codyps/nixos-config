@@ -33,8 +33,10 @@ The mounts use `nofail` so the host can boot without the SATA disk. The Actions
 scalers and `warbler-ai` require their SATA storage before starting, so they
 cannot write into fallback directories on the system SSD.
 
-`actions-vm-storage.service` unlocks the volume after `/persist` is mounted,
-using the root-only `/persist/var/lib/actions-vm-storage/key`. The key was generated
+The SATA mount pulls in the unlock service generated from the host's
+`/etc/crypttab`. After `/persist` is mounted, the service unlocks the volume
+with the root-only `/persist/var/lib/actions-vm-storage/key` and fails without
+prompting if the key is missing or invalid. The key was generated
 on Warbler and is never part of the repository, Nix store, or initrd. Losing that
 key loses access to the runner volume; preserve it in trusted encrypted recovery
 storage when backing up the host. The volume does not participate in early boot
@@ -42,7 +44,7 @@ unlock, signing, or measurements. The OS installation's disko configuration stil
 targets only the NVMe. Preserve the SATA SSD during reinstalls.
 
 ```sh
-systemctl status actions-vm-storage
+systemctl status 'systemd-cryptsetup@warbler\x2dactions.service'
 findmnt -M /var/lib/warbler-sata
 findmnt -T /var/lib/actions-vm
 findmnt -T /var/lib/actions-vm-images

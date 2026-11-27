@@ -164,10 +164,11 @@ usbip detach -p PORT
 
 The guest can write the shared controller's attach and detach controls. Host
 udev exposes the resulting virtual USB device nodes under the guest's
-`/dev/bus/usb`. Warbler's USBGuard policy still applies to kernel imports. If
-it blocks a device, check `sudo usbguard list-devices` on Warbler and authorize
-the specific device there. Direct userspace USB/IP clients can continue to
-connect to their remote servers.
+`/dev/bus/usb`. USBGuard automatically allows imports under the kernel's
+`vhci_hcd` controller. The physical USB ports still use Warbler's existing
+allowlist. Choose a USB/IP server you trust, since Warbler's kernel handles
+its imported devices. Direct userspace USB/IP clients can connect to their
+remote servers as before.
 
 A camera's connection mode is a camera setting, not a kernel module. For
 example, a Fujifilm X-T4 exposes PTP in `USB TETHER SHOOTING AUTO` or

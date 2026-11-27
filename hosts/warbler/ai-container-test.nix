@@ -3,8 +3,10 @@ let hardwareIdentities = (import ../../lib/hardware-identities.nix ../../config/
 pkgs.testers.runNixOSTest {
   name = "warbler-ai-container";
   nodes = {
-    host = { lib, ... }: {
-      imports = [ ../../modules/hardware-identities.nix ./ai-container.nix ];
+    host = { config, lib, ... }: {
+      imports = [ ../../modules/hardware-identities.nix ./ai-container.nix ./usbguard.nix ];
+      services.usbguard.rules = config.services.hardwareIdentities.templates."usbguard.rules".text;
+      boot.kernelModules = [ "dummy_hcd" "g_zero" ];
       # Model the separate host filesystem without a production device or key.
       virtualisation.fileSystems."/var/lib/warbler-sata" = {
         device = "tmpfs";
@@ -94,6 +96,8 @@ pkgs.testers.runNixOSTest {
         'case "$(readlink -f "$dev")" in */dummy_hcd.*/usb*/[0-9]*-[0-9]*) basename "$dev"; break;; esac; '
         'done'
     )
+    host.wait_for_unit("usbguard.service")
+    host.wait_until_succeeds("usbguard list-devices | grep -E '^[0-9]+: block .*name \"Gadget Zero\"'")
     client.wait_until_succeeds("test -n \"$(" + gadget + ")\"")
     busid = client.succeed(gadget).strip()
     client.succeed("usbip bind -b " + shlex.quote(busid))
@@ -102,6 +106,8 @@ pkgs.testers.runNixOSTest {
     ip = client.succeed("ip -4 -o addr show dev eth1 | awk '{split($4, parts, \"/\"); print parts[1]; exit}'").strip()
     assert ip
     client.succeed(ssh + shlex.quote("usbip attach -r " + shlex.quote(ip) + " -b " + shlex.quote(busid)))
+    host.wait_until_succeeds("usbguard list-devices | grep -E '^[0-9]+: allow .*name \"Gadget Zero\".*with-connect-type \"usbip-vhci\"'")
+    host.succeed("usbguard list-devices | grep -E '^[0-9]+: block .*name \"Gadget Zero\"'")
     client.wait_until_succeeds(ssh + shlex.quote('set -e; node=$(' + usb_nodes + '); test -n "$node"; exec 3<>"$node"'))
     client.succeed(ssh + shlex.quote("usbip port | grep -F " + shlex.quote(busid)))
     client.succeed(ssh + "usbip detach -p 0")

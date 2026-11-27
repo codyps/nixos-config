@@ -18,7 +18,10 @@ without moving data.
 `build/` holds installer workspaces and `images/` holds published images.
 `images/macos/` and `state/` are also bind-mounted at
 `/var/lib/actions-vm-images` and `/var/lib/actions-vm-scaler-windows`,
-respectively. macOS runtime state remains at `/var/lib/actions-vm-scaler`.
+respectively. The shared scaler service manages those existing Windows state
+files alongside macOS state at `/var/lib/actions-vm-scaler` and Linux state
+at `/var/lib/actions-vm-scaler-linux`. The NixOS Linux base image is in the Nix
+store.
 
 ### AI container storage
 
@@ -30,7 +33,7 @@ container's home and `/tmp` still use the system SSD.
 ### Unlock and recovery
 
 The mounts use `nofail` so the host can boot without the SATA disk. The Actions
-scalers and `warbler-ai` require their SATA storage before starting, so they
+VM scaler and `warbler-ai` require their SATA storage before starting, so they
 cannot write into fallback directories on the system SSD.
 
 The SATA mount pulls in the unlock service generated from the host's

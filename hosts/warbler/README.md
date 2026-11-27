@@ -38,17 +38,23 @@ SOPS configuration, API access on port 3000, and service operations.
 See [GARM runners](garm.md) for disposable Incus VMs, GitHub App setup,
 scale-to-zero configuration, isolation, and `sudo sys garm` administration.
 
+One `actions-vm-scaler.service` discovers repositories granted to the existing
+GitHub App and serves three QEMU scale sets. Each scale set has one VM slot
+shared across its repositories and an isolated network.
+
+| `runs-on` | Guest | Network |
+| --- | --- | --- |
+| `warbler-macos-intel` | Intel macOS Sequoia 15.8.1 with CLT 16.4 | `10.78.0.0/24` |
+| `warbler-windows` | Windows 11 Pro | `10.80.0.0/24` |
+| `warbler-linux-vm` | NixOS x86_64 with Docker | `10.81.0.0/24` |
+
+GARM continues serving `runs-on: warbler-linux` through Incus. Inspect
+`systemctl status actions-vm-scaler` and `journalctl -u actions-vm-scaler`
+for all three QEMU scale sets.
+
 For macOS image preparation, see the [QEMU image builder](../../scripts/actions-vm-image/README.md).
-Warbler enables `sys actions-vm-image` and the macOS autoscaler with one shared VM
-slot. It uses `/var/lib/actions-vm-images/sequoia-clt-fda-v3` (Sequoia 15.8.1,
-CLT 16.4) and discovers repositories granted to the existing GARM GitHub App.
-Use `runs-on: warbler-macos-intel` for CLI macOS jobs; full Xcode is not installed.
-Inspect `systemctl status actions-vm-scaler` and
-`journalctl -u actions-vm-scaler` for controller status. GARM continues serving
-its separate Linux scale sets.
-Windows jobs use `runs-on: warbler-windows`, with one independently capped VM
-slot and the same App repository discovery. Its controller is
-`actions-vm-scaler-windows.service`; its isolated network is `10.80.0.0/24`.
+Warbler enables `sys actions-vm-image` and uses
+`/var/lib/actions-vm-images/sequoia-clt-fda-v3` for CLI macOS jobs.
 The [Windows image tool](../../scripts/actions-windows-image/README.md) prepares
 Windows 11 Pro from the local installation ISO. The v2 image adds WinGet,
 Chocolatey, common CLI tools, CMake/Ninja/LLVM, Node, Python/uv, Rust, and .NET

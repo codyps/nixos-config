@@ -50,6 +50,20 @@ let
       settings = { scale_set = "test-windows"; app_id = "123"; installation_id = 456; vm.guest_os = "windows"; };
     };
   });
+  grouped = evaluate (lib.recursiveUpdate enabled {
+    services.actions-vm-scaler.scaleSets.windows = {
+      networkOctet = 80;
+      macSlotOffset = 32;
+      imageConfigFile = "/images/windows/vm.json";
+      settings = { scale_set = "test-windows"; vm.guest_os = "windows"; };
+    };
+    services.actions-vm-scaler.scaleSets.linux = {
+      networkOctet = 81;
+      macSlotOffset = 64;
+      imageConfigFile = "/images/linux/vm.json";
+      settings.scale_set = "test-linux";
+    };
+  });
   overlap = evaluate (lib.recursiveUpdate enabled {
     networking.interfaces.ai-ssh.ipv4.addresses = [{ address = "10.78.0.2"; prefixLength = 24; }];
   });
@@ -57,6 +71,7 @@ let
     networking.interfaces.test.ipv4.addresses = [{ address = "10.78.9.1"; prefixLength = 16; }];
   });
   unit = on.systemd.services.actions-vm-scaler.serviceConfig;
+  groupedUnit = grouped.systemd.services.actions-vm-scaler;
 in
 assert builtins.all (x: x.assertion) on.assertions;
 assert !(off.systemd.services ? actions-vm-scaler);
@@ -68,6 +83,15 @@ assert unit.ProtectSystem == "strict";
 assert unit.StateDirectoryMode == "0700";
 assert !(on.networking.firewall.filterForward);
 assert builtins.all (x: x.assertion) multi.assertions;
+assert builtins.all (x: x.assertion) grouped.assertions;
+assert !(grouped.systemd.services ? actions-vm-scaler-windows || grouped.systemd.services ? actions-vm-scaler-linux);
+assert !(grouped.users.users ? actions-vm-scaler-windows || grouped.users.users ? actions-vm-scaler-linux);
+assert groupedUnit.serviceConfig.StateDirectory == [ "actions-vm-scaler" "actions-vm-scaler-linux" "actions-vm-scaler-windows" ];
+assert groupedUnit.serviceConfig.LoadCredential == [ "github-app-key:/run/secrets/app-key" ];
+assert lib.hasInfix "/run/actions-vm-scaler/config.json" groupedUnit.serviceConfig.ExecStart;
+assert builtins.elem "actions-vm-scaler-windows-network.service" groupedUnit.requires;
+assert builtins.elem "actions-vm-scaler-linux-dhcp.service" groupedUnit.requires;
+assert lib.hasInfix "mode tap user actions-vm-scaler\n" (builtins.readFile grouped.systemd.services.actions-vm-scaler-windows-network.serviceConfig.ExecStart);
 assert builtins.any (x: !x.assertion && lib.hasInfix "overlaps" x.message) overlap.assertions;
 assert builtins.any (x: !x.assertion && lib.hasInfix "overlaps" x.message) broadOverlap.assertions;
 assert multi.systemd.services.actions-vm-scaler-windows.serviceConfig.User == "actions-vm-scaler-windows";

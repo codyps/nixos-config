@@ -9,8 +9,9 @@ The controller implements the wire protocol from
 [`actions/scaleset` at e6daac702355cdb5b880b4fbdcf6d85dcd9e48e5](https://github.com/actions/scaleset/tree/e6daac702355cdb5b880b4fbdcf6d85dcd9e48e5).
 It does not execute a Go sidecar. By default it discovers **every repository
 accessible to the configured GitHub App installation**, including personal-account
-repositories, and maintains a separate scale set for each. All repositories use
-the same workflow label and share one host-wide VM capacity limit. Discovery is
+repositories, and maintains each configured scale set in every discovered repository.
+Each scale set uses its own workflow label and shares a VM capacity limit across
+its repositories. Discovery is
 refreshed every 60 seconds (configurable with `discovery_interval_secs`).
 Archived/disabled repositories are excluded because they cannot execute jobs.
 Repository clients share an installation token and serialize its refresh; GitHub
@@ -23,14 +24,24 @@ New grants are picked up automatically. Removed grants stop that repository's
 listener and local VMs; other repositories keep running. A failed or partially
 paginated discovery scan retains the previous membership. Numeric repository IDs
 keep state stable across renames. Each repository has its own listener, retry loop,
-registration namespace and persistent state under `repositories/<id>/`.
+registration namespace and persistent state under `repositories/<id>/` in that
+scale set's state directory.
 
 The scope remains one App installation on github.com and one Linux host per
 process. GHES, multiple installations, multi-host placement and rolling image builds are not implemented. The companion
 [macOS image builder](../actions-vm-image/README.md) automates image preparation,
 installation, first-boot setup, provisioning, sealing, and publication.
-Supplying a nonempty `github_url` explicitly selects
-legacy single-repository/organization mode; **omit it for all granted repositories**.
+Supplying a nonempty `github_url` selects legacy single-repository/organization
+mode for a controller with one scale set. For installation-wide discovery, omit
+`github_url`.
+
+On NixOS, `services.actions-vm-scaler.scaleSets.NAME` adds a scale set to the
+default controller. It inherits the default GitHub App and discovery settings.
+Give each additional scale set its own workflow label, `imageConfigFile` or
+`settings.vm`, `networkOctet`, and `macSlotOffset` range. For a direct CLI
+configuration, `sys actions-vm-scaler check CONFIG` accepts either the original
+single JSON object or an array of scale-set objects. An array with multiple
+objects must use the same App credentials and discovery interval throughout.
 
 ## Windows scale sets
 
@@ -52,8 +63,9 @@ instance**; separate OS instances have independent capacity limits. Set
 `settings.vm.guest_os = "windows"` for Windows instances, including when loading
 image settings through `imageConfigFile`.
 
-Warbler uses one Windows slot (`warbler-windows`) and one macOS slot
-(`warbler-macos-intel`). Windows state is on its dedicated encrypted SSD.
+Warbler's default controller serves `warbler-macos-intel`, `warbler-windows`,
+and `warbler-linux-vm` with one VM slot each. Windows state is on the encrypted
+SATA SSD. GARM serves `warbler-linux` independently.
 
 ## Linux scale sets
 
@@ -76,12 +88,12 @@ The output contains `base.qcow2` and `vm.json`. Set the scaler instance's
 this flake with `self` in scope:
 
 ```nix
-services.actions-vm-scaler.instances.linux.imageConfigFile =
+services.actions-vm-scaler.scaleSets.linux.imageConfigFile =
   "${self.packages.x86_64-linux.actions-linux-image}/vm.json";
 ```
 
-Use the canary example below for the instance's GitHub App, label, and network
-settings. Omit its `settings.vm` block when using the bundled manifest.
+Set the scale set's workflow label and allocate its network and NIC slots. The
+bundled manifest supplies the `settings.vm` image settings.
 The runner reads its JIT configuration at boot. The image build takes no
 GitHub credentials.
 

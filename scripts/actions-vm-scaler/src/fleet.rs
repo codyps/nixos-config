@@ -45,6 +45,11 @@ impl Fleet {
     }
 
     pub async fn new(config: Config) -> Result<Self> {
+        let api = Api::new(config.clone())?;
+        Self::with_api(config, &api).await
+    }
+
+    pub async fn with_api(config: Config, api: &Api) -> Result<Self> {
         ensure!(
             config.github_url.is_empty(),
             "fleet mode requires installation discovery"
@@ -89,9 +94,8 @@ impl Fleet {
             let mut manager = Manager::with_pool(scoped, pool.clone())?;
             manager.discard_local().await?;
         }
-        let api = Api::new(config.clone())?;
         Ok(Self {
-            api,
+            api: api.scoped(config.clone()),
             config,
             pool,
             workers: BTreeMap::new(),
@@ -165,29 +169,43 @@ impl Fleet {
         Ok(())
     }
 
-    pub async fn run(&mut self) -> Result<()> {
+    pub async fn run_all(fleets: &mut [Self], discovery: &Api, interval: Duration) -> Result<()> {
         loop {
-            match self.api.repositories().await {
-                Ok(repositories) => self.reconcile(repositories).await?,
+            match discovery.repositories().await {
+                Ok(repositories) => {
+                    for fleet in &mut *fleets {
+                        fleet.reconcile(repositories.clone()).await?;
+                    }
+                }
                 // A partial/failed scan is not evidence of revoked access.
                 Err(error) => {
                     eprintln!("repository discovery failed; keeping existing listeners: {error:#}")
                 }
             }
-            tokio::time::sleep(Duration::from_secs(self.config.discovery_interval_secs)).await;
+            tokio::time::sleep(interval).await;
         }
     }
 
-    pub async fn shutdown(&mut self) {
-        for worker in self.workers.values_mut() {
+    pub async fn shutdown_all(fleets: &mut [Self]) {
+        for worker in fleets
+            .iter_mut()
+            .flat_map(|fleet| fleet.workers.values_mut())
+        {
             if let Some(stop) = worker.stop.take() {
                 let _ = stop.send(());
             }
         }
         // All workers clean up concurrently, bounded individually below.
-        for (_, worker) in std::mem::take(&mut self.workers) {
-            let _ = worker.task.await;
+        for fleet in fleets {
+            for (_, worker) in std::mem::take(&mut fleet.workers) {
+                let _ = worker.task.await;
+            }
         }
+    }
+
+    #[cfg(test)]
+    pub async fn shutdown(&mut self) {
+        Self::shutdown_all(std::slice::from_mut(self)).await;
     }
 }
 

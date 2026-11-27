@@ -31,7 +31,4 @@ in
     fsType = "none";
     options = [ "bind" "nofail" "x-systemd.requires-mounts-for=${sata}" ];
   };
-  systemd.tmpfiles.rules = [
-    "d /var/lib/actions-vm/state 0700 actions-vm-scaler-windows actions-vm-scaler-windows -"
-  ];
 }

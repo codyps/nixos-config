@@ -1,9 +1,74 @@
 use anyhow::{ensure, Context, Result};
 use serde::{Deserialize, Serialize};
 use std::{
+    collections::HashSet,
     fs,
     path::{Path, PathBuf},
 };
+
+pub fn read_scale_sets(path: &Path) -> Result<Vec<Config>> {
+    let bytes = fs::read(path)?;
+    let configs = if bytes
+        .iter()
+        .copied()
+        .find(|byte| !byte.is_ascii_whitespace())
+        == Some(b'[')
+    {
+        serde_json::from_slice(&bytes)?
+    } else {
+        vec![serde_json::from_slice(&bytes)?]
+    };
+    validate_scale_sets(&configs)?;
+    Ok(configs)
+}
+
+pub(crate) fn validate_scale_sets(configs: &[Config]) -> Result<()> {
+    let first = configs.first().context("provide at least one scale set")?;
+    let mut labels = HashSet::new();
+    let mut state_dirs = HashSet::new();
+    let mut taps = HashSet::new();
+    let mut mac_slots = HashSet::new();
+    let mut tpm_dirs = HashSet::new();
+    for config in configs {
+        config
+            .validate()
+            .with_context(|| format!("validating scale set {}", config.scale_set))?;
+        if configs.len() > 1 {
+            ensure!(
+                config.github_url.is_empty()
+                    && config.app_id == first.app_id
+                    && config.installation_id == first.installation_id
+                    && config.private_key_file == first.private_key_file
+                    && config.discovery_interval_secs == first.discovery_interval_secs,
+                "scale sets in one process must share GitHub App credentials and repository discovery settings"
+            );
+        }
+        ensure!(
+            labels.insert(config.scale_set.to_ascii_lowercase()),
+            "duplicate scale-set label"
+        );
+        ensure!(
+            state_dirs.insert(&config.state_dir),
+            "scale sets must have distinct state directories"
+        );
+        if let Some(tpm) = &config.vm.tpm {
+            ensure!(
+                tpm_dirs.insert(&tpm.socket_dir),
+                "scale sets must have distinct TPM socket directories"
+            );
+        }
+        ensure!(
+            config.vm.taps.iter().all(|tap| taps.insert(tap)),
+            "scale sets must have distinct TAP interfaces"
+        );
+        let offset = usize::from(config.vm.mac_slot_offset);
+        ensure!(
+            (offset..offset + config.vm.taps.len()).all(|slot| mac_slots.insert(slot)),
+            "scale sets must have disjoint synthetic NIC slots"
+        );
+    }
+    Ok(())
+}
 
 #[derive(Clone, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]

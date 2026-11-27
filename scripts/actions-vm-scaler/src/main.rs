@@ -1,11 +1,11 @@
 use actions_vm_scaler::{
     api::Api,
-    config::Config,
+    config::read_scale_sets,
     fleet::{serve, Fleet},
     vm::Manager,
 };
-use anyhow::{ensure, Result};
-use std::path::Path;
+use anyhow::{ensure, Context, Result};
+use std::{path::Path, time::Duration};
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -18,8 +18,12 @@ async fn main() -> Result<()> {
         args.len() == 3 && ["check", "run"].contains(&args[1].as_str()),
         "usage: actions-vm-scaler <check|run> CONFIG"
     );
-    let config = Config::read(Path::new(&args[2]))?;
-    config.check_files()?;
+    let configs = read_scale_sets(Path::new(&args[2]))?;
+    for config in &configs {
+        config
+            .check_files()
+            .with_context(|| format!("checking scale set {}", config.scale_set))?;
+    }
     if args[1] == "check" {
         println!("Configuration and input files validated (no network or VM changes)");
         return Ok(());
@@ -30,17 +34,23 @@ async fn main() -> Result<()> {
     unsafe {
         libc::umask(0o077);
     }
-    if config.github_url.is_empty() {
-        let mut fleet = Fleet::new(config).await?;
+    let first = configs[0].clone();
+    if first.github_url.is_empty() {
+        let discovery = Api::new(first.clone())?;
+        let mut fleets = Vec::with_capacity(configs.len());
+        for config in configs {
+            fleets.push(Fleet::with_api(config, &discovery).await?);
+        }
+        let interval = Duration::from_secs(first.discovery_interval_secs);
         let result = tokio::select! {
-            result = fleet.run() => result,
+            result = Fleet::run_all(&mut fleets, &discovery, interval) => result,
             _ = shutdown() => Ok(()),
         };
-        fleet.shutdown().await;
+        Fleet::shutdown_all(&mut fleets).await;
         result
     } else {
-        let api = Api::new(config.clone())?;
-        let manager = Manager::new(config)?;
+        let api = Api::new(first.clone())?;
+        let manager = Manager::new(first)?;
         let (stop, receiver) = tokio::sync::oneshot::channel();
         let worker = serve(manager, api, receiver);
         tokio::pin!(worker);

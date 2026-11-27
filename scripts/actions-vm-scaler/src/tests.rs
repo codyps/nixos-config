@@ -1,6 +1,6 @@
 use crate::{
     api::{Api, Message, SessionLost},
-    config::{Config, VmConfig},
+    config::{read_scale_sets, Config, GuestOs, VmConfig},
     controller,
     vm::{qemu_args, Manager},
 };
@@ -80,6 +80,36 @@ fn config(temp: &TempDir) -> Config {
         fs::set_permissions(file, fs::Permissions::from_mode(0o755)).unwrap();
     }
     c
+}
+
+#[test]
+fn reads_multiple_scale_sets_and_rejects_shared_vm_resources() {
+    let temp = TempDir::new().unwrap();
+    let mut macos = config(&temp);
+    let file = temp.path().join("config.json");
+    fs::write(&file, serde_json::to_vec(&macos).unwrap()).unwrap();
+    assert_eq!(read_scale_sets(&file).unwrap().len(), 1);
+
+    macos.github_url.clear();
+    let mut linux = macos.clone();
+    linux.scale_set = "linux-vm".into();
+    linux.state_dir = temp.path().join("linux-state");
+    linux.vm.guest_os = GuestOs::Linux;
+    linux.vm.opencore_disk = None;
+    linux.vm.taps = vec!["avl0".into()];
+    linux.vm.mac_slot_offset = 32;
+    fs::write(&file, serde_json::to_vec(&[&macos, &linux]).unwrap()).unwrap();
+    let configs = read_scale_sets(&file).unwrap();
+    assert_eq!(configs.len(), 2);
+    assert!(configs[1].vm.guest_os == GuestOs::Linux);
+
+    linux.vm.taps.clone_from(&macos.vm.taps);
+    fs::write(&file, serde_json::to_vec(&[&macos, &linux]).unwrap()).unwrap();
+    assert!(read_scale_sets(&file)
+        .err()
+        .unwrap()
+        .to_string()
+        .contains("distinct TAP interfaces"));
 }
 
 #[test]

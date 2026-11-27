@@ -147,6 +147,32 @@ support conventional scripts. `nix-ld` supports standard Linux dynamic loaders.
 This remains NixOS: software that requires apt, arbitrary FHS libraries, a
 desktop, GPU access, or privileged installation may need additional packaging.
 
+### USB/IP
+
+The container shares Warbler's kernel and cannot load modules itself, so Warbler
+loads `usbip-core`, `vhci-hcd`, and `usbip-host`. The guest has the matching
+`usbip` and `usbipd` tools. As `cody-ai`, list, attach, and detach kernel USB/IP
+devices using the remote server address or the local endpoint of a tunnel.
+The new device mounts take effect on the first container restart after deployment.
+
+```sh
+usbip list -r SERVER
+usbip attach -r SERVER -b BUSID
+usbip port
+usbip detach -p PORT
+```
+
+The guest can write the shared controller's attach and detach controls. Host
+udev exposes the resulting virtual USB device nodes under the guest's
+`/dev/bus/usb`. Warbler's USBGuard policy still applies to kernel imports. If
+it blocks a device, check `sudo usbguard list-devices` on Warbler and authorize
+the specific device there. Direct userspace USB/IP clients can continue to
+connect to their remote servers.
+
+A camera's connection mode is a camera setting, not a kernel module. For
+example, a Fujifilm X-T4 exposes PTP in `USB TETHER SHOOTING AUTO` or
+`USB TETHER SHOOTING FIXED`; `USB CARD READER` exposes mass storage instead.
+
 ### Shell environments and history
 
 `nix-shell`, `nix develop`, and flake commands are available to `cody-ai`.

@@ -44,8 +44,11 @@ pkgs.testers.runNixOSTest {
       # Keep the shell checks offline, including the compiler/setup dependencies.
       virtualisation.additionalPaths = [ (pkgs.mkShell { packages = [ pkgs.hello ]; }) ];
     };
-    client = { ... }: {
+    client = { config, ... }: {
       virtualisation.vlans = [ 1 2 ];
+      boot.kernelModules = [ "dummy_hcd" "g_zero" "usbip_host" ];
+      environment.systemPackages = [ config.boot.kernelPackages.usbip ];
+      systemd.services.usbipd.serviceConfig.ExecStart = "${config.boot.kernelPackages.usbip}/bin/usbipd";
       services.dnsmasq = {
         enable = true;
         settings = {
@@ -56,6 +59,7 @@ pkgs.testers.runNixOSTest {
         };
       };
       networking.firewall.allowedUDPPorts = [ 67 ];
+      networking.firewall.allowedTCPPorts = [ 3240 ];
     };
   };
   testScript = ''
@@ -66,6 +70,12 @@ pkgs.testers.runNixOSTest {
     client.wait_for_unit("dnsmasq.service")
     host.wait_for_unit("container@warbler-ai.service")
     inside = "nixos-container run warbler-ai -- "
+    # The guest shares the host kernel; both USB/IP halves must be loaded there
+    # and the matching userspace tools must be available inside the container.
+    host.wait_until_succeeds("grep -q '^usbip_core ' /proc/modules")
+    host.wait_until_succeeds("grep -q '^vhci_hcd ' /proc/modules")
+    host.wait_until_succeeds("grep -q '^usbip_host ' /proc/modules")
+    host.succeed(inside + "sh -ec " + shlex.quote("command -v usbip; command -v usbipd"))
     host.wait_until_succeeds(inside + "test -S /run/user/1001/bus")
     host.wait_until_succeeds(inside + "test -S /home/cody-ai/.codex/app-server-control/app-server-control.sock")
     host.wait_until_succeeds(inside + "ip -4 address show mv-eth1 | grep 192.168.1.100")
@@ -75,6 +85,27 @@ pkgs.testers.runNixOSTest {
     host.succeed(inside + "sh -c " + shlex.quote("echo " + shlex.quote(key) + " > /home/cody-ai/.ssh/authorized_keys; chown cody-ai:cody-ai /home/cody-ai/.ssh/authorized_keys"))
     ssh = "ssh -n -o StrictHostKeyChecking=accept-new -i /root/ai-key cody-ai@192.168.1.100 "
     client.wait_until_succeeds(ssh + "true")
+    # Import a simulated USB gadget through the shared kernel as the guest user.
+    usb_nodes = 'find /dev/bus/usb -type c'
+    assert not host.succeed(inside + usb_nodes).strip()
+    gadget = (
+        'for dev in /sys/bus/usb/devices/*; do '
+        'grep -qx DEVTYPE=usb_device "$dev/uevent" || continue; '
+        'case "$(readlink -f "$dev")" in */dummy_hcd.*/usb*/[0-9]*-[0-9]*) basename "$dev"; break;; esac; '
+        'done'
+    )
+    client.wait_until_succeeds("test -n \"$(" + gadget + ")\"")
+    busid = client.succeed(gadget).strip()
+    client.succeed("usbip bind -b " + shlex.quote(busid))
+    client.succeed("systemctl start usbipd.service")
+    client.wait_for_open_port(3240)
+    ip = client.succeed("ip -4 -o addr show dev eth1 | awk '{split($4, parts, \"/\"); print parts[1]; exit}'").strip()
+    assert ip
+    client.succeed(ssh + shlex.quote("usbip attach -r " + shlex.quote(ip) + " -b " + shlex.quote(busid)))
+    client.wait_until_succeeds(ssh + shlex.quote('set -e; node=$(' + usb_nodes + '); test -n "$node"; exec 3<>"$node"'))
+    client.succeed(ssh + shlex.quote("usbip port | grep -F " + shlex.quote(busid)))
+    client.succeed(ssh + "usbip detach -p 0")
+    host.wait_until_succeeds(inside + "sh -ec " + shlex.quote('test -z "$(' + usb_nodes + ')"'), timeout=15)
     # Plain Cargo must select the upstream shim in SSH and user services.
     mbx_check = "test $(command -v cargo) = /home/cody-ai/.local/share/mbx/bin/cargo; mbx doctor --json | jq -e '.checks[] | select(.name == \"setup\") | .severity == \"pass\"'"
     client.succeed(ssh + shlex.quote("set -e; " + mbx_check))

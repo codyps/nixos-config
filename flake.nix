@@ -466,6 +466,10 @@
                 home-manager.users.cody.imports = [
                   ./home-manager/home.nix
                 ];
+                home-manager.users.cody.programs.git.signing = {
+                  format = nixpkgs.lib.mkForce "ssh";
+                  key = nixpkgs.lib.mkForce "~/.ssh/id_ed25519";
+                };
               }
             ];
           };

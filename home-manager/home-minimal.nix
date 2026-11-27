@@ -276,7 +276,6 @@ in
     "${cache-home}/nix/current-home-flake".source = ../.;
     ".tmux.conf".source = ../config/.tmux.conf;
     ".config/kitty/kitty.conf".source = ../config/.config/kitty/kitty.conf;
-    ".ssh/config".source = ../config/.ssh/config;
   };
 
   xdg.configFile."nvim/raw".source = ./nvim;

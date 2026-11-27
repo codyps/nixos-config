@@ -192,6 +192,5 @@ in
   home.file = {
     "${cache-home}/nix/current-home-flake".source = ../.;
     ".tmux.conf".source = ../config/.tmux.conf;
-    ".ssh/config".source = ../config/.ssh/config;
   };
 }

@@ -88,6 +88,7 @@ in
     };
     users.users.cody = {
       isNormalUser = true;
+      linger = true;
       extraGroups = [ "wheel" ];
       openssh.authorizedKeys.keys = authorizedKeys;
     };
